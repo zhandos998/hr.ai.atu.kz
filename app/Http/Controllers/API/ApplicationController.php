@@ -3,10 +3,17 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+
 use App\Models\Application;
 use App\Models\ApplicationStatus;
 use App\Models\Resume;
+use App\Models\Vacancy;
+
+use App\Models\ApplicationDocument;
 
 class ApplicationController extends Controller
 {
