@@ -22,4 +22,14 @@ class Application extends Model
     {
         return $this->belongsTo(Vacancy::class);
     }
+
+    public function resume() // одно резюме на заявку
+    {
+        return $this->hasOne(\App\Models\Resume::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(\App\Models\ApplicationDocument::class);
+    }
 }

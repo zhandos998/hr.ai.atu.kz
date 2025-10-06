@@ -15,11 +15,12 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/vacancies', [VacancyController::class, 'index']);
 Route::get('/vacancies/{id}', [VacancyController::class, 'show']);
 
+Route::post('/chat/send', [ChatController::class, 'send'])->middleware('throttle:30,1');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
-    Route::post('/chat/send', [ChatController::class, 'send']);
 
     Route::post('/resumes', [ResumeController::class, 'store']);
 
@@ -54,3 +55,10 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+
+
+Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacancies.index');
+Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
+// (если есть страница детали заявки)
+Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');

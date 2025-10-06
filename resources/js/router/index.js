@@ -83,9 +83,10 @@ router.beforeEach(async (to, from, next) => {
     const token = localStorage.getItem('token');
     const isAuthenticated = !!token;
 
-    if (to.meta.requiresAuth && !isAuthenticated) {
-        return next('/login');
-    }
+if (to.meta.requiresAuth && !isAuthenticated) {
+  // запоминаем целевой путь
+  return next({ name: 'Login', query: { next: to.fullPath } });
+}
 
     if (to.meta.requiresAdmin) {
         const authStore = useAuthStore();

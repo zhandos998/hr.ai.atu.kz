@@ -1,6 +1,6 @@
 <template>
   <Layout>
-    <div class="max-w-5xl mx-auto py-8 px-4">
+    <div class="max-w-7xl mx-auto py-8 px-4">
       <h1 class="text-2xl md:text-3xl font-bold text-center mb-6 text-[#005eb8]">Управление заявками</h1>
 
       <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
@@ -19,6 +19,31 @@
           </div>
 
           <div class="flex items-center gap-2">
+            <a
+                v-if="app.resume_url"
+                :href="app.resume_url"
+                target="_blank"
+                rel="noopener"
+                class="border border-[#005eb8] text-[#005eb8] hover:bg-[#005eb8] hover:text-white px-3 py-1 rounded transition h-[60px] content-center"
+                >
+                Резюме
+            </a>
+
+            <!-- Документы -->
+            <template v-if="app.documents_map && Object.keys(app.documents_map).length">
+                <a
+                v-for="(doc, type) in app.documents_map"
+                :key="type"
+                :href="doc.url"
+                target="_blank"
+                rel="noopener"
+                :download="`${type}-${app.id}`"
+                class="border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1 rounded transition h-[60px] content-center"
+                >
+                {{ docLabel(type) }}
+                </a>
+            </template>
+
             <select
               v-model="app.status.code"
               @change="updateStatus(app)"
@@ -47,6 +72,14 @@ import axios from 'axios';
 const applications = ref([]);
 const loading = ref(true);
 const statuses = ref([]);
+const docLabels = {
+  id_card: 'Уд. личности',
+  diploma: 'Диплом',
+  articles: 'Статьи/публикации',
+  address_certificate: 'Адресная справка',
+};
+
+const docLabel = (type) => docLabels[type] || type;
 
 const fetchApplications = async () => {
   loading.value = true;
@@ -102,4 +135,5 @@ onMounted(() => {
   fetchApplications();
   fetchStatuses();
 });
+
 </script>
