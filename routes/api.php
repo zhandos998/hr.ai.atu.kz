@@ -6,7 +6,6 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\ChatController;
 use App\Http\Controllers\API\ResumeController;
 use App\Http\Controllers\API\ApplicationController;
-
 use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -15,7 +14,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/vacancies', [VacancyController::class, 'index']);
 Route::get('/vacancies/{id}', [VacancyController::class, 'show']);
 
-Route::post('/chat/send', [ChatController::class, 'send'])->middleware('throttle:30,1');
+//Route::post('/chat/send', [ChatController::class, 'send'])->middleware('throttle:30,1');
+Route::middleware('auth:sanctum')->post('/chat/send', [ChatController::class, 'send']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

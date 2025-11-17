@@ -19,6 +19,7 @@ export const useChatStore = defineStore('chat', {
                 const res = await fetch('/api/chat/send', {
                     method: 'POST',
                     headers: {
+                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : undefined,
                     },
