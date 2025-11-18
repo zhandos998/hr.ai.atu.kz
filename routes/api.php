@@ -6,6 +6,8 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\ChatController;
 use App\Http\Controllers\API\ResumeController;
 use App\Http\Controllers\API\ApplicationController;
+use App\Http\Controllers\API\CandidateAIController;
+use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -63,3 +65,9 @@ Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacanci
 Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
 // (если есть страница детали заявки)
 Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
+
+Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
+
+
+Route::get('/departments', [DepartmentController::class, 'index']);
+// Route::get('/positions', [DepartmentController::class, 'index']);
