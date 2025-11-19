@@ -31,17 +31,6 @@ class CandidateAIController extends Controller
             ->first();
 
         if ($existing) {
-            if ($existing->score == null) {
-                return response()->json([
-                    'cached' => false,
-                    'score' => $existing->score,
-                    'decision' => $existing->decision,
-                    'education_match' => $existing->education_match,
-                    'experience_match' => $existing->experience_match,
-                    'soft_skills_match' => $existing->soft_skills_match,
-                    'summary' => $existing->{"summary_$lang"}
-                ]);
-            }
             return response()->json([
                 'cached' => true,
                 'score' => $existing->score,
