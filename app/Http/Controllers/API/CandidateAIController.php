@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
+use PhpOffice\PhpWord\IOFactory;
 
 class CandidateAIController extends Controller
 {
@@ -30,6 +31,17 @@ class CandidateAIController extends Controller
             ->first();
 
         if ($existing) {
+            if ($existing->score == null) {
+                return response()->json([
+                    'cached' => false,
+                    'score' => $existing->score,
+                    'decision' => $existing->decision,
+                    'education_match' => $existing->education_match,
+                    'experience_match' => $existing->experience_match,
+                    'soft_skills_match' => $existing->soft_skills_match,
+                    'summary' => $existing->{"summary_$lang"}
+                ]);
+            }
             return response()->json([
                 'cached' => true,
                 'score' => $existing->score,
@@ -40,6 +52,14 @@ class CandidateAIController extends Controller
                 'summary' => $existing->{"summary_$lang"}
             ]);
         }
+
+        CandidateAIResult::updateOrCreate(
+            [
+                'worker_id'   => $workerId,
+                'position_id' => $positionId
+            ],
+            []
+        );
 
         $positionModel = Position::findOrFail($positionId);
 
@@ -73,7 +93,10 @@ class CandidateAIController extends Controller
         // ==== 2. System prompt ====
         $system = <<<SYS
         Ты — эксперт отдела кадров АТУ.
-        Ты анализируешь документы кандидатов и даёшь объективную оценку по шкале 0–10.
+        Ни при каких условиях не выдумывай данные.
+        Все оценки выводи только числами (без %), строго в диапазоне 0–10.
+        Если soft-skills явно не указаны, но могут быть логически подразумеваемы для должности, оценивай их как 3–6.
+        Если полностью отсутствуют любые намёки — ставь 0.
         SYS;
 
         // ==== 3. Message для AI ====
@@ -132,14 +155,30 @@ class CandidateAIController extends Controller
                         "schema" => [
                             "type" => "object",
                             "properties" => [
-                                "score" => ["type" => "number"],
+                                "score" => [
+                                    "type" => "number",
+                                    "minimum" => 0,
+                                    "maximum" => 10
+                                ],
                                 "decision" => [
                                     "type" => "string",
-                                    "description" => "Решение по кандидату",
+                                    "description" => "Краткое решение (только: подходит / рассмотреть / не подходит)",
                                 ],
-                                "education_match" => ["type" => "number"],
-                                "experience_match" => ["type" => "number"],
-                                "soft_skills_match" => ["type" => "number"],
+                                "education_match" => [
+                                    "type" => "number",
+                                    "minimum" => 0,
+                                    "maximum" => 10
+                                ],
+                                "experience_match" => [
+                                    "type" => "number",
+                                    "minimum" => 0,
+                                    "maximum" => 10
+                                ],
+                                "soft_skills_match" => [
+                                    "type" => "number",
+                                    "minimum" => 0,
+                                    "maximum" => 10
+                                ],
                                 "summary" => ["type" => "string"]
                             ],
                             "required" => ["score", "decision", "summary"]
@@ -208,11 +247,24 @@ class CandidateAIController extends Controller
         $qualification = $args['qualification'] ?? '';
 
         // 1) Загружаем HTML блоки
-        $conclusion = $this->loadPage("https://konkurs.atu.kz/?page=application/conclusion&worker_id={$workerId}");
-        $protocol   = $this->loadPage("https://konkurs.atu.kz/?page=application/protocol&worker_id={$workerId}");
+        $conclusion = $this->loadPage("https://konkurs.atu.kz/application/conclusion.php?worker_id={$workerId}");
 
+        // $protocol   = $this->loadPage("https://konkurs.atu.kz/application/protocol.php?worker_id={$workerId}");
+
+        // Log::info("FINAL MESSAGE:", [$conclusion]);
+        // Log::info("FINAL MESSAGE:", [$protocol]);
         // 2) Находим все документы
         $documents = $this->autoScanDocuments($workerId);
+        Log::info("documents:", [count($documents)]);
+        if (count($documents) === 0) {
+            return [
+                'education_match' => 0,
+                'experience_match' => 0,
+                'soft_skills_match' => 0,
+                'final_decision' => 'не подходит',
+                'summary' => 'Кандидат не предоставил документы. Анализ невозможен.'
+            ];
+        }
 
         // 3) Vision анализ документов
         $aiResult = $this->visionAnalyze(
@@ -220,7 +272,7 @@ class CandidateAIController extends Controller
             $duties,
             $qualification,
             $conclusion,
-            $protocol,
+            // $protocol,
             $documents
         );
 
@@ -256,6 +308,9 @@ class CandidateAIController extends Controller
         $files = [];
 
         foreach ($m[1] as $f) {
+            // if (preg_match('/\.(jpeg|jpg|png)$/i', $f)) {
+            //     $files[] = $url . $f;
+            // }
             if (preg_match('/\.(jpeg|jpg|png|pdf|docx)$/i', $f)) {
                 $files[] = $url . $f;
             }
@@ -264,32 +319,92 @@ class CandidateAIController extends Controller
         return $files;
     }
 
-    private function visionAnalyze(string $position, string $duties, string $qualification, string $conclusion, string $protocol, array $documents): array
+    private function visionAnalyze(string $position, string $duties, string $qualification, string $conclusion, array $documents): array
     {
         $content = [];
 
-        // текстовая часть
         $content[] = [
             "type" => "text",
             "text" => "Должность: {$position}\n\n" .
                 "Должностные обязанности:\n{$duties}\n\n" .
                 "Требования к квалификации:\n{$qualification}\n\n" .
-                "Заключение комиссии:\n{$conclusion}\n\n" .
-                "Протокол:\n{$protocol}"
+                "Заключение комиссии:\n{$conclusion}"
         ];
 
-        // изображения (base64)
-        foreach ($documents as $doc) {
-            $base64 = $this->fetchImageAsBase64($doc);
+        $hasRealData = false;
 
-            if ($base64) {
+        foreach ($documents as $doc) {
+
+            $res = Http::timeout(20)->get($doc);
+
+            if (!$res->successful()) continue;
+
+            $mime = $res->header('Content-Type');
+            Log::info("MIME:", [$mime]);
+            // images
+            if (str_starts_with($mime, 'image/')) {
+                $hasRealData = true;
+                $base64 = "data:$mime;base64," . base64_encode($res->body());
                 $content[] = [
                     "type" => "image_url",
-                    "image_url" => [
-                        "url" => $base64
-                    ]
+                    "image_url" => ["url" => $base64]
                 ];
             }
+
+            // PDF
+            elseif ($mime === 'application/pdf') {
+
+                $raw = $res->body();
+
+                Log::info("PDF SIZE:", [strlen($raw)]);
+                Log::info("PDF HEADERS:", [$res->headers()]);
+                // 2) Если текст пустой или каша -> запускаем AI OCR
+                Log::info("PDF: fallback to AI OCR");
+                $text = $this->aiExtractPdfText($raw);
+
+                // if (!$text || mb_strlen($text) < 10) {
+                //     Log::info("PDF: fallback to AI OCR");
+                //     $text = $this->aiExtractPdfText($raw);
+                // }
+
+                if ($text && mb_strlen($text) > 10) {
+                    $hasRealData = true;
+                    $content[] = ["type" => "text", "text" => "PDF OCR:\n$text"];
+                    Log::info("PDF OCR TEXT:", [$text]);
+                } else {
+                    Log::info("PDF: no readable text");
+                }
+            }
+
+            // DOCX
+            elseif ($mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+
+                $path = storage_path('temp.docx');
+                file_put_contents($path, $res->body());
+
+                $text = $this->cleanText($this->docxToText($path));
+                if (!$text || mb_strlen($text) < 10) continue;
+                // $text = $this->toUTF8($text);
+                unlink($path);
+
+                if (trim($text) !== '') {
+                    $hasRealData = true;
+                    $content[] = ["type" => "text", "text" => "DOCX:\n$text"];
+                    Log::info("Docx:", [$text]);
+                }
+                Log::info("Docx:", ['none']);
+            }
+        }
+
+        // Если нет ни одного реального документа
+        if (!$hasRealData) {
+            return [
+                "education_match" => 0,
+                "experience_match" => 0,
+                "soft_skills_match" => 0,
+                "final_decision" => "не подходит",
+                "summary" => "Кандидат не предоставил документы. Анализ невозможен."
+            ];
         }
 
         $response = OpenAI::chat()->create([
@@ -297,12 +412,29 @@ class CandidateAIController extends Controller
             'messages' => [
                 [
                     "role" => "system",
-                    "content" => "Проанализируй документы кандидата и выдай JSON."
+                    "content" => "Ты HR-эксперт АТУ.
+
+                    Правила анализа:
+
+                    1) НЕ выдумывай новые данные.
+                    2) Если документ явно является дипломом/сертификатом образования
+                    (например, файл называется 'diplom', 'diploma', 'диплом', 'аттестат',
+                    или содержит слова 'бакалавр', 'магистр', 'университет'),
+                    ставь education_match = 5–10, даже если текст распознан частично.
+                    3) Если документ явно является справкой о стаже, сертификатом курсов, резюме
+                    или содержит слова 'опыт', 'работал', 'стаж', 'должность', 'год',
+                    ставь experience_match = 5–10.
+                    4) Если документ — изображение диплома, но текст не распознан — всё равно
+                    считай образование подтверждённым.
+                    5) Если документ содержит признаки soft-skills (коммуникация, ответственность,
+                    организация, аналитика, дисциплина) — оценивай soft_skills_match = 3–6.
+                    6) Если нет ни одного признака — ставь 0.
+                    7) НИКОГДА не придумывай образование/опыт, если документ явно НЕ является дипломом
+                    или справкой.
+
+                    Выдай JSON."
                 ],
-                [
-                    "role" => "user",
-                    "content" => $content
-                ]
+                ["role" => "user", "content" => $content]
             ],
             'response_format' => [
                 "type" => "json_schema",
@@ -317,18 +449,12 @@ class CandidateAIController extends Controller
                             "final_decision" => ["type" => "string"],
                             "summary" => ["type" => "string"]
                         ],
-                        "required" => [
-                            "education_match",
-                            "experience_match",
-                            "soft_skills_match",
-                            "final_decision",
-                            "summary"
-                        ]
+                        "required" => ["education_match", "experience_match", "soft_skills_match", "final_decision", "summary"]
                     ]
                 ]
             ]
         ]);
-        Log::channel('single')->info("VISION RAW: " . $response->choices[0]->message->content);
+
         return json_decode($response->choices[0]->message->content, true);
     }
 
@@ -338,25 +464,6 @@ class CandidateAIController extends Controller
             $a['education_match']   * 0.4 +
             $a['experience_match']  * 0.3 +
             $a['soft_skills_match'] * 0.1;
-    }
-
-    private function fetchImageAsBase64(string $url): ?string
-    {
-        try {
-            $res = Http::timeout(15)->get($url);
-
-            if (!$res->successful()) {
-                return null;
-            }
-
-            $content = $res->body();
-            $mime = $res->header('Content-Type') ?? 'image/jpeg';
-            $base64 = base64_encode($content);
-
-            return "data:{$mime};base64,{$base64}";
-        } catch (\Exception $e) {
-            return null;
-        }
     }
 
     private function getLanguageInstruction(string $lang): string
@@ -402,5 +509,69 @@ class CandidateAIController extends Controller
         ]);
 
         return json_decode($response->choices[0]->message->content, true);
+    }
+
+    private function docxToText($filePath)
+    {
+        $phpWord = IOFactory::load($filePath);
+        $text = '';
+
+        foreach ($phpWord->getSections() as $section) {
+            foreach ($section->getElements() as $element) {
+                if (method_exists($element, 'getText')) {
+                    $text .= $element->getText() . "\n";
+                }
+            }
+        }
+
+        return $text;
+    }
+
+    private function cleanText($text)
+    {
+        // удаляем управляющие символы кроме табуляции и перевода строки
+        // $text = preg_replace('/[\x00-\x1F\x80-\x9F]/u', '', $text);
+
+        // конвертируем в UTF-8
+        if (!mb_detect_encoding($text, 'UTF-8', true)) {
+            $text = mb_convert_encoding($text, 'UTF-8', 'auto');
+        }
+
+        return trim($text);
+    }
+
+    private function aiExtractPdfText(string $rawPdf): ?string
+    {
+        try {
+            $base64 = base64_encode($rawPdf);
+
+            $dataUrl = "data:application/pdf;base64," . $base64;
+
+            $response = OpenAI::responses()->create([
+                "model" => "gpt-4o-mini",
+                "input" => [
+                    [
+                        "role" => "user",
+                        "content" => [
+                            [
+                                "type" => "input_text",
+                                "text" => "Извлеки весь текст из PDF и верни только текст."
+                            ],
+                            [
+                                "type" => "input_file",
+                                "filename" => "document.pdf",
+                                "file_data" => $dataUrl
+                            ]
+                        ]
+                    ]
+                ]
+            ]);
+
+            // return $response->output[0]->content[0]->text ?? null;
+            return $response->outputText ?? null;
+        } catch (\Exception $e) {
+            Log::error("AI PDF OCR ERROR", [$e->getMessage()]);
+            return null;
+        }
     }
 }

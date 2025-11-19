@@ -8,6 +8,7 @@ use App\Http\Controllers\API\ResumeController;
 use App\Http\Controllers\API\ApplicationController;
 use App\Http\Controllers\API\CandidateAIController;
 use App\Http\Controllers\API\DepartmentController;
+use App\Http\Controllers\Api\PdfParseController;
 use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -71,3 +72,5 @@ Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
 
 Route::get('/departments', [DepartmentController::class, 'index']);
 // Route::get('/positions', [DepartmentController::class, 'index']);
+
+Route::post('/pdf/parse', [PdfParseController::class, 'parse']);
