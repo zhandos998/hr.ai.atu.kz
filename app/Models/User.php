@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'phone',
         'password',
+        'role',
     ];
 
     /**
@@ -33,6 +34,10 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    protected $appends = [
+        'is_commission_member',
     ];
 
     /**
@@ -50,5 +55,47 @@ class User extends Authenticatable
     public function isAdmin()
     {
         return $this->role === 'admin';
+    }
+
+    public function isLawyer()
+    {
+        return $this->role === 'lawyer';
+    }
+
+    public function positions()
+    {
+        return $this->belongsToMany(Position::class)->withTimestamps();
+    }
+
+    public function commissionMember()
+    {
+        return $this->hasOne(CommissionMember::class);
+    }
+
+    public function commissionVotes()
+    {
+        return $this->hasMany(ApplicationCommissionVote::class);
+    }
+
+    public function commissionVacancies()
+    {
+        return $this->belongsToMany(Vacancy::class, 'vacancy_commission_member')->withTimestamps();
+    }
+
+    public function getIsCommissionMemberAttribute(): bool
+    {
+        if ($this->relationLoaded('commissionVacancies') && $this->commissionVacancies->isNotEmpty()) {
+            return true;
+        }
+
+        if ($this->relationLoaded('commissionMember') && $this->commissionMember !== null) {
+            return true;
+        }
+
+        return Vacancy::query()
+            ->whereHas('commissionMembers', function ($query) {
+                $query->where('users.id', $this->id);
+            })
+            ->exists();
     }
 }

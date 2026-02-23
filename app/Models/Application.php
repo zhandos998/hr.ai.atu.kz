@@ -32,4 +32,9 @@ class Application extends Model
     {
         return $this->hasMany(\App\Models\ApplicationDocument::class);
     }
+
+    public function commissionVotes()
+    {
+        return $this->hasMany(ApplicationCommissionVote::class);
+    }
 }

@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\IsAdmin::class,
+            'lawyer' => \App\Http\Middleware\IsLawyer::class,
+            'commission' => \App\Http\Middleware\IsCommissionMember::class,
         ]);
         $middleware->api([
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,

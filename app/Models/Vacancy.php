@@ -15,4 +15,14 @@ class Vacancy extends Model
     {
         return $this->hasMany(Application::class);
     }
+
+    public function position()
+    {
+        return $this->belongsTo(Position::class);
+    }
+
+    public function commissionMembers()
+    {
+        return $this->belongsToMany(User::class, 'vacancy_commission_member')->withTimestamps();
+    }
 }

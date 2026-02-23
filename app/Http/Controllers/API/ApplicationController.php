@@ -3,58 +3,40 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-
 use App\Models\Application;
+use App\Models\ApplicationDocument;
 use App\Models\ApplicationStatus;
 use App\Models\Resume;
 use App\Models\Vacancy;
-
-use App\Models\ApplicationDocument;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ApplicationController extends Controller
 {
-    /**
-     * Вывод всех заявок для админки
-     */
     public function index()
     {
-        $applications = Application::with(['user', 'status'])
+        $applications = Application::with([
+            'user',
+            'status',
+            'vacancy',
+            'vacancy.commissionMembers:id,name,email,phone',
+            'commissionVotes:id,application_id,user_id,decision,comment,updated_at',
+            'resume',
+            'documents',
+        ])
             ->latest()
             ->get();
 
         $applications->transform(function ($a) {
-            // Резюме (если есть)
-            $a->resume_url = $a->resume
-                ? url(Storage::url($a->resume->file_path))
-                : null;
-
-
-            // Карта документов: type => { path, url }
-            $docs = [];
-            foreach ($a->documents as $doc) {
-                $docs[$doc->type] = [
-                    'path' => $doc->file_path,
-                    'url'  => url(Storage::url($a->resume->file_path)),
-                ];
-            }
-            $a->documents_map = (object) $docs; // пустой объект вместо [] если нет документов
-
-            // Если не нужно дублировать полные связи в JSON — можно скрыть:
-            // unset($a->resume, $a->documents);
-
-            return $a;
+            $a = $this->attachDocumentUrls($a);
+            return $this->attachVoteSummary($a);
         });
 
         return response()->json($applications);
     }
 
-    /**
-     * Обновление статуса заявки
-     */
     public function updateStatus(Request $request, $id)
     {
         $application = Application::findOrFail($id);
@@ -63,16 +45,12 @@ class ApplicationController extends Controller
             'status_code' => 'required|exists:application_statuses,code',
         ]);
 
-
-        $status = ApplicationStatus::where('code', $validated['status_code'])->first();
-
-        $application->update([
-            'status_id' => $status->id,
-        ]);
+        $status = ApplicationStatus::where('code', $validated['status_code'])->firstOrFail();
+        $application->update(['status_id' => $status->id]);
 
         return response()->json([
             'message' => 'Статус заявки обновлен.',
-            'application' => $application
+            'application' => $application->load(['user', 'status']),
         ]);
     }
 
@@ -80,73 +58,69 @@ class ApplicationController extends Controller
     {
         $validated = $request->validate([
             'vacancy_id' => 'required|exists:vacancies,id',
-            'resume'     => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
         ]);
 
         $user = $request->user();
 
         return DB::transaction(function () use ($validated, $user, $request) {
-            // 1) находим вакансию (опционально для доп.проверок)
             $vacancy = Vacancy::findOrFail($validated['vacancy_id']);
-
-            // 2) статус pending
             $statusId = ApplicationStatus::where('code', 'pending')->value('id');
 
-            // 3) создаём заявку
             $application = Application::create([
-                'user_id'    => $user->id,
+                'user_id' => $user->id,
                 'vacancy_id' => $vacancy->id,
-                'status_id'  => $statusId,
+                'status_id' => $statusId,
             ]);
 
-            // 4) сохраняем файл резюме в папку заявки
             $storedPath = $request->file('resume')->store("resumes/{$application->id}", 'public');
 
-            // 5) пишем запись в resumes с привязкой к заявке
             $resume = Resume::create([
                 'application_id' => $application->id,
-                'user_id'        => $user->id,
-                'file_path'      => $storedPath,
+                'user_id' => $user->id,
+                'file_path' => $storedPath,
             ]);
 
-            // 6) добавим удобный URL для фронта
             $application->load('resume');
-            $resumeUrl = Storage::url($resume->file_path); // /storage/resumes/{id}/...
 
             return response()->json([
-                'message'     => 'Вы успешно откликнулись на вакансию.',
+                'message' => 'Вы успешно откликнулись на вакансию.',
                 'application' => $application,
-                'resume'      => $resume,
-                'resume_url'  => $resumeUrl,
+                'resume' => $resume,
+                'resume_url' => Storage::url($resume->file_path),
             ], 201);
         });
     }
 
+    public function show($id)
+    {
+        $application = Application::with(['status', 'vacancy', 'resume', 'documents'])->findOrFail($id);
+        return response()->json($this->attachDocumentUrls($application));
+    }
+
     public function acceptResume($id)
     {
-        $this->updateStatusCode($id, 'resume_accepted', 'Резюме принято.');
+        return $this->updateStatusCode($id, 'resume_accepted', 'Резюме принято.');
     }
 
     public function rejectResume($id)
     {
-        $this->updateStatusCode($id, 'resume_rejected', 'Резюме отклонено.');
+        return $this->updateStatusCode($id, 'resume_rejected', 'Резюме отклонено.');
     }
 
     public function acceptDocs($id)
     {
-        $this->updateStatusCode($id, 'docs_accepted', 'Документы приняты.');
+        return $this->updateStatusCode($id, 'docs_accepted', 'Документы приняты.');
     }
-
 
     public function rejectDocs($id)
     {
-        $this->updateStatusCode($id, 'docs_rejected', 'Документы отклонены.');
+        return $this->updateStatusCode($id, 'docs_rejected', 'Документы отклонены.');
     }
-
 
     public function complete($id)
     {
-        $this->updateStatusCode($id, 'completed', 'Кандидат принят на вакансию.');
+        return $this->updateStatusCode($id, 'completed', 'Кандидат принят на вакансию.');
     }
 
     public function userApplications(Request $request)
@@ -161,41 +135,10 @@ class ApplicationController extends Controller
             ->latest()
             ->get();
 
-        $applications->transform(function ($a) {
-            // Резюме
-            $a->resume_url = $a->resume
-                ? url(Storage::url($a->resume->file_path))
-                : null;
-
-            // Документы
-            $docs = [];
-            foreach ($a->documents as $doc) {
-                $docs[$doc->type] = [
-                    'path' => $doc->file_path,
-                    'url'  => url(Storage::url($doc->file_path)),
-                ];
-            }
-            $a->documents_map = (object) $docs;
-
-            return $a;
-        });
+        $applications->transform(fn ($a) => $this->attachDocumentUrls($a));
 
         return response()->json($applications);
     }
-
-    private function updateStatusCode($id, $code, $message)
-    {
-        $application = Application::findOrFail($id);
-        $status = ApplicationStatus::where('code', $code)->first();
-        $application->status_id = $status->id;
-        $application->save();
-
-        return response()->json([
-            'message' => $message,
-            'application' => $application->load(['user', 'status']),
-        ]);
-    }
-
 
     public function uploadDocs(Request $request, $id)
     {
@@ -208,51 +151,83 @@ class ApplicationController extends Controller
             return response()->json(['message' => 'Сейчас нельзя загрузить/заменить документы.'], 403);
         }
 
-        // ожидаемые типы
         $expected = ['id_card', 'diploma'];
-        if ($application->vacancy->type === 'pps')   $expected[] = 'articles';
-        if ($application->vacancy->type === 'staff') $expected[] = 'address_certificate';
-
-        $existing = $application->documents->pluck('type')->all();
-
-        // динамические правила
-        $rules = [];
-        foreach ($expected as $t) {
-            $base = in_array($t, $existing) ? 'sometimes' : 'required';
-            $max  = ($t === 'articles') ? 5120 : 2048;
-            $mimes = ($t === 'articles') ? 'pdf,zip' : 'pdf,jpg,jpeg,png';
-            $rules[$t] = "$base|file|mimes:$mimes|max:$max";
+        if ($application->vacancy->type === 'pps') {
+            $expected[] = 'articles';
+        }
+        if ($application->vacancy->type === 'staff') {
+            $expected[] = 'address_certificate';
         }
 
-        $validated = $request->validate($rules);
+        $rules = [];
+        foreach ($expected as $type) {
+            $hasAnyExisting = $application->documents->contains(
+                fn ($doc) => $this->documentBaseType($doc->type) === $type
+            );
+            $base = $hasAnyExisting ? 'sometimes' : 'required';
+            $max = ($type === 'articles') ? 5120 : 2048;
+            $mimes = ($type === 'articles') ? 'pdf,zip' : 'pdf,jpg,jpeg,png';
 
+            $rules[$type] = "$base|array|min:1";
+            $rules["{$type}.*"] = "file|mimes:$mimes|max:$max";
+        }
+
+        $request->validate($rules);
         $savedDocs = [];
 
-        DB::transaction(function () use ($validated, $application, &$savedDocs) {
-            foreach ($validated as $type => $file) {
-                $ext = $file->getClientOriginalExtension();
-                $dir = "applications/{$application->id}";
-                $path = $file->storeAs($dir, "{$type}.{$ext}", 'public');
-
-                $doc = ApplicationDocument::firstOrNew([
-                    'application_id' => $application->id,
-                    'type' => $type,
-                ]);
-
-                if ($doc->exists && $doc->file_path && $doc->file_path !== $path) {
-                    Storage::disk('public')->delete($doc->file_path);
+        DB::transaction(function () use ($request, $expected, $application, &$savedDocs) {
+            foreach ($expected as $type) {
+                $files = $request->file($type, []);
+                if ($files instanceof UploadedFile) {
+                    $files = [$files];
+                }
+                if (!is_array($files) || count($files) === 0) {
+                    continue;
                 }
 
-                $doc->file_path = $path;
-                $doc->save();
+                // Append files: keep existing files and add new ones with next suffix.
+                $existingTypes = ApplicationDocument::query()
+                    ->where('application_id', $application->id)
+                    ->pluck('type')
+                    ->all();
 
-                $savedDocs[$type] = [
-                    'path' => $path,
-                    'url'  => url(Storage::url($path)),
-                ];
+                $nextIndex = 1;
+                foreach ($existingTypes as $existingType) {
+                    if ($this->documentBaseType($existingType) !== $type) {
+                        continue;
+                    }
+
+                    if ($existingType === $type) {
+                        $nextIndex = max($nextIndex, 2);
+                        continue;
+                    }
+
+                    if (preg_match('/^' . preg_quote($type, '/') . '_(\d+)$/', $existingType, $m)) {
+                        $nextIndex = max($nextIndex, ((int) $m[1]) + 1);
+                    }
+                }
+
+                foreach ($files as $file) {
+                    $storedType = $nextIndex === 1 ? $type : "{$type}_{$nextIndex}";
+                    $ext = $file->getClientOriginalExtension();
+                    $dir = "applications/{$application->id}";
+                    $path = $file->storeAs($dir, "{$storedType}.{$ext}", 'public');
+
+                    ApplicationDocument::create([
+                        'application_id' => $application->id,
+                        'type' => $storedType,
+                        'file_path' => $path,
+                    ]);
+
+                    $savedDocs[$storedType] = [
+                        'path' => $path,
+                        'url' => url(Storage::url($path)),
+                    ];
+
+                    $nextIndex++;
+                }
             }
 
-            // статус: помечаем как "документы загружены"
             $statusId = ApplicationStatus::where('code', 'docs_uploaded')->value('id');
             if ($statusId) {
                 $application->status_id = $statusId;
@@ -262,7 +237,116 @@ class ApplicationController extends Controller
 
         return response()->json([
             'message' => 'Документы обновлены.',
-            'documents_map' => (object)$savedDocs,
+            'documents_map' => (object) $savedDocs,
         ]);
+    }
+
+    public function lawyerQueue()
+    {
+        $applications = Application::with([
+            'user:id,name,email,phone',
+            'status:id,code,name',
+            'vacancy:id,title,type',
+            'resume:id,application_id,file_path',
+            'documents:id,application_id,type,file_path',
+        ])
+            ->whereHas('status', fn ($q) => $q->where('code', 'docs_uploaded'))
+            ->latest()
+            ->get();
+
+        $applications->transform(fn ($a) => $this->attachDocumentUrls($a));
+
+        return response()->json($applications);
+    }
+
+    public function lawyerSetCorruptionStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status_code' => 'required|in:corruption_not_found,corruption_found',
+        ]);
+
+        $application = Application::with('status')->findOrFail($id);
+
+        if ($application->status?->code !== 'docs_uploaded') {
+            return response()->json([
+                'message' => 'Lawyer может проверять только заявки со статусом "Документы загружены".',
+            ], 422);
+        }
+
+        $statusId = ApplicationStatus::where('code', $validated['status_code'])->value('id');
+        if (!$statusId) {
+            return response()->json(['message' => 'Статус не найден.'], 422);
+        }
+
+        $application->status_id = $statusId;
+        $application->save();
+
+        return response()->json([
+            'message' => 'Статус проверки lawyer обновлен.',
+            'application' => $application->load([
+                'user:id,name,email,phone',
+                'status:id,code,name',
+                'vacancy:id,title,type',
+            ]),
+        ]);
+    }
+
+    private function updateStatusCode($id, $code, $message)
+    {
+        $application = Application::findOrFail($id);
+        $status = ApplicationStatus::where('code', $code)->firstOrFail();
+        $application->status_id = $status->id;
+        $application->save();
+
+        return response()->json([
+            'message' => $message,
+            'application' => $application->load(['user', 'status']),
+        ]);
+    }
+
+    private function attachDocumentUrls(Application $application): Application
+    {
+        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+
+        $docs = [];
+        foreach ($application->documents as $doc) {
+            $docs[$doc->type] = [
+                'path' => $doc->file_path,
+                'url' => url(Storage::url($doc->file_path)),
+            ];
+        }
+        $application->documents_map = (object) $docs;
+
+        return $application;
+    }
+
+    private function attachVoteSummary(Application $application): Application
+    {
+        $globalMemberIds = \App\Models\CommissionMember::query()->pluck('user_id')->all();
+        $vacancyMemberIds = collect($application->vacancy?->commissionMembers ?? [])->pluck('id')->all();
+        $assignedIds = collect(array_merge($globalMemberIds, $vacancyMemberIds))
+            ->unique()
+            ->values()
+            ->all();
+        $membersCount = count($assignedIds);
+        $votes = ($application->commissionVotes ?? collect())
+            ->whereIn('user_id', $assignedIds);
+        $hireVotes = $votes->where('decision', 'hire')->count();
+        $rejectVotes = $votes->where('decision', 'reject')->count();
+
+        $application->vote_summary = [
+            'total_members' => $membersCount,
+            'hire' => $hireVotes,
+            'reject' => $rejectVotes,
+            'voted' => $votes->count(),
+            'pending' => max($membersCount - $votes->count(), 0),
+        ];
+
+        return $application;
+    }
+
+    private function documentBaseType(string $type): string
+    {
+        return preg_replace('/_\\d+$/', '', $type);
     }
 }
