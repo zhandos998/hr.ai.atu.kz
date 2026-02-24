@@ -15,6 +15,11 @@ use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/email/verification-notification', [AuthController::class, 'resendVerification']);
+Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
+Route::post('/password/forgot', [AuthController::class, 'forgotPassword']);
+Route::post('/password/reset', [AuthController::class, 'resetPassword']);
+Route::post('/user/email/change-confirm', [AuthController::class, 'confirmEmailChange']);
 
 Route::get('/vacancies', [VacancyController::class, 'index']);
 Route::get('/vacancies/{id}', [VacancyController::class, 'show']);
@@ -26,6 +31,8 @@ Route::middleware('auth:sanctum')->post('/chat/send', [ChatController::class, 's
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::post('/user/password', [AuthController::class, 'changePassword']);
+    Route::post('/user/email/change-request', [AuthController::class, 'requestEmailChange']);
 
 
     Route::post('/resumes', [ResumeController::class, 'store']);
@@ -91,7 +98,7 @@ Route::middleware(['auth:sanctum', 'commission'])->group(function () {
 
 Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacancies.index');
 Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
-// (если есть страница детали заявки)
+// (РµСЃР»Рё РµСЃС‚СЊ СЃС‚СЂР°РЅРёС†Р° РґРµС‚Р°Р»Рё Р·Р°СЏРІРєРё)
 Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
 
 Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);

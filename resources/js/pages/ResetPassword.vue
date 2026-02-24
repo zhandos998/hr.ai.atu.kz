@@ -1,119 +1,100 @@
 <template>
   <Layout>
     <div class="max-w-md mx-auto mt-12 bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-      <h1 class="text-2xl font-bold text-center mb-6 text-[#005eb8]">Регистрация в HR Chat ATU</h1>
+      <h1 class="text-2xl font-bold text-center mb-6 text-[#005eb8]">Сброс пароля</h1>
 
       <p v-if="status" class="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">{{ status }}</p>
       <p v-if="error" class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ error }}</p>
 
-      <form @submit.prevent="register" class="space-y-4">
-        <div>
-          <label class="block mb-1 text-gray-700">ФИО</label>
-          <input
-            v-model="name"
-            type="text"
-            required
-            placeholder="Иванов Иван"
-            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
-          />
-        </div>
-
+      <form @submit.prevent="submit" class="space-y-4">
         <div>
           <label class="block mb-1 text-gray-700">Email</label>
           <input
             v-model="email"
             type="email"
             required
-            placeholder="you@atu.kz"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
 
         <div>
-          <label class="block mb-1 text-gray-700">Телефон</label>
-          <input
-            v-model="phone"
-            type="text"
-            placeholder="87771112233"
-            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
-          />
-        </div>
-
-        <div>
-          <label class="block mb-1 text-gray-700">Пароль</label>
+          <label class="block mb-1 text-gray-700">Новый пароль</label>
           <input
             v-model="password"
             type="password"
             required
             minlength="6"
-            placeholder="••••••••"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
 
         <div>
-          <label class="block mb-1 text-gray-700">Подтверждение пароля</label>
+          <label class="block mb-1 text-gray-700">Подтвердите пароль</label>
           <input
             v-model="password_confirmation"
             type="password"
             required
             minlength="6"
-            placeholder="••••••••"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
 
         <button
-          type="submit"
           :disabled="loading"
+          type="submit"
           class="w-full bg-[#005eb8] hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition cursor-pointer disabled:opacity-60"
         >
-          {{ loading ? 'Регистрация...' : 'Зарегистрироваться' }}
+          {{ loading ? 'Сохранение...' : 'Сменить пароль' }}
         </button>
       </form>
-
-      <p class="text-center text-gray-600 mt-4">
-        Уже есть аккаунт?
-        <router-link to="/login" class="text-[#005eb8] hover:underline">Войти</router-link>
-      </p>
     </div>
   </Layout>
 </template>
 
 <script setup>
 import Layout from '../components/Layout.vue';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
-const name = ref('');
+const route = useRoute();
+const router = useRouter();
+
 const email = ref('');
-const phone = ref('');
 const password = ref('');
 const password_confirmation = ref('');
 const loading = ref(false);
 const status = ref('');
 const error = ref('');
-const router = useRouter();
 
-const register = async () => {
+onMounted(() => {
+  email.value = String(route.query.email || '');
+});
+
+const submit = async () => {
+  const token = route.query.token;
+
+  if (!token || !email.value) {
+    error.value = 'Некорректная ссылка для сброса пароля.';
+    return;
+  }
+
   loading.value = true;
-  status.value = '';
   error.value = '';
+  status.value = '';
 
   try {
-    const response = await axios.post('/api/register', {
-      name: name.value,
+    const response = await axios.post('/api/password/reset', {
       email: email.value,
-      phone: phone.value,
+      token,
       password: password.value,
       password_confirmation: password_confirmation.value,
     });
 
-    status.value = response.data.message || 'Регистрация успешна. Подтвердите email.';
+    status.value = response.data.message;
     setTimeout(() => router.replace('/login'), 1200);
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Ошибка регистрации. Проверьте данные.';
+    error.value = e?.response?.data?.message || 'Не удалось сбросить пароль.';
   } finally {
     loading.value = false;
   }
