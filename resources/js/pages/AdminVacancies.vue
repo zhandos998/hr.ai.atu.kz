@@ -67,50 +67,6 @@
               <p class="text-sm text-gray-500 mt-1">Тип: {{ vacancy.type === 'staff' ? 'Сотрудники' : 'ППС' }}</p>
               <p class="text-sm text-gray-500 mt-1">Должность: {{ vacancy.position?.name || 'Не указана' }}</p>
 
-              <div class="mt-3 border-t border-gray-100 pt-3 space-y-2">
-                <div class="text-sm font-semibold text-gray-700">Голосующие по вакансии</div>
-                <div v-if="vacancyMembers(vacancy).length" class="flex flex-wrap gap-2">
-                  <span
-                    v-for="member in vacancyMembers(vacancy)"
-                    :key="member.id"
-                    class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm"
-                  >
-                    <span>{{ member.name }}</span>
-                    <button
-                      @click="removeVacancyMember(vacancy.id, member.id)"
-                      class="text-red-600 hover:text-red-700 font-semibold cursor-pointer"
-                      title="Удалить голосующего"
-                    >
-                      ×
-                    </button>
-                  </span>
-                </div>
-                <div v-else class="text-sm text-gray-500">Голосующие не назначены.</div>
-
-                <div class="flex flex-col md:flex-row gap-2">
-                  <select
-                    v-model="memberToAdd[vacancy.id]"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  >
-                    <option value="">Выберите пользователя</option>
-                    <option
-                      v-for="user in vacancyCandidates[vacancy.id] || []"
-                      :key="user.id"
-                      :value="user.id"
-                    >
-                      {{ user.name }} ({{ user.email }})
-                    </option>
-                  </select>
-                  <button
-                    @click="addVacancyMember(vacancy.id)"
-                    :disabled="!memberToAdd[vacancy.id]"
-                    class="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-lg transition cursor-pointer"
-                  >
-                    Добавить
-                  </button>
-                </div>
-              </div>
-
               <div class="flex gap-2 mt-3">
                 <button @click="startEdit(vacancy)" class="text-[#005eb8] hover:underline text-sm cursor-pointer">
                   Редактировать
@@ -133,14 +89,11 @@
                 placeholder="Описание вакансии"
                 class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#005eb8] transition"
               />
-              <select
-                v-model="editVacancy.type"
-                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#005eb8] transition"
-              >
-                <option disabled value="">Выберите тип</option>
-                <option value="staff">Сотрудники</option>
-                <option value="pps">ППС</option>
-              </select>
+              <input
+                value="Сотрудники"
+                disabled
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-600"
+              />
               <select
                 v-model="editVacancy.department_id"
                 @change="editVacancy.position_id = ''"
@@ -197,60 +150,17 @@ const newVacancy = ref({ title: '', description: '', type: '', department_id: ''
 const editId = ref(null);
 const editVacancy = ref({ title: '', description: '', type: '', department_id: '', position_id: '' });
 
-const vacancyCandidates = ref({});
-const memberToAdd = ref({});
-
 const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
-
-const vacancyMembers = (vacancy) => vacancy.commission_members || [];
 
 const fetchVacancies = async () => {
   loading.value = true;
   try {
     const response = await axios.get('/api/admin/vacancies');
     vacancies.value = response.data;
-
-    await Promise.all(vacancies.value.map((v) => loadVacancyCandidates(v.id)));
   } catch (error) {
     alert(errorText(error));
   } finally {
     loading.value = false;
-  }
-};
-
-const loadVacancyCandidates = async (vacancyId) => {
-  try {
-    const response = await axios.get(`/api/admin/vacancies/${vacancyId}/commission-candidates`);
-    vacancyCandidates.value = {
-      ...vacancyCandidates.value,
-      [vacancyId]: response.data,
-    };
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-const addVacancyMember = async (vacancyId) => {
-  const userId = Number(memberToAdd.value[vacancyId]);
-  if (!userId) return;
-
-  try {
-    await axios.post(`/api/admin/vacancies/${vacancyId}/commission-members`, { user_id: userId });
-    memberToAdd.value[vacancyId] = '';
-    await fetchVacancies();
-  } catch (error) {
-    alert(errorText(error));
-  }
-};
-
-const removeVacancyMember = async (vacancyId, userId) => {
-  if (!confirm('Удалить голосующего из вакансии?')) return;
-
-  try {
-    await axios.delete(`/api/admin/vacancies/${vacancyId}/commission-members/${userId}`);
-    await fetchVacancies();
-  } catch (error) {
-    alert(errorText(error));
   }
 };
 
@@ -309,7 +219,7 @@ const startEdit = (vacancy) => {
   editVacancy.value = {
     title: vacancy.title,
     description: vacancy.description,
-    type: vacancy.type,
+    type: 'staff',
     department_id: vacancy.position?.department_id || '',
     position_id: vacancy.position_id || '',
   };
@@ -333,6 +243,7 @@ const updateVacancy = async (id) => {
   try {
     await axios.put(`/api/admin/vacancies/${id}`, {
       ...editVacancy.value,
+      type: 'staff',
       position_id: Number(editVacancy.value.position_id),
     });
     cancelEdit();

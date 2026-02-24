@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationStatus;
+use App\Models\CandidateAIResult;
+use App\Models\CommissionMember;
 use App\Models\Resume;
+use App\Models\User;
 use App\Models\Vacancy;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -15,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
 
 class ApplicationController extends Controller
 {
+    private $globalCommissionMembersCache = null;
+
     public function index()
     {
         $applications = Application::with([
@@ -31,7 +36,8 @@ class ApplicationController extends Controller
 
         $applications->transform(function ($a) {
             $a = $this->attachDocumentUrls($a);
-            return $this->attachVoteSummary($a);
+            $a = $this->attachVoteSummary($a);
+            return $this->attachAiResult($a);
         });
 
         return response()->json($applications);
@@ -322,12 +328,22 @@ class ApplicationController extends Controller
 
     private function attachVoteSummary(Application $application): Application
     {
-        $globalMemberIds = \App\Models\CommissionMember::query()->pluck('user_id')->all();
-        $vacancyMemberIds = collect($application->vacancy?->commissionMembers ?? [])->pluck('id')->all();
-        $assignedIds = collect(array_merge($globalMemberIds, $vacancyMemberIds))
-            ->unique()
+        $globalMembers = $this->globalCommissionMembers();
+        $vacancyMembers = collect($application->vacancy?->commissionMembers ?? [])->map(function ($member) {
+            return [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+            ];
+        });
+
+        $allMembers = $globalMembers
+            ->concat($vacancyMembers)
+            ->unique('id')
             ->values()
-            ->all();
+            ->values();
+
+        $assignedIds = $allMembers->pluck('id')->all();
         $membersCount = count($assignedIds);
         $votes = ($application->commissionVotes ?? collect())
             ->whereIn('user_id', $assignedIds);
@@ -342,11 +358,87 @@ class ApplicationController extends Controller
             'pending' => max($membersCount - $votes->count(), 0),
         ];
 
+        $votesByUserId = $votes->keyBy('user_id');
+        $application->vote_details = $allMembers->map(function ($member) use ($votesByUserId) {
+            $vote = $votesByUserId->get($member['id']);
+
+            return [
+                'user_id' => $member['id'],
+                'name' => $member['name'],
+                'email' => $member['email'],
+                'decision' => $vote?->decision ?? 'pending',
+                'comment' => $vote?->comment,
+                'voted_at' => $vote?->updated_at,
+            ];
+        })->all();
+
         return $application;
     }
 
     private function documentBaseType(string $type): string
     {
         return preg_replace('/_\\d+$/', '', $type);
+    }
+
+    private function attachAiResult(Application $application): Application
+    {
+        $workerId = $application->user_id;
+        $positionId = $application->vacancy?->position_id;
+
+        if (!$workerId || !$positionId) {
+            $application->ai_result = null;
+            return $application;
+        }
+
+        $result = CandidateAIResult::query()
+            ->where('worker_id', $workerId)
+            ->where('position_id', $positionId)
+            ->orderByDesc('updated_at')
+            ->first([
+                'score',
+                'decision',
+                'education_match',
+                'experience_match',
+                'soft_skills_match',
+                'summary_ru',
+            ]);
+
+        $application->ai_result = $result ? [
+            'score' => $result->score,
+            'decision' => $result->decision,
+            'education_match' => $result->education_match,
+            'experience_match' => $result->experience_match,
+            'soft_skills_match' => $result->soft_skills_match,
+            'summary' => $result->summary_ru,
+        ] : null;
+
+        return $application;
+    }
+
+    private function globalCommissionMembers()
+    {
+        if ($this->globalCommissionMembersCache !== null) {
+            return $this->globalCommissionMembersCache;
+        }
+
+        $ids = CommissionMember::query()->pluck('user_id')->all();
+
+        if (empty($ids)) {
+            $this->globalCommissionMembersCache = collect();
+            return $this->globalCommissionMembersCache;
+        }
+
+        $this->globalCommissionMembersCache = User::query()
+            ->whereIn('id', $ids)
+            ->get(['id', 'name', 'email'])
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ];
+            });
+
+        return $this->globalCommissionMembersCache;
     }
 }

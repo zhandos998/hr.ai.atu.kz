@@ -98,7 +98,7 @@ Route::middleware(['auth:sanctum', 'commission'])->group(function () {
 
 Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacancies.index');
 Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
-// (РµСЃР»Рё РµСЃС‚СЊ СЃС‚СЂР°РЅРёС†Р° РґРµС‚Р°Р»Рё Р·Р°СЏРІРєРё)
+// Если есть страница деталей заявки
 Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
 
 Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);

@@ -13,10 +13,13 @@
           class="bg-white rounded-xl shadow border border-gray-100 p-4 flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4"
         >
           <div class="space-y-1 lg:max-w-sm">
-            <h2 class="text-lg font-semibold text-[#005eb8]">{{ app.vacancy_title }}</h2>
+            <h2 class="text-lg font-semibold text-[#005eb8]">
+              Вакансия: {{ vacancyTitle(app) }}
+            </h2>
             <p class="text-gray-700 text-sm">Пользователь: {{ app.user.name }} ({{ app.user.email }})</p>
             <p class="text-gray-700 text-sm">Телефон: {{ app.user.phone || 'Не указан' }}</p>
             <p class="text-gray-500 text-sm">Дата подачи: {{ formatDate(app.created_at) }}</p>
+            <p class="text-gray-500 text-sm">ID кандидата: {{ app.user.id }}</p>
 
             <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
               <div class="bg-blue-50 rounded px-2 py-1">Всего членов: <b>{{ app.vote_summary?.total_members ?? 0 }}</b></div>
@@ -24,6 +27,26 @@
               <div class="bg-red-50 rounded px-2 py-1">Против: <b>{{ app.vote_summary?.reject ?? 0 }}</b></div>
               <div class="bg-gray-50 rounded px-2 py-1">Голосовали: <b>{{ app.vote_summary?.voted ?? 0 }}</b></div>
               <div class="bg-amber-50 rounded px-2 py-1 col-span-2">Ожидают: <b>{{ app.vote_summary?.pending ?? 0 }}</b></div>
+            </div>
+
+            <div v-if="(app.vote_details || []).length" class="mt-2 space-y-1">
+              <div class="text-xs font-semibold text-gray-600">Детали голосования:</div>
+              <div
+                v-for="vote in app.vote_details"
+                :key="`${app.id}-${vote.user_id}`"
+                class="flex items-center justify-between gap-2 text-xs bg-gray-50 border border-gray-100 rounded px-2 py-1"
+              >
+                <div class="min-w-0">
+                  <div class="truncate text-gray-700">{{ vote.name }}</div>
+                  <div class="truncate text-gray-400">{{ vote.email }}</div>
+                </div>
+                <span
+                  class="font-semibold whitespace-nowrap px-2 py-0.5 rounded"
+                  :class="voteDecisionClass(vote.decision)"
+                >
+                  {{ voteDecisionLabel(vote.decision) }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -110,6 +133,32 @@
                 </option>
               </select>
             </div>
+
+            <div class="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div class="text-sm font-semibold text-gray-700">AI-анализ кандидата</div>
+                <button
+                  @click="generateCandidateAI(app)"
+                  :disabled="aiLoadingByAppId[app.id]"
+                  class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-lg text-sm transition cursor-pointer"
+                >
+                  {{ aiLoadingByAppId[app.id] ? 'Генерация...' : 'Сгенерировать' }}
+                </button>
+              </div>
+
+              <p v-if="aiErrorByAppId[app.id]" class="text-sm text-red-700">{{ aiErrorByAppId[app.id] }}</p>
+
+              <template v-if="aiByAppId[app.id]">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div class="bg-indigo-50 rounded px-2 py-1">Итоговый балл: <b>{{ aiByAppId[app.id].score ?? '-' }}</b></div>
+                  <div class="bg-indigo-50 rounded px-2 py-1">Решение: <b>{{ aiByAppId[app.id].decision || '-' }}</b></div>
+                  <div class="bg-indigo-50 rounded px-2 py-1">Образование: <b>{{ aiByAppId[app.id].education_match ?? '-' }}</b></div>
+                  <div class="bg-indigo-50 rounded px-2 py-1">Опыт: <b>{{ aiByAppId[app.id].experience_match ?? '-' }}</b></div>
+                  <div class="bg-indigo-50 rounded px-2 py-1 col-span-1 sm:col-span-2">Soft skills: <b>{{ aiByAppId[app.id].soft_skills_match ?? '-' }}</b></div>
+                </div>
+                <div class="text-sm text-gray-700 whitespace-pre-line">{{ aiByAppId[app.id].summary }}</div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -127,6 +176,9 @@ const loading = ref(true);
 const statuses = ref([]);
 const vacancyCandidates = ref({});
 const memberToAdd = ref({});
+const aiByAppId = ref({});
+const aiLoadingByAppId = ref({});
+const aiErrorByAppId = ref({});
 
 const docLabels = {
   id_card: 'Уд. личности',
@@ -152,7 +204,18 @@ const statusName = (status) => {
   if (status.code === 'not_accepted') return 'Не принят на вакансию';
   return status.name;
 };
+const voteDecisionLabel = (decision) => {
+  if (decision === 'hire') return 'За';
+  if (decision === 'reject') return 'Против';
+  return 'Не голосовал';
+};
+const voteDecisionClass = (decision) => {
+  if (decision === 'hire') return 'bg-emerald-100 text-emerald-700';
+  if (decision === 'reject') return 'bg-red-100 text-red-700';
+  return 'bg-gray-200 text-gray-700';
+};
 
+const vacancyTitle = (app) => app?.vacancy?.title || 'Без названия';
 const vacancyIdForApp = (app) => app?.vacancy?.id || app?.vacancy_id || null;
 const vacancyMembers = (app) => app?.vacancy?.commission_members || [];
 
@@ -174,6 +237,13 @@ const fetchApplications = async () => {
   try {
     const response = await axios.get('/api/admin/applications');
     applications.value = response.data;
+    aiByAppId.value = {};
+    aiErrorByAppId.value = {};
+    applications.value.forEach((app) => {
+      if (app.ai_result) {
+        aiByAppId.value[app.id] = app.ai_result;
+      }
+    });
 
     const vacancyIds = [...new Set(applications.value.map((a) => vacancyIdForApp(a)).filter(Boolean))];
     await Promise.all(vacancyIds.map((id) => loadVacancyCandidates(id)));
@@ -220,6 +290,39 @@ const updateStatus = async (app) => {
   } catch (error) {
     console.error(error);
     alert('Ошибка при обновлении статуса.');
+  }
+};
+
+const generateCandidateAI = async (app) => {
+  const positionId = app?.vacancy?.position_id;
+  const workerId = app?.user?.id;
+
+  aiErrorByAppId.value[app.id] = '';
+
+  if (!workerId) {
+    aiErrorByAppId.value[app.id] = 'Не найден ID кандидата.';
+    return;
+  }
+
+  if (!positionId) {
+    aiErrorByAppId.value[app.id] = 'У вакансии не указана должность (position_id).';
+    return;
+  }
+
+  aiLoadingByAppId.value[app.id] = true;
+
+  try {
+    const response = await axios.post('/api/check-candidate', {
+      worker_id: Number(workerId),
+      position_id: Number(positionId),
+      lang: 'ru',
+    });
+
+    aiByAppId.value[app.id] = response.data;
+  } catch (error) {
+    aiErrorByAppId.value[app.id] = error?.response?.data?.message || 'Ошибка при генерации AI-анализа.';
+  } finally {
+    aiLoadingByAppId.value[app.id] = false;
   }
 };
 
