@@ -13,7 +13,6 @@
             v-model="name"
             type="text"
             required
-            placeholder="Иванов Иван"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -24,7 +23,6 @@
             v-model="email"
             type="email"
             required
-            placeholder="you@atu.kz"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -34,7 +32,6 @@
           <input
             v-model="phone"
             type="text"
-            placeholder="87771112233"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -46,7 +43,6 @@
             type="password"
             required
             minlength="6"
-            placeholder="••••••••"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -58,7 +54,6 @@
             type="password"
             required
             minlength="6"
-            placeholder="••••••••"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -119,4 +114,3 @@ const register = async () => {
   }
 };
 </script>
-
