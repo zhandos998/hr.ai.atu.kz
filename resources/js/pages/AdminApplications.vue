@@ -64,15 +64,15 @@
 
             <template v-if="app.documents_map && Object.keys(app.documents_map).length">
               <a
-                v-for="(doc, type) in app.documents_map"
-                :key="type"
-                :href="doc.url"
+                v-for="item in orderedDocs(app.documents_map)"
+                :key="item.type"
+                :href="item.doc.url"
                 target="_blank"
                 rel="noopener"
-                :download="`${type}-${app.id}`"
-                class="inline-flex items-center whitespace-nowrap border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                :download="`${item.type}-${app.id}`"
+                :class="`inline-flex items-center whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition ${docTypeClass(item.base)}`"
               >
-                {{ docLabel(type) }}
+                {{ docLabel(item.type) }}
               </a>
             </template>
             </div>
@@ -181,10 +181,10 @@ const aiLoadingByAppId = ref({});
 const aiErrorByAppId = ref({});
 
 const docLabels = {
-  id_card: 'Уд. личности',
-  diploma: 'Диплом',
-  articles: 'Статьи/публикации',
-  address_certificate: 'Адресная справка',
+  diploma: 'Дипломы и сертификаты',
+  recommendation_letter: 'Рекомендательное письмо',
+  scientific_works: 'Список научных трудов',
+  articles: 'Список научных трудов',
 };
 
 const parseDocType = (type) => {
@@ -193,9 +193,38 @@ const parseDocType = (type) => {
   if (!match) return { base: raw, index: null };
   return { base: match[1], index: Number(match[2]) };
 };
+const normalizeBase = (type) => {
+  const base = String(type).replace(/_\d+$/, '');
+  return base === 'articles' ? 'scientific_works' : base;
+};
+const docOrder = {
+  diploma: 1,
+  recommendation_letter: 2,
+  scientific_works: 3,
+};
+const orderedDocs = (documentsMap) => {
+  return Object.entries(documentsMap || {})
+    .map(([type, doc]) => {
+      const parsed = parseDocType(type);
+      const base = normalizeBase(parsed.base);
+      const index = parsed.index || (docOrder[base] ? 1 : 0);
+      return { type, doc, base, index };
+    })
+    .sort((a, b) => (docOrder[a.base] || 99) - (docOrder[b.base] || 99) || a.index - b.index);
+};
+const docTypeClass = (base) => {
+  if (base === 'diploma') return 'border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white';
+  if (base === 'recommendation_letter') return 'border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white';
+  if (base === 'scientific_works') return 'border-cyan-600 text-cyan-700 hover:bg-cyan-600 hover:text-white';
+  return 'border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white';
+};
 const docLabel = (type) => {
   const parsed = parseDocType(type);
-  const base = docLabels[parsed.base] || parsed.base;
+  const normalizedBase = normalizeBase(parsed.base);
+  const base = docLabels[normalizedBase] || parsed.base;
+  if (['diploma', 'recommendation_letter', 'scientific_works'].includes(normalizedBase)) {
+    return `${base} #${parsed.index || 1}`;
+  }
   return parsed.index ? `${base} #${parsed.index}` : base;
 };
 const statusName = (status) => {
@@ -345,4 +374,5 @@ onMounted(() => {
   fetchStatuses();
 });
 </script>
+
 

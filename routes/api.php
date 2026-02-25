@@ -47,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
         return \App\Models\ApplicationStatus::select('id', 'code', 'name')->get();
     });
     Route::post('/applications/{id}/upload-docs', [ApplicationController::class, 'uploadDocs']);
+    Route::delete('/applications/{id}/documents/{documentId}', [ApplicationController::class, 'deleteDocument']);
 });
 
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {

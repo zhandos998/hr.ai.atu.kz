@@ -9,6 +9,7 @@ use App\Models\ApplicationStatus;
 use App\Models\CommissionMember;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CommissionController extends Controller
 {
@@ -104,6 +105,8 @@ class CommissionController extends Controller
                 'vacancy.commissionMembers:id,name,email,phone,role',
                 'status:id,code,name',
                 'commissionVotes.user:id,name,email,role',
+                'resume:id,application_id,file_path',
+                'documents:id,application_id,type,file_path',
             ])
             ->where('status_id', $statusId);
 
@@ -155,10 +158,56 @@ class CommissionController extends Controller
                 ] : null,
             ];
 
+            $application = $this->attachDocumentUrls($application);
+
             return $application;
         });
 
         return response()->json($applications);
+    }
+
+    private function attachDocumentUrls(Application $application): Application
+    {
+        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+
+        $docs = [];
+        foreach ($application->documents as $doc) {
+            $normalizedType = $this->normalizeDocumentTypeForOutput($doc->type);
+            if ($normalizedType === null) {
+                continue;
+            }
+
+            $docs[$normalizedType] = [
+                'path' => $doc->file_path,
+                'url' => url(Storage::url($doc->file_path)),
+            ];
+        }
+        $application->documents_map = (object) $docs;
+
+        return $application;
+    }
+
+    private function normalizeDocumentTypeForOutput(string $type): ?string
+    {
+        $baseType = preg_replace('/_\\d+$/', '', $type);
+
+        if (in_array($baseType, ['id_card', 'address_certificate'], true)) {
+            return null;
+        }
+
+        if ($baseType === 'articles') {
+            $baseType = 'scientific_works';
+        }
+
+        if (preg_match('/_(\\d+)$/', $type, $matches)) {
+            return "{$baseType}_{$matches[1]}";
+        }
+
+        if (in_array($baseType, ['diploma', 'recommendation_letter', 'scientific_works'], true)) {
+            return "{$baseType}_1";
+        }
+
+        return $baseType;
     }
 
     public function vote(Request $request, int $id)

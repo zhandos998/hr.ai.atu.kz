@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="$emit('close')"></div>
 
@@ -6,7 +6,7 @@
       <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
         <div class="flex items-center justify-between px-5 py-4 border-b">
           <h3 class="text-lg md:text-xl font-semibold text-[#005eb8]">
-            {{ mode === 'replace' ? 'Заменить документы' : 'Загрузить документы' }}
+            {{ mode === 'replace' ? 'Дополнить документы' : 'Загрузить документы' }}
           </h3>
           <button class="p-2 rounded-full hover:bg-gray-100 transition" @click="$emit('close')" aria-label="Закрыть">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -94,6 +94,7 @@
 
           <div class="mt-3 text-xs text-gray-500">
             <span class="text-red-500">*</span> обязательные при первой подаче.
+            <span v-if="mode === 'replace'" class="block mt-1">В режиме дополнения новые файлы добавляются к уже загруженным.</span>
           </div>
         </div>
 
@@ -107,18 +108,25 @@
               @click="submit"
             >
               <span v-if="submitting">Загрузка...</span>
-              <span v-else>{{ mode === 'replace' ? 'Заменить' : 'Загрузить' }}</span>
+              <span v-else>{{ mode === 'replace' ? 'Дополнить' : 'Загрузить' }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
+    <AppMessageModal
+      v-model="errorModalOpen"
+      title="Ошибка"
+      :message="errorModalMessage"
+      confirm-text="Понятно"
+    />
   </div>
 </template>
 
 <script setup>
 import axios from 'axios';
 import { reactive, ref, computed } from 'vue';
+import AppMessageModal from './AppMessageModal.vue';
 
 const props = defineProps({
   application: { type: Object, required: true },
@@ -127,45 +135,47 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved']);
 
 const selected = reactive({
-  id_card: [],
   diploma: [],
-  articles: [],
-  address_certificate: [],
+  recommendation_letter: [],
+  scientific_works: [],
 });
 const dragOver = reactive({
-  id_card: false,
   diploma: false,
-  articles: false,
-  address_certificate: false,
+  recommendation_letter: false,
+  scientific_works: false,
 });
 
 const docLabels = {
-  id_card: 'Уд. личности',
-  diploma: 'Диплом',
-  articles: 'Статьи / публикации',
-  address_certificate: 'Адресная справка',
+  diploma: 'Дипломы и сертификаты',
+  recommendation_letter: 'Рекомендательное письмо',
+  scientific_works: 'Список научных трудов',
 };
 const docLabel = (type) => docLabels[type] || type;
 
+const normalizeBaseType = (type) => {
+  const base = String(type).replace(/_\d+$/, '');
+  if (base === 'articles') return 'scientific_works';
+  return base;
+};
+
 const has = (type) => {
   if (!props.application?.documents_map) return false;
-  return Object.keys(props.application.documents_map).some((key) => normalizeType(key) === type);
+  return Object.keys(props.application.documents_map).some((key) => normalizeBaseType(key) === type);
 };
 
 const isPps = computed(() => props.application?.vacancy?.type === 'pps');
-const isStaff = computed(() => props.application?.vacancy?.type === 'staff');
+const requiredTypes = computed(() => ['diploma']);
 
 const expectedTypes = computed(() => {
-  const base = ['id_card', 'diploma'];
-  if (isPps.value) base.push('articles');
-  if (isStaff.value) base.push('address_certificate');
+  const base = ['diploma', 'recommendation_letter'];
+  if (isPps.value) base.push('scientific_works');
   return base;
 });
 
-const isRequired = (t) => !has(t);
+const isRequired = (t) => requiredTypes.value.includes(t) && !has(t);
 
-const acceptFor = (t) => (t === 'articles' ? '.pdf,.zip' : '.pdf,.jpg,.jpeg,.png');
-const hintFor = (t) => (t === 'articles' ? 'PDF/ZIP до 5 МБ каждый' : 'PDF/JPG/PNG до 2 МБ каждый');
+const acceptFor = (t) => (t === 'scientific_works' ? '.pdf,.zip' : '.pdf,.jpg,.jpeg,.png');
+const hintFor = (t) => (t === 'scientific_works' ? 'PDF/ZIP до 5 МБ каждый' : 'PDF/JPG/PNG до 2 МБ каждый');
 
 const onPick = (type, e) => {
   const files = Array.from(e.target.files || []);
@@ -188,6 +198,8 @@ const removeSelectedFile = (type, index) => {
 };
 
 const submitting = ref(false);
+const errorModalOpen = ref(false);
+const errorModalMessage = ref('');
 
 const disableSave = computed(() => {
   if (props.mode === 'create') {
@@ -198,6 +210,7 @@ const disableSave = computed(() => {
 
 const submit = async () => {
   const fd = new FormData();
+  fd.append('mode', 'append');
 
   if (props.mode === 'create') {
     for (const t of expectedTypes.value) {
@@ -225,11 +238,13 @@ const submit = async () => {
     emit('saved');
   } catch (e) {
     console.error(e);
-    alert('Не удалось загрузить документы');
+    errorModalMessage.value =
+      e?.response?.data?.message ||
+      Object.values(e?.response?.data?.errors || {})?.[0]?.[0] ||
+      'Не удалось загрузить документы';
+    errorModalOpen.value = true;
   } finally {
     submitting.value = false;
   }
 };
-
-const normalizeType = (type) => String(type).replace(/_\d+$/, '');
 </script>
