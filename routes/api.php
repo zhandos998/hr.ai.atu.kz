@@ -10,6 +10,7 @@ use App\Http\Controllers\API\CandidateAIController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\AdminStructureController;
 use App\Http\Controllers\API\CommissionController;
+use App\Http\Controllers\API\AdminUserController;
 use App\Http\Controllers\Api\PdfParseController;
 use App\Http\Controllers\API\VacancyController;
 
@@ -83,6 +84,9 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/commission-candidates', [CommissionController::class, 'adminCandidateUsers']);
     Route::post('/admin/commission-members', [CommissionController::class, 'adminAddMember']);
     Route::delete('/admin/commission-members/{userId}', [CommissionController::class, 'adminRemoveMember']);
+
+    Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
 });
 
 Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {

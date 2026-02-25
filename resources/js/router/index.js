@@ -26,6 +26,7 @@ const routes = [
   { path: '/admin/positions/create', name: 'AdminPositionCreate', component: () => import('../pages/AdminPositionCreate.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/structure-tree', name: 'AdminStructureTree', component: () => import('../pages/AdminStructureTree.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/commission-members', name: 'AdminCommissionMembers', component: () => import('../pages/AdminCommissionMembers.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/users', name: 'AdminUsers', component: () => import('../pages/AdminUsers.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
 
   { path: '/lawyer/applications', name: 'LawyerApplications', component: () => import('../pages/LawyerApplications.vue'), meta: { requiresAuth: true, requiresLawyer: true } },
   { path: '/commission/applications', name: 'CommissionApplications', component: () => import('../pages/CommissionApplications.vue'), meta: { requiresAuth: true, requiresCommission: true } },
