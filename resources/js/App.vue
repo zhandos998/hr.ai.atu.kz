@@ -1,11 +1,13 @@
 <template>
     <router-view />
+    <AppDialogHost />
 </template>
 
 <script setup>
 import { onMounted } from 'vue';
 import { useAuthStore } from './stores/useAuthStore';
 import axios from 'axios';
+import AppDialogHost from './components/AppDialogHost.vue';
 
 const authStore = useAuthStore();
 

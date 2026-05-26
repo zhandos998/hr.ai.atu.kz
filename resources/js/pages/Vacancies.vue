@@ -28,7 +28,7 @@
           <div>
             <h2 class="text-xl font-semibold mb-2 text-[#005eb8]">{{ vacancy.title }}</h2>
             <p class="text-gray-700 mb-2">{{ vacancy.description }}</p>
-            <p class="text-sm text-gray-500">Тип: {{ vacancy.type === 'staff' ? 'Сотрудники' : 'ППС' }}</p>
+            <p class="text-sm text-gray-500">Тип: {{ vacancyTypeLabel(vacancy.type) }}</p>
             <p class="text-sm text-gray-500">Должность: {{ vacancy.position?.name || 'Не указана' }}</p>
           </div>
           <button
@@ -49,6 +49,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/useAuthStore';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { vacancyTypeLabel } from '../utils/vacancyTypes';
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -74,7 +75,7 @@ onMounted(() => {
 
 const types = [
   { label: 'Все', value: 'all' },
-  { label: 'Сотрудники', value: 'staff' },
+  { label: 'ОУП', value: 'staff' },
   { label: 'ППС', value: 'pps' },
 ];
 const filterType = ref('all');

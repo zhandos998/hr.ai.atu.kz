@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="max-w-7xl mx-auto mt-12 bg-white shadow-lg rounded-xl p-6 border border-gray-100">
     <h2 class="text-xl font-semibold mb-4 text-[#005eb8] text-center">Мои заявки</h2>
 
@@ -9,17 +9,41 @@
       <div
         v-for="app in applications"
         :key="app.id"
-        class="bg-white rounded-xl shadow border border-gray-100 p-4 space-y-3"
+        class="bg-white rounded-xl shadow border border-gray-100 p-4 space-y-4"
       >
-        <div>
-          <h3 class="text-lg font-semibold text-[#005eb8]">{{ app.vacancy.title }}</h3>
-          <p class="text-gray-700 mb-2">{{ app.vacancy.description }}</p>
-          <p class="text-sm text-gray-500">Тип: {{ app.vacancy.type === 'staff' ? 'Сотрудники' : 'ППС' }}</p>
-          <p class="text-sm text-gray-500">Дата подачи: {{ new Date(app.created_at).toLocaleDateString('ru-RU') }}</p>
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+          <div>
+            <h3 class="text-lg font-semibold text-[#005eb8]">{{ app.vacancy.title }}</h3>
+            <p class="text-gray-700 mb-2">{{ app.vacancy.description }}</p>
+            <p class="text-sm text-gray-500">Тип: {{ vacancyTypeLabel(app.vacancy.type) }}</p>
+            <p class="text-sm text-gray-500">Дата подачи: {{ new Date(app.created_at).toLocaleDateString('ru-RU') }}</p>
+          </div>
+
+          <div
+            :class="summaryClass(app.status?.code) + ' px-3 py-1 rounded-full text-sm text-center w-max font-medium'"
+          >
+            {{ summaryLabel(app.status?.code) }}
+          </div>
         </div>
 
-        <div :class="statusClasses(app.status.code) + ' px-3 py-1 rounded-full text-sm text-center w-max'">
-          {{ statusText(app.status.code) }}
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div
+            v-for="stage in applicationStageOrder"
+            :key="stage"
+            class="rounded-xl border border-gray-200 bg-slate-50 p-3 space-y-2"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-sm font-semibold text-gray-800">{{ stageTitle(stage) }}</div>
+              <span
+                :class="stageClass(stage, app[stageStatusField(stage)]) + ' px-2 py-0.5 rounded-full text-xs font-medium'"
+              >
+                {{ stageLabel(stage, app[stageStatusField(stage)]) }}
+              </span>
+            </div>
+            <p class="text-sm text-gray-600 whitespace-pre-line min-h-10">
+              {{ app[stageCommentField(stage)] || 'Комментарий отсутствует.' }}
+            </p>
+          </div>
         </div>
 
         <div class="flex flex-wrap gap-2">
@@ -61,22 +85,23 @@
           <span v-else class="text-xs text-gray-400">Документы не загружены</span>
         </div>
 
-        <template v-if="['resume_accepted', 'docs_rejected'].includes(app.status.code)">
+        <div class="flex flex-wrap gap-2">
           <button
+            v-if="canCreateDocs(app)"
             @click="openUploadModal(app)"
             class="inline-flex items-center bg-[#005eb8] hover:bg-blue-700 text-white text-center font-semibold px-3 py-2 rounded-lg text-sm transition"
           >
             Загрузить документы
           </button>
-        </template>
-        <template v-if="canUpdateDocs(app)">
+
           <button
+            v-if="canUpdateDocs(app)"
             @click="openUploadModal(app, 'replace')"
             class="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white text-center font-semibold px-3 py-2 rounded-lg text-sm transition"
           >
             Дополнить документы
           </button>
-        </template>
+        </div>
 
         <UploadDocsModal
           v-if="showUploadModal"
@@ -112,6 +137,17 @@ import { ref, onMounted } from 'vue';
 import UploadDocsModal from '../components/UploadDocsModal.vue';
 import AppMessageModal from '../components/AppMessageModal.vue';
 import axios from 'axios';
+import {
+  applicationStageOrder,
+  stageClass,
+  stageCommentField,
+  stageLabel,
+  stageStatusField,
+  stageTitle,
+  summaryClass,
+  summaryLabel,
+} from '../utils/applicationStages';
+import { vacancyTypeLabel } from '../utils/vacancyTypes';
 
 const applications = ref([]);
 const loading = ref(true);
@@ -127,9 +163,6 @@ const fetchApplications = async () => {
     loading.value = false;
   }
 };
-
-const canUpdateDocs = (app) => ['docs_rejected', 'docs_uploaded'].includes(app.status.code);
-const canManageDocs = (app) => ['resume_accepted', 'docs_rejected', 'docs_uploaded'].includes(app.status.code);
 
 const showUploadModal = ref(false);
 const selectedApplication = ref(null);
@@ -155,6 +188,7 @@ const docLabels = {
   diploma: 'Дипломы и сертификаты',
   recommendation_letter: 'Рекомендательное письмо',
   scientific_works: 'Список научных трудов',
+  other: 'Другое',
   articles: 'Список научных трудов',
 };
 
@@ -166,6 +200,7 @@ const requestDeleteDocument = (applicationId, documentId) => {
 const performDeleteDocument = async () => {
   const { applicationId, documentId } = deletePayload.value;
   if (!applicationId || !documentId) return;
+
   try {
     await axios.delete(`/api/applications/${applicationId}/documents/${documentId}`);
     await fetchApplications();
@@ -176,21 +211,26 @@ const performDeleteDocument = async () => {
     deletePayload.value = { applicationId: null, documentId: null };
   }
 };
+
 const parseDocType = (type) => {
   const raw = String(type);
   const match = raw.match(/^(.*)_(\d+)$/);
   if (!match) return { base: raw, index: null };
   return { base: match[1], index: Number(match[2]) };
 };
+
 const normalizeBase = (type) => {
   const base = String(type).replace(/_\d+$/, '');
   return base === 'articles' ? 'scientific_works' : base;
 };
+
 const docOrder = {
   diploma: 1,
   recommendation_letter: 2,
   scientific_works: 3,
+  other: 4,
 };
+
 const orderedDocs = (documentsMap) => {
   return Object.entries(documentsMap || {})
     .map(([type, doc]) => {
@@ -201,77 +241,40 @@ const orderedDocs = (documentsMap) => {
     })
     .sort((a, b) => (docOrder[a.base] || 99) - (docOrder[b.base] || 99) || a.index - b.index);
 };
+
 const docTypeClass = (base) => {
   if (base === 'diploma') return 'border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white';
   if (base === 'recommendation_letter') return 'border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white';
   if (base === 'scientific_works') return 'border-cyan-600 text-cyan-700 hover:bg-cyan-600 hover:text-white';
   return 'border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white';
 };
+
 const docLabel = (type) => {
   const parsed = parseDocType(type);
   const normalizedBase = normalizeBase(parsed.base);
   const base = docLabels[normalizedBase] || parsed.base;
-  if (['diploma', 'recommendation_letter', 'scientific_works'].includes(normalizedBase)) {
+  if (['diploma', 'recommendation_letter', 'scientific_works', 'other'].includes(normalizedBase)) {
     return `${base} #${parsed.index || 1}`;
   }
   return parsed.index ? `${base} #${parsed.index}` : base;
 };
 
-const statusText = (code) => {
-  switch (code) {
-    case 'pending':
-      return 'Ваше резюме на рассмотрении';
-    case 'resume_rejected':
-      return 'Резюме отклонено';
-    case 'resume_accepted':
-      return 'Резюме принято, загрузите документы';
-    case 'docs_uploaded':
-      return 'Документы загружены, ожидают проверки';
-    case 'docs_rejected':
-      return 'Документы отклонены, загрузите заново';
-    case 'docs_accepted':
-      return 'Документы приняты';
-    case 'corruption_not_found':
-      return 'Коррупция: не выявлена';
-    case 'corruption_found':
-      return 'Коррупция: выявлена';
-    case 'completed':
-      return 'Вы приняты на вакансию';
-    case 'not_accepted':
-      return 'Не приняты на вакансию';
-    default:
-      return code;
-  }
-};
+const canManageDocs = (app) => (
+  app.resume_status === 'accepted'
+  && ['awaiting_upload', 'uploaded', 'rejected'].includes(app.documents_status)
+  && app.compliance_status === 'not_started'
+  && !['hired', 'rejected'].includes(app.hiring_status)
+);
 
-const statusClasses = (code) => {
-  switch (code) {
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'resume_rejected':
-    case 'docs_rejected':
-      return 'bg-red-100 text-red-800';
-    case 'resume_accepted':
-    case 'docs_uploaded':
-      return 'bg-blue-100 text-blue-800';
-    case 'docs_accepted':
-      return 'bg-green-100 text-green-800';
-    case 'corruption_not_found':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'corruption_found':
-      return 'bg-red-100 text-red-800';
-    case 'completed':
-      return 'bg-green-200 text-green-900 font-semibold';
-    case 'not_accepted':
-      return 'bg-red-200 text-red-900 font-semibold';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
+const canCreateDocs = (app) => (
+  app.resume_status === 'accepted'
+  && ['awaiting_upload', 'rejected'].includes(app.documents_status)
+  && app.compliance_status === 'not_started'
+);
+
+const canUpdateDocs = (app) => canManageDocs(app);
 
 onMounted(() => {
   fetchApplications();
 });
 </script>
-
-

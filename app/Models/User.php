@@ -13,6 +13,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens;
 
+    public const LEGAL_ROLE_ALIASES = ['lawyer', 'compliance_director'];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -59,7 +61,37 @@ class User extends Authenticatable
 
     public function isLawyer()
     {
-        return $this->role === 'lawyer';
+        return in_array($this->role, self::LEGAL_ROLE_ALIASES, true);
+    }
+
+    public function isScienceDirector()
+    {
+        return $this->role === 'science_director';
+    }
+
+    public function isDigitalDirector()
+    {
+        return $this->role === 'digital_director';
+    }
+
+    public function isStrategyDirector()
+    {
+        return $this->role === 'strategy_director';
+    }
+
+    public function isAcademicDirector()
+    {
+        return $this->role === 'academic_director';
+    }
+
+    public function isLibraryDirector()
+    {
+        return $this->role === 'library_director';
+    }
+
+    public function isComplianceDirector()
+    {
+        return $this->isLawyer();
     }
 
     public function positions()
@@ -70,6 +102,11 @@ class User extends Authenticatable
     public function commissionMember()
     {
         return $this->hasOne(CommissionMember::class);
+    }
+
+    public function ppsFacultyCommissionMemberships()
+    {
+        return $this->hasMany(PpsFacultyCommissionMember::class);
     }
 
     public function commissionVotes()
@@ -88,14 +125,28 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->relationLoaded('commissionMember') && $this->commissionMember !== null) {
+        if ($this->relationLoaded('commissionMember') && $this->commissionMember !== null && $this->commissionMember->isActive()) {
             return true;
         }
 
-        return Vacancy::query()
+        if ($this->relationLoaded('ppsFacultyCommissionMemberships') && $this->ppsFacultyCommissionMemberships->isNotEmpty()) {
+            return true;
+        }
+
+        if (Vacancy::query()
             ->whereHas('commissionMembers', function ($query) {
                 $query->where('users.id', $this->id);
             })
-            ->exists();
+            ->exists()) {
+            return true;
+        }
+
+        return CommissionMember::query()
+            ->where('user_id', $this->id)
+            ->active()
+            ->exists()
+            || PpsFacultyCommissionMember::query()
+                ->where('user_id', $this->id)
+                ->exists();
     }
 }

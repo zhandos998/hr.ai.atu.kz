@@ -11,7 +11,13 @@ use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\AdminStructureController;
 use App\Http\Controllers\API\CommissionController;
 use App\Http\Controllers\API\AdminUserController;
-use App\Http\Controllers\Api\PdfParseController;
+use App\Http\Controllers\API\ScienceApplicationController;
+use App\Http\Controllers\API\DigitalApplicationController;
+use App\Http\Controllers\API\StrategyApplicationController;
+use App\Http\Controllers\API\AcademicApplicationController;
+use App\Http\Controllers\API\LibraryApplicationController;
+use App\Http\Controllers\API\ComplianceApplicationController;
+use App\Http\Controllers\API\PdfParseController;
 use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -60,7 +66,16 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/vacancies/{id}/commission-members/{userId}', [VacancyController::class, 'removeCommissionMember']);
 
     Route::get('/admin/applications', [ApplicationController::class, 'index']);
+    Route::post('/admin/applications', [ApplicationController::class, 'adminStore']);
+    Route::get('/admin/applications/{id}', [ApplicationController::class, 'adminShow']);
+    Route::put('/admin/applications/{id}/archive', [ApplicationController::class, 'archive']);
+    Route::put('/admin/applications/{id}/unarchive', [ApplicationController::class, 'unarchive']);
+    Route::post('/admin/applications/{id}/upload-docs', [ApplicationController::class, 'adminUploadDocs']);
+    Route::put('/admin/applications/{id}/staff-details', [ApplicationController::class, 'updateStaffDetails']);
+    Route::post('/admin/applications/{id}/pps-profile', [ApplicationController::class, 'updatePpsProfile']);
+    Route::delete('/admin/applications/{id}/pps-profile/documents/{documentId}', [ApplicationController::class, 'deletePpsProfileDocument']);
     Route::put('/admin/applications/{id}', [ApplicationController::class, 'updateStatus']);
+    Route::get('/admin/applications/{id}/lawyer-response-pdf', [ApplicationController::class, 'adminLawyerResponsePdf']);
 
     Route::put('/admin/applications/{id}/accept-resume', [ApplicationController::class, 'acceptResume']);
     Route::put('/admin/applications/{id}/reject-resume', [ApplicationController::class, 'rejectResume']);
@@ -95,8 +110,52 @@ Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {
     Route::put('/lawyer/applications/{id}/corruption-status', [ApplicationController::class, 'lawyerSetCorruptionStatus']);
 });
 
+Route::middleware(['auth:sanctum', 'science'])->group(function () {
+    Route::get('/science/applications', [ScienceApplicationController::class, 'queue']);
+    Route::get('/science/applications/{id}', [ScienceApplicationController::class, 'show']);
+    Route::post('/science/applications/{id}/scientific-works', [ScienceApplicationController::class, 'updateScientificWorks']);
+    Route::delete('/science/applications/{applicationId}/scientific-works-documents/{documentId}', [ScienceApplicationController::class, 'deleteScientificWorksDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'digital'])->group(function () {
+    Route::get('/digital/applications', [DigitalApplicationController::class, 'queue']);
+    Route::get('/digital/applications/{id}', [DigitalApplicationController::class, 'show']);
+    Route::post('/digital/applications/{id}/digital-mooc', [DigitalApplicationController::class, 'updateDigitalMooc']);
+    Route::delete('/digital/applications/{applicationId}/digital-mooc-documents/{documentId}', [DigitalApplicationController::class, 'deleteDigitalMoocDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'strategy'])->group(function () {
+    Route::get('/strategy/applications', [StrategyApplicationController::class, 'queue']);
+    Route::get('/strategy/applications/{id}', [StrategyApplicationController::class, 'show']);
+    Route::post('/strategy/applications/{id}/strategy-review', [StrategyApplicationController::class, 'updateStrategyReview']);
+    Route::delete('/strategy/applications/{applicationId}/strategy-documents/{documentId}', [StrategyApplicationController::class, 'deleteStrategyDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'academic'])->group(function () {
+    Route::get('/academic/applications', [AcademicApplicationController::class, 'queue']);
+    Route::get('/academic/applications/{id}', [AcademicApplicationController::class, 'show']);
+    Route::post('/academic/applications/{id}/academic-review', [AcademicApplicationController::class, 'updateAcademicReview']);
+    Route::delete('/academic/applications/{applicationId}/academic-documents/{documentId}', [AcademicApplicationController::class, 'deleteAcademicDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'library'])->group(function () {
+    Route::get('/library/applications', [LibraryApplicationController::class, 'queue']);
+    Route::get('/library/applications/{id}', [LibraryApplicationController::class, 'show']);
+    Route::post('/library/applications/{id}/library-metrics', [LibraryApplicationController::class, 'updateLibraryMetrics']);
+    Route::delete('/library/applications/{applicationId}/library-documents/{documentId}', [LibraryApplicationController::class, 'deleteLibraryDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {
+    Route::get('/compliance/applications', [ComplianceApplicationController::class, 'queue']);
+    Route::get('/compliance/applications/{id}', [ComplianceApplicationController::class, 'show']);
+    Route::get('/compliance/applications/{id}/lawyer-response-pdf', [ApplicationController::class, 'adminLawyerResponsePdf']);
+    Route::post('/compliance/applications/{id}/department-review', [ComplianceApplicationController::class, 'updateComplianceDepartment']);
+    Route::delete('/compliance/applications/{applicationId}/documents/{documentId}', [ComplianceApplicationController::class, 'deleteComplianceDocument']);
+});
+
 Route::middleware(['auth:sanctum', 'commission'])->group(function () {
     Route::get('/commission/applications', [CommissionController::class, 'queue']);
+    Route::get('/commission/applications/{id}', [CommissionController::class, 'show']);
     Route::post('/commission/applications/{id}/vote', [CommissionController::class, 'vote']);
 });
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\CommissionMember;
 use App\Models\User;
 use App\Models\Vacancy;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class VacancyController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'type' => 'required|in:staff,pps',
-            'position_id' => 'required|integer|exists:positions,id',
+            'position_id' => 'nullable|integer|exists:positions,id',
         ]);
 
         $vacancy = Vacancy::create($validated);
@@ -82,10 +83,19 @@ class VacancyController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $assignedIds = $vacancy->commissionMembers()->pluck('users.id');
+        $mainCommissionIds = CommissionMember::query()
+            ->forVacancyType($vacancy->type)
+            ->pluck('user_id');
 
         $users = User::query()
             ->select('id', 'name', 'email', 'phone')
             ->whereNotIn('id', $assignedIds)
+            ->whereNotIn('id', $mainCommissionIds)
+            ->where(function ($query) {
+                $query
+                    ->whereNull('email')
+                    ->orWhere('email', 'not like', 'manual-candidate-%@hr-ai.invalid');
+            })
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
                     $inner
@@ -109,6 +119,24 @@ class VacancyController extends Controller
             'user_id' => 'required|integer|exists:users,id',
         ]);
 
+        $user = User::query()->findOrFail($validated['user_id']);
+        if ($this->isTechnicalManualCandidate($user)) {
+            return response()->json([
+                'message' => 'Технического кандидата нельзя добавить в комиссию.',
+            ], 422);
+        }
+
+        $isMainCommissionMember = CommissionMember::query()
+            ->forVacancyType($vacancy->type)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($isMainCommissionMember) {
+            return response()->json([
+                'message' => 'Пользователь уже входит в основную комиссию.',
+            ], 422);
+        }
+
         $vacancy->commissionMembers()->syncWithoutDetaching([$validated['user_id']]);
 
         return response()->json([
@@ -126,5 +154,10 @@ class VacancyController extends Controller
             'message' => 'Р“РѕР»РѕСЃСѓСЋС‰РёР№ СѓРґР°Р»РµРЅ РёР· РІР°РєР°РЅСЃРёРё.',
             'vacancy' => $vacancy->fresh()->load('commissionMembers:id,name,email,phone'),
         ]);
+    }
+
+    private function isTechnicalManualCandidate(User $user): bool
+    {
+        return (bool) preg_match('/^manual-candidate-.+@hr-ai\.invalid$/i', (string) $user->email);
     }
 }

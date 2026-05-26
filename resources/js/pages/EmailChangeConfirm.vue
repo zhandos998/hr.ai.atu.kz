@@ -22,6 +22,7 @@ import Layout from '../components/Layout.vue';
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { normalizeRole } from '../utils/roles';
 
 const route = useRoute();
 const router = useRouter();
@@ -46,7 +47,7 @@ const confirm = async () => {
     const response = await axios.post('/api/user/email/change-confirm', { token });
 
     localStorage.setItem('token', response.data.token);
-    localStorage.setItem('role', response.data.user?.role || 'user');
+    localStorage.setItem('role', normalizeRole(response.data.user?.role) || 'user');
     axios.defaults.headers.common.Authorization = `Bearer ${response.data.token}`;
 
     status.value = 'Email успешно изменен. Перенаправляем в профиль...';

@@ -17,15 +17,18 @@
 
         <div class="p-5">
           <div class="grid gap-4 md:grid-cols-2">
-            <div v-for="t in expectedTypes" :key="t" class="rounded-xl border border-gray-200 p-4">
-              <div class="flex items-start justify-between mb-3">
-                <div class="font-medium">
-                  {{ docLabel(t) }}
-                  <span v-if="isRequired(t) && mode === 'create'" class="text-red-500">*</span>
+            <div v-for="t in expectedTypes" :key="t" class="flex min-h-[214px] flex-col rounded-xl border border-gray-200 p-4">
+              <div class="mb-3 grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                <div class="min-w-0">
+                  <div class="truncate font-medium">{{ docLabel(t) }}</div>
+                  <div class="mt-1 h-4 text-xs font-normal text-gray-400">
+                    <span v-if="isRequired(t) && mode === 'create'" class="text-red-500">обязательно</span>
+                    <span v-else-if="isOptional(t)">необязательно</span>
+                  </div>
                 </div>
                 <span
                   :class="[
-                    'text-xs px-2 py-0.5 rounded-full',
+                    'shrink-0 text-xs px-2 py-0.5 rounded-full',
                     has(t)
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-gray-100 text-gray-600 border border-gray-200',
@@ -36,7 +39,7 @@
               </div>
 
               <label
-                class="group relative block cursor-pointer rounded-lg border-2 border-dashed p-4 text-center"
+                class="group relative flex min-h-[96px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center"
                 :class="
                   dragOver[t]
                     ? 'border-[#005eb8] bg-blue-50/50'
@@ -92,8 +95,7 @@
             </div>
           </div>
 
-          <div class="mt-3 text-xs text-gray-500">
-            <span class="text-red-500">*</span> обязательные при первой подаче.
+          <div v-if="mode === 'replace'" class="mt-3 text-xs text-gray-500">
             <span v-if="mode === 'replace'" class="block mt-1">В режиме дополнения новые файлы добавляются к уже загруженным.</span>
           </div>
         </div>
@@ -131,6 +133,7 @@ import AppMessageModal from './AppMessageModal.vue';
 const props = defineProps({
   application: { type: Object, required: true },
   mode: { type: String, default: 'create' },
+  uploadUrl: { type: String, default: '' },
 });
 const emit = defineEmits(['close', 'saved']);
 
@@ -138,17 +141,20 @@ const selected = reactive({
   diploma: [],
   recommendation_letter: [],
   scientific_works: [],
+  other: [],
 });
 const dragOver = reactive({
   diploma: false,
   recommendation_letter: false,
   scientific_works: false,
+  other: false,
 });
 
 const docLabels = {
   diploma: 'Дипломы и сертификаты',
   recommendation_letter: 'Рекомендательное письмо',
   scientific_works: 'Список научных трудов',
+  other: 'Другое',
 };
 const docLabel = (type) => docLabels[type] || type;
 
@@ -164,18 +170,30 @@ const has = (type) => {
 };
 
 const isPps = computed(() => props.application?.vacancy?.type === 'pps');
-const requiredTypes = computed(() => ['diploma']);
+const requiredTypes = computed(() => []);
+const uploadEndpoint = computed(() => props.uploadUrl || `/api/applications/${props.application.id}/upload-docs`);
 
 const expectedTypes = computed(() => {
-  const base = ['diploma', 'recommendation_letter'];
-  if (isPps.value) base.push('scientific_works');
-  return base;
+  if (isPps.value) {
+    return ['recommendation_letter', 'other'];
+  }
+
+  return ['diploma', 'recommendation_letter', 'other'];
 });
 
 const isRequired = (t) => requiredTypes.value.includes(t) && !has(t);
+const isOptional = (t) => !requiredTypes.value.includes(t);
 
-const acceptFor = (t) => (t === 'scientific_works' ? '.pdf,.zip' : '.pdf,.jpg,.jpeg,.png');
-const hintFor = (t) => (t === 'scientific_works' ? 'PDF/ZIP до 5 МБ каждый' : 'PDF/JPG/PNG до 2 МБ каждый');
+const acceptFor = (t) => {
+  if (t === 'scientific_works') return '.pdf,.zip';
+  if (t === 'other') return '.pdf,.doc,.docx,.jpg,.jpeg,.png,.zip';
+  return '.pdf,.jpg,.jpeg,.png';
+};
+const hintFor = (t) => {
+  if (t === 'scientific_works') return 'PDF/ZIP до 5 МБ каждый';
+  if (t === 'other') return 'PDF/DOC/DOCX/JPG/PNG/ZIP до 5 МБ каждый';
+  return 'PDF/JPG/PNG до 2 МБ каждый';
+};
 
 const onPick = (type, e) => {
   const files = Array.from(e.target.files || []);
@@ -201,38 +219,29 @@ const submitting = ref(false);
 const errorModalOpen = ref(false);
 const errorModalMessage = ref('');
 
+const hasSelectedFiles = computed(() => expectedTypes.value.some((t) => selected[t].length > 0));
 const disableSave = computed(() => {
-  if (props.mode === 'create') {
-    return expectedTypes.value.some((t) => isRequired(t) && selected[t].length === 0);
-  }
-  return expectedTypes.value.every((t) => selected[t].length === 0);
+  if (!hasSelectedFiles.value) return true;
+
+  return expectedTypes.value.some((t) => isRequired(t) && selected[t].length === 0);
 });
 
 const submit = async () => {
+  if (!hasSelectedFiles.value) return;
+
   const fd = new FormData();
   fd.append('mode', 'append');
 
-  if (props.mode === 'create') {
-    for (const t of expectedTypes.value) {
-      if (isRequired(t) && selected[t].length === 0) return;
-      for (const file of selected[t]) {
-        fd.append(`${t}[]`, file);
-      }
+  for (const t of expectedTypes.value) {
+    if (isRequired(t) && selected[t].length === 0) return;
+    for (const file of selected[t]) {
+      fd.append(`${t}[]`, file);
     }
-  } else {
-    let any = false;
-    for (const t of expectedTypes.value) {
-      for (const file of selected[t]) {
-        fd.append(`${t}[]`, file);
-        any = true;
-      }
-    }
-    if (!any) return;
   }
 
   submitting.value = true;
   try {
-    await axios.post(`/api/applications/${props.application.id}/upload-docs`, fd, {
+    await axios.post(uploadEndpoint.value, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     emit('saved');

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\CommissionMember;
+use App\Models\PpsFacultyCommissionMember;
 use App\Models\Vacancy;
 use Closure;
 use Illuminate\Http\Request;
@@ -25,6 +26,13 @@ class IsCommissionMember
         // Backward compatibility: users added through old global commission list.
         if (!$isMember) {
             $isMember = CommissionMember::query()
+                ->where('user_id', $user->id)
+                ->active()
+                ->exists();
+        }
+
+        if (!$isMember) {
+            $isMember = PpsFacultyCommissionMember::query()
                 ->where('user_id', $user->id)
                 ->exists();
         }

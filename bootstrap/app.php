@@ -21,6 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\IsAdmin::class,
             'lawyer' => \App\Http\Middleware\IsLawyer::class,
+            'science' => \App\Http\Middleware\IsScienceDirector::class,
+            'digital' => \App\Http\Middleware\IsDigitalDirector::class,
+            'strategy' => \App\Http\Middleware\IsStrategyDirector::class,
+            'academic' => \App\Http\Middleware\IsAcademicDirector::class,
+            'library' => \App\Http\Middleware\IsLibraryDirector::class,
             'commission' => \App\Http\Middleware\IsCommissionMember::class,
         ]);
         $middleware->api([

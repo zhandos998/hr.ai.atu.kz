@@ -4,8 +4,14 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import { createPinia } from 'pinia';
+import { installAlertOverride } from './plugins/installAlertOverride';
 
-createApp(App)
+const app = createApp(App);
+const pinia = createPinia();
+
+installAlertOverride(pinia);
+
+app
+    .use(pinia)
     .use(router)
-    .use(createPinia())
     .mount('#app');

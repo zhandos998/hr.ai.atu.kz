@@ -8,9 +8,33 @@ class Application extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'archived_at' => 'datetime',
+    ];
+
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+
+    public function stageLogs()
+    {
+        return $this->hasMany(ApplicationStageLog::class)->latest();
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function archivedBy()
+    {
+        return $this->belongsTo(User::class, 'archived_by_user_id');
     }
 
     public function status()
@@ -20,7 +44,7 @@ class Application extends Model
 
     public function vacancy()
     {
-        return $this->belongsTo(Vacancy::class);
+        return $this->belongsTo(Vacancy::class)->withTrashed();
     }
 
     public function resume() // одно резюме на заявку
@@ -31,6 +55,11 @@ class Application extends Model
     public function documents()
     {
         return $this->hasMany(\App\Models\ApplicationDocument::class);
+    }
+
+    public function ppsProfile()
+    {
+        return $this->hasOne(ApplicationPpsProfile::class);
     }
 
     public function commissionVotes()

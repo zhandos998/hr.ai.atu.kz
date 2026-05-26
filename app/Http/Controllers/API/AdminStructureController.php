@@ -18,7 +18,7 @@ class AdminStructureController extends Controller
                 $query->select('id', 'department_id', 'name', 'duties', 'qualification')->orderBy('name');
             }])
             ->orderBy('name')
-            ->get(['id', 'name', 'description']);
+            ->get(['id', 'name', 'description', 'parent_id']);
 
         return response()->json($departments);
     }
@@ -28,6 +28,7 @@ class AdminStructureController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:departments,name',
             'description' => 'nullable|string',
+            'parent_id' => 'nullable|integer|exists:departments,id',
         ]);
 
         $department = Department::create($validated);
@@ -42,7 +43,20 @@ class AdminStructureController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:departments,name,' . $department->id,
             'description' => 'nullable|string',
+            'parent_id' => 'nullable|integer|exists:departments,id',
         ]);
+
+        if (($validated['parent_id'] ?? null) === $department->id) {
+            return response()->json([
+                'message' => 'Нельзя сделать департамент родителем самого себя.',
+            ], 422);
+        }
+
+        if (!empty($validated['parent_id']) && $this->isDescendantDepartment($department->id, (int) $validated['parent_id'])) {
+            return response()->json([
+                'message' => 'Нельзя вложить департамент в собственный подотдел.',
+            ], 422);
+        }
 
         $department->update($validated);
 
@@ -51,11 +65,17 @@ class AdminStructureController extends Controller
 
     public function destroyDepartment(int $id)
     {
-        $department = Department::withCount('positions')->findOrFail($id);
+        $department = Department::withCount(['positions', 'children'])->findOrFail($id);
 
         if ($department->positions_count > 0) {
             return response()->json([
                 'message' => 'Нельзя удалить отдел, пока в нем есть должности.',
+            ], 422);
+        }
+
+        if ($department->children_count > 0) {
+            return response()->json([
+                'message' => 'Нельзя удалить подразделение, пока в нем есть подотделы.',
             ], 422);
         }
 
@@ -68,7 +88,7 @@ class AdminStructureController extends Controller
     {
         $positions = Position::query()
             ->with([
-                'department:id,name',
+                'department:id,name,parent_id',
                 'users:id,name,email,phone',
             ])
             ->orderBy('name')
@@ -97,7 +117,7 @@ class AdminStructureController extends Controller
             ], 422);
         }
 
-        $position = Position::create($validated)->load('department:id,name');
+        $position = Position::create($validated)->load('department:id,name,parent_id');
 
         return response()->json($position, 201);
     }
@@ -127,7 +147,7 @@ class AdminStructureController extends Controller
 
         $position->update($validated);
 
-        return response()->json($position->load('department:id,name'));
+        return response()->json($position->load('department:id,name,parent_id'));
     }
 
     public function destroyPosition(int $id)
@@ -152,13 +172,14 @@ class AdminStructureController extends Controller
     public function positionUsers(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $reservedRoles = self::reservedRoles();
 
         $users = User::query()
             ->select('id', 'name', 'email', 'phone')
-            ->where(function ($query) {
+            ->where(function ($query) use ($reservedRoles) {
                 $query
                     ->whereNull('role')
-                    ->orWhereNotIn('role', ['admin', 'lawyer']);
+                    ->orWhereNotIn('role', $reservedRoles);
             })
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
@@ -188,7 +209,7 @@ class AdminStructureController extends Controller
             ->where(function ($query) {
                 $query
                     ->whereNull('role')
-                    ->orWhereNotIn('role', ['admin', 'lawyer']);
+                    ->orWhereNotIn('role', self::reservedRoles());
             })
             ->exists();
 
@@ -215,5 +236,32 @@ class AdminStructureController extends Controller
             'message' => 'Пользователь удален из должности.',
             'position' => $position->fresh()->load('users:id,name,email,phone'),
         ]);
+    }
+
+    private function isDescendantDepartment(int $departmentId, int $candidateParentId): bool
+    {
+        $currentId = $candidateParentId;
+
+        while ($currentId !== null) {
+            if ($currentId === $departmentId) {
+                return true;
+            }
+
+            $currentId = Department::query()->whereKey($currentId)->value('parent_id');
+        }
+
+        return false;
+    }
+
+    private static function reservedRoles(): array
+    {
+        return array_values(array_unique(array_merge([
+            'admin',
+            'science_director',
+            'digital_director',
+            'strategy_director',
+            'academic_director',
+            'library_director',
+        ], User::LEGAL_ROLE_ALIASES)));
     }
 }

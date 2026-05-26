@@ -10,7 +10,10 @@ use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
 {
-    private const ALLOWED_ROLES = ['user', 'lawyer', 'admin'];
+    private const ALLOWED_ROLES = ['user', 'lawyer', 'science_director', 'digital_director', 'strategy_director', 'academic_director', 'library_director', 'admin'];
+    private const LEGACY_ROLE_ALIASES = [
+        'compliance_director' => 'lawyer',
+    ];
 
     public function index(Request $request): JsonResponse
     {
@@ -23,10 +26,16 @@ class AdminUserController extends Controller
             ->with([
                 'positions:id,name,department_id',
                 'positions.department:id,name',
-                'commissionMember:id,user_id',
+                'commissionMember:id,user_id,is_pps,is_staff',
                 'commissionVacancies:id',
+                'ppsFacultyCommissionMemberships:id,user_id',
             ])
             ->select('id', 'name', 'email', 'phone', 'role', 'email_verified_at', 'created_at')
+            ->where(function ($query) {
+                $query
+                    ->whereNull('email')
+                    ->orWhere('email', 'not like', 'manual-candidate-%@hr-ai.invalid');
+            })
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
                     $inner
@@ -36,7 +45,14 @@ class AdminUserController extends Controller
                 });
             })
             ->when($role !== '', function ($query) use ($role) {
-                $query->where('role', $role);
+                $normalizedRole = self::normalizeRole($role);
+
+                if ($normalizedRole === 'lawyer') {
+                    $query->whereIn('role', User::LEGAL_ROLE_ALIASES);
+                    return;
+                }
+
+                $query->where('role', $normalizedRole);
             })
             ->when($emailVerified === 'yes', function ($query) {
                 $query->whereNotNull('email_verified_at');
@@ -48,12 +64,14 @@ class AdminUserController extends Controller
                 $query->where(function ($inner) {
                     $inner
                         ->whereHas('commissionMember')
-                        ->orWhereHas('commissionVacancies');
+                        ->orWhereHas('commissionVacancies')
+                        ->orWhereHas('ppsFacultyCommissionMemberships');
                 });
             })
             ->when($commission === 'no', function ($query) {
                 $query->whereDoesntHave('commissionMember')
-                    ->whereDoesntHave('commissionVacancies');
+                    ->whereDoesntHave('commissionVacancies')
+                    ->whereDoesntHave('ppsFacultyCommissionMemberships');
             })
             ->orderBy('name')
             ->limit(300)
@@ -64,7 +82,7 @@ class AdminUserController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'phone' => $user->phone,
-                    'role' => $user->role,
+                    'role' => self::normalizeRole($user->role),
                     'email_verified_at' => $user->email_verified_at,
                     'created_at' => $user->created_at,
                     'is_commission_member' => $user->is_commission_member,
@@ -88,7 +106,7 @@ class AdminUserController extends Controller
     public function updateRole(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
-            'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
+            'role' => ['required', 'string', Rule::in(array_merge(self::ALLOWED_ROLES, array_keys(self::LEGACY_ROLE_ALIASES)))],
         ]);
 
         $user = User::query()->findOrFail($id);
@@ -99,12 +117,17 @@ class AdminUserController extends Controller
             ], 422);
         }
 
-        $user->role = $validated['role'];
+        $user->role = self::normalizeRole($validated['role']);
         $user->save();
 
         return response()->json([
             'message' => 'Роль пользователя обновлена.',
-            'user' => $user->fresh(['positions.department', 'commissionMember', 'commissionVacancies:id']),
+            'user' => $user->fresh(['positions.department', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id']),
         ]);
+    }
+
+    private static function normalizeRole(?string $role): ?string
+    {
+        return self::LEGACY_ROLE_ALIASES[$role] ?? $role;
     }
 }

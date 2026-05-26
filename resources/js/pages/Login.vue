@@ -52,6 +52,7 @@ import Layout from '../components/Layout.vue';
 import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
+import { normalizeRole } from '../utils/roles';
 
 const email = ref('');
 const password = ref('');
@@ -73,7 +74,7 @@ const login = async () => {
 
     const { token, user } = response.data;
     localStorage.setItem('token', token);
-    localStorage.setItem('role', user.role || 'user');
+    localStorage.setItem('role', normalizeRole(user.role) || 'user');
     axios.defaults.headers.common.Authorization = `Bearer ${token}`;
 
     const next = route.query.next || '/';

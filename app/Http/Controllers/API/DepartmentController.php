@@ -13,7 +13,7 @@ class DepartmentController extends Controller
     {
         $departments = Department::query()
             ->with(['positions:id,department_id,name'])
-            ->select('id', 'name')
+            ->select('id', 'name', 'parent_id')
             ->get();
 
         return response()->json($departments);

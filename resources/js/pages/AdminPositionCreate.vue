@@ -17,27 +17,31 @@
             v-model="form.department_id"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           >
-            <option disabled value="">Выберите отдел</option>
+            <option disabled value="">Выберите подразделение</option>
             <option v-for="department in departments" :key="department.id" :value="department.id">
-              {{ department.name }}
+              {{ department.full_name }}
             </option>
           </select>
+
           <input
             v-model="form.name"
             type="text"
             placeholder="Название должности"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           />
+
           <textarea
             v-model="form.duties"
             placeholder="Обязанности (необязательно)"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
-          />
+          ></textarea>
+
           <textarea
             v-model="form.qualification"
             placeholder="Требования (необязательно)"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
-          />
+          ></textarea>
+
           <button
             type="submit"
             :disabled="submitting"
@@ -56,6 +60,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
+import { decorateDepartments } from '../utils/departments';
 
 const router = useRouter();
 const submitting = ref(false);
@@ -67,7 +72,7 @@ const errorText = (error) => error?.response?.data?.message || 'Ошибка. П
 const fetchDepartments = async () => {
   try {
     const response = await axios.get('/api/admin/departments');
-    departments.value = response.data;
+    departments.value = decorateDepartments(response.data);
   } catch (error) {
     alert(errorText(error));
   }
@@ -75,7 +80,7 @@ const fetchDepartments = async () => {
 
 const createPosition = async () => {
   if (!form.value.department_id || !form.value.name.trim()) {
-    alert('Выберите отдел и укажите название должности.');
+    alert('Выберите подразделение и укажите название должности.');
     return;
   }
 

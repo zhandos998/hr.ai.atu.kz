@@ -22,6 +22,7 @@ import Layout from '../components/Layout.vue';
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { normalizeRole } from '../utils/roles';
 
 const route = useRoute();
 const router = useRouter();
@@ -48,7 +49,7 @@ const verify = async () => {
     const { token: authToken, user } = response.data;
 
     localStorage.setItem('token', authToken);
-    localStorage.setItem('role', user.role || 'user');
+    localStorage.setItem('role', normalizeRole(user.role) || 'user');
     axios.defaults.headers.common.Authorization = `Bearer ${authToken}`;
 
     status.value = 'Email подтвержден. Перенаправляем в профиль...';

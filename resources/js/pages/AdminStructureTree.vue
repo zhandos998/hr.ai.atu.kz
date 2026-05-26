@@ -9,56 +9,24 @@
         <input
           v-model="search"
           type="text"
-          placeholder="Поиск по департаменту, должности, обязанностям и требованиям"
+          placeholder="Поиск по департаменту, подотделу, должности, обязанностям и требованиям"
           class="w-full border border-gray-300 rounded-lg px-4 py-2"
         />
       </div>
 
       <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
-      <div v-else-if="filteredDepartments.length === 0" class="text-center text-gray-600">Ничего не найдено.</div>
+      <div v-else-if="filteredTree.length === 0" class="text-center text-gray-600">Ничего не найдено.</div>
 
       <div v-else class="space-y-3">
-        <div
-          v-for="department in filteredDepartments"
+        <DepartmentStructureNode
+          v-for="department in filteredTree"
           :key="department.id"
-          class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden"
-        >
-          <button
-            @click="toggleDepartment(department.id)"
-            class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition cursor-pointer"
-          >
-            <div>
-              <div class="font-semibold text-[#005eb8]">{{ department.name }}</div>
-              <div class="text-xs text-gray-500">Должностей: {{ department.positions?.length || 0 }}</div>
-            </div>
-            <span class="text-[#005eb8] text-lg">{{ expanded[department.id] ? '−' : '+' }}</span>
-          </button>
-
-          <div v-if="expanded[department.id]" class="border-t border-gray-100 p-4">
-            <p v-if="department.description" class="text-sm text-gray-700 mb-3 whitespace-pre-line">
-              {{ department.description }}
-            </p>
-
-            <div v-if="!department.positions || department.positions.length === 0" class="text-sm text-gray-500">
-              В этом департаменте пока нет должностей.
-            </div>
-            <ul v-else class="space-y-2">
-              <li
-                v-for="position in department.positions"
-                :key="position.id"
-                class="border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <div class="font-medium text-gray-800">{{ position.name }}</div>
-                <div v-if="position.duties" class="text-sm text-gray-700 mt-1 whitespace-pre-line">
-                  <span class="font-semibold">Должностные обязанности:</span> {{ position.duties }}
-                </div>
-                <div v-if="position.qualification" class="text-sm text-gray-700 mt-1 whitespace-pre-line">
-                  <span class="font-semibold">Требования к квалификации:</span> {{ position.qualification }}
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
+          :department="department"
+          :expanded="expanded[department.id] || forceExpand"
+          :expanded-map="expanded"
+          :force-expand="forceExpand"
+          @toggle="toggleDepartment"
+        />
       </div>
     </div>
   </Layout>
@@ -68,6 +36,8 @@
 import { computed, onMounted, ref } from 'vue';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
+import DepartmentStructureNode from '../components/DepartmentStructureNode.vue';
+import { buildDepartmentTree, decorateDepartments } from '../utils/departments';
 
 const departments = ref([]);
 const loading = ref(true);
@@ -76,11 +46,13 @@ const search = ref('');
 
 const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
 
-const filteredDepartments = computed(() => {
-  const q = search.value.trim().toLowerCase();
-  if (!q) return departments.value;
+const departmentTree = computed(() => buildDepartmentTree(decorateDepartments(departments.value)));
+const forceExpand = computed(() => search.value.trim() !== '');
 
-  return departments.value
+const filterTree = (items, q) => {
+  if (!q) return items;
+
+  return items
     .map((department) => {
       const departmentName = (department.name || '').toLowerCase();
       const departmentDescription = (department.description || '').toLowerCase();
@@ -90,21 +62,26 @@ const filteredDepartments = computed(() => {
         const name = (position.name || '').toLowerCase();
         const duties = (position.duties || '').toLowerCase();
         const qualification = (position.qualification || '').toLowerCase();
+
         return name.includes(q) || duties.includes(q) || qualification.includes(q);
       });
 
-      if (departmentMatched) {
-        return department;
+      const filteredChildren = filterTree(department.children || [], q);
+
+      if (!departmentMatched && filteredPositions.length === 0 && filteredChildren.length === 0) {
+        return null;
       }
 
-      if (filteredPositions.length > 0) {
-        return { ...department, positions: filteredPositions };
-      }
-
-      return null;
+      return {
+        ...department,
+        positions: departmentMatched ? department.positions : filteredPositions,
+        children: filteredChildren,
+      };
     })
     .filter(Boolean);
-});
+};
+
+const filteredTree = computed(() => filterTree(departmentTree.value, search.value.trim().toLowerCase()));
 
 const fetchDepartments = async () => {
   loading.value = true;

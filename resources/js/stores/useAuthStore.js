@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
+import { normalizeRole } from '../utils/roles';
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -12,11 +13,15 @@ export const useAuthStore = defineStore('auth', {
         async fetchUser() {
             try {
                 const response = await axios.get('/api/user');
-                this.user = response.data;
-                this.role = response.data.role;
+                const user = {
+                    ...response.data,
+                    role: normalizeRole(response.data.role),
+                };
+                this.user = user;
+                this.role = user.role;
                 // console.log('User loaded:', this.user);
                 // console.log('Role:', this.role);
-                return response.data; // ✅ добавляем возврат
+                return user; // ✅ добавляем возврат
             } catch (error) {
                 this.user = null;
                 this.role = null;

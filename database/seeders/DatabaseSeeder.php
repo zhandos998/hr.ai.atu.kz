@@ -15,10 +15,14 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UserSeeder::class,
+            CommissionCandidateUserSeeder::class,
+            DepartmentPositionSeeder::class,
+            FacultyDepartmentSeeder::class,
+            PpsPositionSeeder::class,
             VacancySeeder::class,
             ApplicationSeeder::class,
             ApplicationStatusSeeder::class,
-            DepartmentPositionSeeder::class,
+            PpsCommissionSeeder::class,
         ]);
     }
 }

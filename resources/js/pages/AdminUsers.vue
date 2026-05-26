@@ -21,6 +21,11 @@
             <option value="">Все роли</option>
             <option value="user">user</option>
             <option value="lawyer">lawyer</option>
+            <option value="science_director">science_director</option>
+            <option value="digital_director">digital_director</option>
+            <option value="strategy_director">strategy_director</option>
+            <option value="academic_director">academic_director</option>
+            <option value="library_director">library_director</option>
             <option value="admin">admin</option>
           </select>
 
@@ -44,7 +49,7 @@
         </div>
 
         <div class="text-xs text-gray-500">
-          Фильтры обязательны для работы со списком: используйте поиск и параметры выше для быстрого отбора пользователей.
+          Используйте поиск и фильтры, чтобы быстро находить нужных пользователей и назначать им роли.
         </div>
 
         <div v-if="loading" class="text-gray-500">Загрузка...</div>
@@ -77,13 +82,18 @@
                 >
                   <option value="user">user</option>
                   <option value="lawyer">lawyer</option>
+                  <option value="science_director">science_director</option>
+                  <option value="digital_director">digital_director</option>
+                  <option value="strategy_director">strategy_director</option>
+                  <option value="academic_director">academic_director</option>
+                  <option value="library_director">library_director</option>
                   <option value="admin">admin</option>
                 </select>
                 <div
                   v-if="authStore.user?.id === user.id"
                   class="text-xs text-amber-700 mt-1"
                 >
-                  Текущему админу роль изменить нельзя.
+                  Текущему администратору роль изменить нельзя.
                 </div>
               </div>
             </div>
