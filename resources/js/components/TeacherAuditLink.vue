@@ -44,7 +44,7 @@
                 v-if="violation.status"
                 class="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800"
               >
-                Статус: {{ violation.status }}
+                Статус: {{ violationStatusLabel(violation.status) }}
               </span>
             </li>
           </ul>
@@ -214,5 +214,24 @@ const violationText = (violation) => {
     || violation?.title
     || violation?.name
     || 'Нарушение';
+};
+
+const violationStatusLabels = {
+  pending: 'Ожидает рассмотрения',
+  open: 'Открыто',
+  active: 'Активно',
+  in_progress: 'В работе',
+  processing: 'В работе',
+  reviewed: 'Рассмотрено',
+  resolved: 'Устранено',
+  closed: 'Закрыто',
+  rejected: 'Отклонено',
+  cancelled: 'Отменено',
+};
+
+const violationStatusLabel = (status) => {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+
+  return violationStatusLabels[normalizedStatus] || status;
 };
 </script>
