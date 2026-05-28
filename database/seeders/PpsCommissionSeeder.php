@@ -7,7 +7,6 @@ use App\Models\PpsFacultyCommissionMember;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class PpsCommissionSeeder extends Seeder
 {
@@ -46,6 +45,7 @@ class PpsCommissionSeeder extends Seeder
             $user->forceFill([
                 'name' => $name,
                 'email_verified_at' => $user->email_verified_at ?: now(),
+                'password' => Hash::make('1234'),
             ])->save();
 
             return $user;
@@ -56,7 +56,7 @@ class PpsCommissionSeeder extends Seeder
             'email' => $email,
             'phone' => null,
             'email_verified_at' => now(),
-            'password' => Hash::make(Str::random(32)),
+            'password' => Hash::make('1234'),
             'role' => 'user',
         ]);
     }

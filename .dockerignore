@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+docker.env
 node_modules
 vendor
 public/build

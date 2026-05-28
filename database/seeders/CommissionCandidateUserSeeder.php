@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class CommissionCandidateUserSeeder extends Seeder
 {
@@ -26,11 +25,11 @@ class CommissionCandidateUserSeeder extends Seeder
         $user->forceFill([
             'name' => $name,
             'email_verified_at' => $user->email_verified_at ?: now(),
+            'password' => Hash::make('1234'),
         ]);
 
         if (!$user->exists) {
             $user->phone = null;
-            $user->password = Hash::make(Str::random(32));
             $user->role = 'user';
         }
 

@@ -21,7 +21,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users,email',
             'phone' => 'nullable|string|unique:users,phone',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => 'required|string|min:4|confirmed',
         ]);
 
         User::create([
@@ -53,13 +53,13 @@ class AuthController extends Controller
             ]);
         }
 
-        // if (is_null($user->email_verified_at)) {
-        //     $this->sendEmailVerificationLink($user->email);
+        if (is_null($user->email_verified_at)) {
+            $this->sendEmailVerificationLink($user->email);
 
-        //     throw ValidationException::withMessages([
-        //         'email' => ['Email не подтвержден. Мы отправили новое письмо для подтверждения.'],
-        //     ]);
-        // }
+            throw ValidationException::withMessages([
+                'email' => ['Email не подтвержден. Мы отправили новое письмо для подтверждения.'],
+            ]);
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -185,7 +185,7 @@ class AuthController extends Controller
         $fields = $request->validate([
             'email' => 'required|email',
             'token' => 'required|string',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => 'required|string|min:4|confirmed',
         ]);
 
         $record = DB::table('password_reset_tokens')
@@ -229,7 +229,7 @@ class AuthController extends Controller
     {
         $fields = $request->validate([
             'current_password' => 'required|string',
-            'password' => 'required|string|min:6|confirmed|different:current_password',
+            'password' => 'required|string|min:4|confirmed|different:current_password',
         ]);
 
         $user = $request->user();

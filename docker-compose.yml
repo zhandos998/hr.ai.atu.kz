@@ -1,5 +1,5 @@
 x-app-env: &app-env
-  APP_NAME: ${APP_NAME:-HR-AI.ATU.KZ}
+  APP_NAME: ${APP_NAME:-VACANCY.ATU.KZ}
   APP_ENV: ${APP_ENV:-production}
   APP_DEBUG: ${APP_DEBUG:-false}
   APP_KEY: ${APP_KEY:?APP_KEY is required}
@@ -12,8 +12,8 @@ x-app-env: &app-env
   DB_CONNECTION: mysql
   DB_HOST: db
   DB_PORT: 3306
-  DB_DATABASE: ${DOCKER_DB_DATABASE:-hr_ai}
-  DB_USERNAME: ${DOCKER_DB_USERNAME:-hr_ai}
+  DB_DATABASE: ${DOCKER_DB_DATABASE:-vacancy}
+  DB_USERNAME: ${DOCKER_DB_USERNAME:-vacancy}
   DB_PASSWORD: ${DOCKER_DB_PASSWORD:-secret}
   CACHE_STORE: ${CACHE_STORE:-database}
   SESSION_DRIVER: ${SESSION_DRIVER:-database}
@@ -26,7 +26,7 @@ x-app-env: &app-env
   MAIL_PASSWORD: ${MAIL_PASSWORD:-}
   MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-}
   MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@example.com}
-  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-HR-AI.ATU.KZ}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-VACANCY.ATU.KZ}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   TEACHER_AUDIT_URL: ${TEACHER_AUDIT_URL:-https://kmk.atu.kz/api/external/teacher-audit}
   TEACHER_AUDIT_API_KEY: ${TEACHER_AUDIT_API_KEY:-}
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       target: app
-    image: hr-ai-atu-app:latest
+    image: vacancy-atu-app:latest
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
 
   queue:
-    image: hr-ai-atu-app:latest
+    image: vacancy-atu-app:latest
     build:
       context: .
       target: app
@@ -71,7 +71,7 @@ services:
     build:
       context: .
       target: nginx
-    image: hr-ai-atu-nginx:latest
+    image: vacancy-atu-nginx:latest
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8000}:80"
@@ -85,8 +85,8 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DOCKER_DB_DATABASE:-hr_ai}
-      MYSQL_USER: ${DOCKER_DB_USERNAME:-hr_ai}
+      MYSQL_DATABASE: ${DOCKER_DB_DATABASE:-vacancy}
+      MYSQL_USER: ${DOCKER_DB_USERNAME:-vacancy}
       MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD:-secret}
       MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-root}
     volumes:

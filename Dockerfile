@@ -64,7 +64,6 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/php/entrypoint.sh /usr/local/bin/hr-ai-entrypoint
 
 RUN chmod +x /usr/local/bin/hr-ai-entrypoint \
-    && composer dump-autoload --optimize \
     && mkdir -p \
         storage/app/public \
         storage/framework/cache \
@@ -73,6 +72,8 @@ RUN chmod +x /usr/local/bin/hr-ai-entrypoint \
         storage/framework/views \
         storage/logs \
         bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache public/build \
+    && composer dump-autoload --optimize \
     && chown -R www-data:www-data storage bootstrap/cache public/build
 
 ENTRYPOINT ["hr-ai-entrypoint"]

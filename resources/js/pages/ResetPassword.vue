@@ -23,7 +23,7 @@
             v-model="password"
             type="password"
             required
-            minlength="6"
+            minlength="4"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>
@@ -34,7 +34,7 @@
             v-model="password_confirmation"
             type="password"
             required
-            minlength="6"
+            minlength="4"
             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#005eb8] transition"
           />
         </div>

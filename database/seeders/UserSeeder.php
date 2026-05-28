@@ -15,7 +15,8 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Admin ATU',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('1234'),
             'role' => 'admin',
         ]);
 
@@ -24,7 +25,8 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Джуринская Индира',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('9791'),
             'role' => 'science_director',
         ]);
 
@@ -33,7 +35,8 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Калабина Анастасия',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('9564'),
             'role' => 'digital_director',
         ]);
 
@@ -42,7 +45,8 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Василина Гулзира',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('4567'),
             'role' => 'strategy_director',
         ]);
 
@@ -51,7 +55,8 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Ахметова Нурсулу',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('4360'),
             'role' => 'academic_director',
         ]);
 
@@ -60,26 +65,28 @@ class UserSeeder extends Seeder
         ], [
             'name' => 'Толекова Бахыт',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('5677'),
             'role' => 'library_director',
         ]);
 
         User::updateOrCreate([
             'email' => 'b.esembaeva@atu.edu.kz',
         ], [
-            'name' => 'Балзада Есембаева',
+            'name' => 'Есембаева Балзада',
             'phone' => null,
-            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'password' => Hash::make('8363'),
             'role' => 'lawyer',
         ]);
 
-        // User::updateOrCreate([
-        //     'email' => 'zhandos998@gmail.com',
-        // ], [
-        //     'name' => 'Zhappas Zhandos Adiluly',
-        //     'phone' => '+77473186847',
-        //     'password' => Hash::make('123456789'),
-        //     'role' => 'user',
-        // ]);
+        User::updateOrCreate([
+            'email' => 'zhandos998@gmail.com',
+        ], [
+            'name' => 'Zhappas Zhandos Adiluly',
+            'phone' => '+77473186847',
+            'password' => Hash::make('123456789'),
+            'role' => 'user',
+        ]);
     }
 }
