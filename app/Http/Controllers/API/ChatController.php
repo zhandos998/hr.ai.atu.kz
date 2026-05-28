@@ -190,7 +190,6 @@ class ChatController extends Controller
                 'text' => 'Для проверки статуса вашей заявки необходимо авторизоваться.',
                 'buttons' => [
                     ['label' => 'Войти', 'url' => url('/login')],
-                    ['label' => 'Регистрация', 'url' => url('/register')],
                 ]
             ];
         }
@@ -232,7 +231,6 @@ class ChatController extends Controller
                 'text' => 'Для проверки статуса вашей заявки необходимо авторизоваться.',
                 'buttons' => [
                     ['label' => 'Войти', 'url' => url('/login')],
-                    ['label' => 'Регистрация', 'url' => url('/register')],
                 ]
             ];
         }

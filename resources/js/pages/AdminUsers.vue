@@ -3,9 +3,96 @@
     <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <div class="flex items-center justify-between gap-3">
         <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Пользователи и роли</h1>
+        <button
+          type="button"
+          class="inline-flex items-center whitespace-nowrap rounded-lg bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+          @click="showCreateForm = !showCreateForm"
+        >
+          {{ showCreateForm ? 'Скрыть форму' : 'Добавить пользователя' }}
+        </button>
       </div>
 
       <section class="bg-white rounded-xl shadow border border-gray-100 p-4 space-y-4">
+        <form
+          v-if="showCreateForm"
+          class="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-4"
+          @submit.prevent="createUser"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div class="xl:col-span-2">
+              <label class="block text-xs uppercase tracking-wide text-gray-500 mb-1">ФИО</label>
+              <input
+                v-model="createForm.name"
+                type="text"
+                required
+                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+              />
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-gray-500 mb-1">Email</label>
+              <input
+                v-model="createForm.email"
+                type="email"
+                required
+                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+              />
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-gray-500 mb-1">Телефон</label>
+              <input
+                v-model="createForm.phone"
+                type="text"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+              />
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-gray-500 mb-1">Пароль</label>
+              <input
+                v-model="createForm.password"
+                type="text"
+                required
+                minlength="4"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-[minmax(0,20rem),auto] gap-3 md:items-end">
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-gray-500 mb-1">Роль</label>
+              <select
+                v-model="createForm.role"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+              >
+                <option
+                  v-for="role in roleOptions"
+                  :key="`create-${role.value}`"
+                  :value="role.value"
+                >
+                  {{ role.label }}
+                </option>
+              </select>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                :disabled="creatingUser"
+                class="inline-flex items-center justify-center rounded-lg bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ creatingUser ? 'Создание...' : 'Создать' }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                @click="resetCreateForm"
+              >
+                Очистить
+              </button>
+            </div>
+          </div>
+        </form>
+
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           <input
             v-model="filters.q"
@@ -19,14 +106,13 @@
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           >
             <option value="">Все роли</option>
-            <option value="user">user</option>
-            <option value="lawyer">lawyer</option>
-            <option value="science_director">science_director</option>
-            <option value="digital_director">digital_director</option>
-            <option value="strategy_director">strategy_director</option>
-            <option value="academic_director">academic_director</option>
-            <option value="library_director">library_director</option>
-            <option value="admin">admin</option>
+            <option
+              v-for="role in roleOptions"
+              :key="`filter-${role.value}`"
+              :value="role.value"
+            >
+              {{ role.label }}
+            </option>
           </select>
 
           <select
@@ -80,14 +166,13 @@
                   @change="onChangeRole(user, $event.target.value)"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="user">user</option>
-                  <option value="lawyer">lawyer</option>
-                  <option value="science_director">science_director</option>
-                  <option value="digital_director">digital_director</option>
-                  <option value="strategy_director">strategy_director</option>
-                  <option value="academic_director">academic_director</option>
-                  <option value="library_director">library_director</option>
-                  <option value="admin">admin</option>
+                  <option
+                    v-for="role in roleOptions"
+                    :key="`user-${user.id}-${role.value}`"
+                    :value="role.value"
+                  >
+                    {{ role.label }}
+                  </option>
                 </select>
                 <div
                   v-if="authStore.user?.id === user.id"
@@ -130,6 +215,8 @@ const authStore = useAuthStore();
 const users = ref([]);
 const loading = ref(false);
 const savingUserIds = ref([]);
+const showCreateForm = ref(false);
+const creatingUser = ref(false);
 
 const filters = ref({
   q: '',
@@ -138,9 +225,38 @@ const filters = ref({
   commission: '',
 });
 
+const emptyCreateForm = () => ({
+  name: '',
+  email: '',
+  phone: '',
+  role: 'user',
+  password: '',
+});
+
+const createForm = ref(emptyCreateForm());
+
+const roleOptions = [
+  { value: 'user', label: 'Пользователь' },
+  { value: 'lawyer', label: 'Юрист / комплаенс' },
+  { value: 'science_director', label: 'Директор по науке' },
+  { value: 'digital_director', label: 'Директор по цифровизации' },
+  { value: 'strategy_director', label: 'Директор по стратегии' },
+  { value: 'academic_director', label: 'Академический директор' },
+  { value: 'library_director', label: 'Научная библиотека' },
+  { value: 'admin', label: 'Администратор' },
+];
+
+const roleLabel = (role) => (
+  roleOptions.find((option) => option.value === (role || 'user'))?.label || role || 'Пользователь'
+);
+
 const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
 
 const isSaving = (userId) => savingUserIds.value.includes(userId);
+
+const resetCreateForm = () => {
+  createForm.value = emptyCreateForm();
+};
 
 const fetchUsers = async () => {
   loading.value = true;
@@ -161,10 +277,49 @@ const fetchUsers = async () => {
   }
 };
 
+const createUser = async () => {
+  if (creatingUser.value) return;
+
+  if (!createForm.value.name.trim()) {
+    alert('Введите ФИО пользователя.');
+    return;
+  }
+
+  if (!createForm.value.email.trim()) {
+    alert('Введите email пользователя.');
+    return;
+  }
+
+  if (!createForm.value.password || createForm.value.password.length < 4) {
+    alert('Пароль должен быть не короче 4 символов.');
+    return;
+  }
+
+  creatingUser.value = true;
+
+  try {
+    await axios.post('/api/admin/users', {
+      name: createForm.value.name.trim(),
+      email: createForm.value.email.trim(),
+      phone: createForm.value.phone.trim() || null,
+      role: createForm.value.role,
+      password: createForm.value.password,
+    });
+
+    resetCreateForm();
+    showCreateForm.value = false;
+    await fetchUsers();
+  } catch (error) {
+    alert(errorText(error));
+  } finally {
+    creatingUser.value = false;
+  }
+};
+
 const onChangeRole = async (user, role) => {
   if ((user.role || 'user') === role) return;
 
-  if (!confirm(`Изменить роль пользователя "${user.name}" на "${role}"?`)) return;
+  if (!confirm(`Изменить роль пользователя "${user.name}" на "${roleLabel(role)}"?`)) return;
 
   savingUserIds.value = [...savingUserIds.value, user.id];
   try {

@@ -39,10 +39,6 @@
         <router-link to="/forgot-password" class="text-[#005eb8] hover:underline">Забыли пароль?</router-link>
       </div>
 
-      <p class="text-center text-gray-600 mt-4">
-        Нет аккаунта?
-        <router-link to="/register" class="text-[#005eb8] hover:underline">Зарегистрируйтесь</router-link>
-      </p>
     </div>
   </Layout>
 </template>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
@@ -76,31 +77,40 @@ class AdminUserController extends Controller
             ->orderBy('name')
             ->limit(300)
             ->get()
-            ->map(function (User $user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => self::normalizeRole($user->role),
-                    'email_verified_at' => $user->email_verified_at,
-                    'created_at' => $user->created_at,
-                    'is_commission_member' => $user->is_commission_member,
-                    'positions' => $user->positions->map(function ($position) {
-                        return [
-                            'id' => $position->id,
-                            'name' => $position->name,
-                            'department' => $position->department ? [
-                                'id' => $position->department->id,
-                                'name' => $position->department->name,
-                            ] : null,
-                        ];
-                    })->values(),
-                ];
-            })
+            ->map(fn (User $user) => $this->transformUser($user))
             ->values();
 
         return response()->json($users);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
+            'phone' => ['nullable', 'string', 'max:255', Rule::unique('users', 'phone')],
+            'role' => ['required', 'string', Rule::in(array_merge(self::ALLOWED_ROLES, array_keys(self::LEGACY_ROLE_ALIASES)))],
+            'password' => ['required', 'string', 'min:4', 'max:64'],
+        ]);
+
+        $user = User::query()->create([
+            'name' => trim($validated['name']),
+            'email' => mb_strtolower(trim($validated['email'])),
+            'phone' => $this->emptyToNull($validated['phone'] ?? null),
+            'role' => self::normalizeRole($validated['role']),
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $user->forceFill([
+            'email_verified_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'message' => 'Пользователь создан.',
+            'user' => $this->transformUser(
+                $user->fresh(['positions.department', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id'])
+            ),
+        ], 201);
     }
 
     public function updateRole(Request $request, int $id): JsonResponse
@@ -129,5 +139,36 @@ class AdminUserController extends Controller
     private static function normalizeRole(?string $role): ?string
     {
         return self::LEGACY_ROLE_ALIASES[$role] ?? $role;
+    }
+
+    private function transformUser(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => self::normalizeRole($user->role),
+            'email_verified_at' => $user->email_verified_at,
+            'created_at' => $user->created_at,
+            'is_commission_member' => $user->is_commission_member,
+            'positions' => $user->positions->map(function ($position) {
+                return [
+                    'id' => $position->id,
+                    'name' => $position->name,
+                    'department' => $position->department ? [
+                        'id' => $position->department->id,
+                        'name' => $position->department->name,
+                    ] : null,
+                ];
+            })->values(),
+        ];
+    }
+
+    private function emptyToNull($value): ?string
+    {
+        $trimmed = trim((string) ($value ?? ''));
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

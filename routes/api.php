@@ -105,6 +105,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/commission-members/{userId}', [CommissionController::class, 'adminRemoveMember']);
 
     Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
 });
 

@@ -241,10 +241,6 @@
                                     to="/login"
                                     class="text-[#005eb8] hover:text-blue-700 font-medium transition"
                                 >Вход</router-link>
-                                <router-link
-                                    to="/register"
-                                    class="text-[#005eb8] hover:text-blue-700 font-medium transition"
-                                >Регистрация</router-link>
                             </template>
                             <template v-else>
                                 <router-link
@@ -340,11 +336,6 @@
                             class="text-[#005eb8] hover:text-blue-700 font-medium transition py-1"
                             @click="closeMobileMenu"
                         >Вход</router-link>
-                        <router-link
-                            to="/register"
-                            class="text-[#005eb8] hover:text-blue-700 font-medium transition py-1"
-                            @click="closeMobileMenu"
-                        >Регистрация</router-link>
                     </template>
                     <template v-else>
                         <router-link
