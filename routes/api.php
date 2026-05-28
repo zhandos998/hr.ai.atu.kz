@@ -18,6 +18,7 @@ use App\Http\Controllers\API\AcademicApplicationController;
 use App\Http\Controllers\API\LibraryApplicationController;
 use App\Http\Controllers\API\ComplianceApplicationController;
 use App\Http\Controllers\API\PdfParseController;
+use App\Http\Controllers\API\TeacherAuditController;
 use App\Http\Controllers\API\VacancyController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -48,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/applications', [ApplicationController::class, 'store']);
 
     Route::get('/applications', [ApplicationController::class, 'userApplications']);
+    Route::get('/teacher-audit', [TeacherAuditController::class, 'show']);
 
     Route::get('/application-statuses', function () {
         return \App\Models\ApplicationStatus::select('id', 'code', 'name')->get();

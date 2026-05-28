@@ -73,6 +73,11 @@
                             </p>
                             <p class="text-gray-500 text-sm">Дата подачи: {{ formatDate(application.created_at) }}</p>
                             <p class="text-gray-500 text-sm">ID кандидата: {{ application.user?.id }}</p>
+                            <TeacherAuditLink
+                                v-if="isPpsApplication"
+                                :application="application"
+                                class="mt-3"
+                            />
                         </div>
 
                         <div class="grid grid-cols-2 gap-2 text-xs">
@@ -1148,6 +1153,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import Layout from "../components/Layout.vue";
+import TeacherAuditLink from "../components/TeacherAuditLink.vue";
 import UploadDocsModal from "../components/UploadDocsModal.vue";
 import {
     applicationStageOrder,

@@ -15,11 +15,17 @@
     <p v-if="application?.pps_profile?.department_name" class="text-sm text-gray-600">
       Кафедра: {{ application.pps_profile.department_name }}
     </p>
+    <TeacherAuditLink
+      v-if="isPpsApplication"
+      :application="application"
+      class="mt-3"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import TeacherAuditLink from './TeacherAuditLink.vue';
 import { vacancyTypeLabel } from '../utils/vacancyTypes';
 
 const props = defineProps({
@@ -30,4 +36,5 @@ const props = defineProps({
 });
 
 const vacancyTitle = computed(() => props.application?.vacancy?.title || props.application?.pps_profile?.desired_position || 'Вакансия не указана');
+const isPpsApplication = computed(() => props.application?.vacancy?.type === 'pps');
 </script>

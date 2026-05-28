@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'teacher_audit' => [
+        'url' => env('TEACHER_AUDIT_URL', 'https://kmk.atu.kz/api/external/teacher-audit'),
+        'api_key' => env('TEACHER_AUDIT_API_KEY'),
+        'verify_ssl' => filter_var(env('TEACHER_AUDIT_VERIFY_SSL', true), FILTER_VALIDATE_BOOL),
+    ],
+
 ];
