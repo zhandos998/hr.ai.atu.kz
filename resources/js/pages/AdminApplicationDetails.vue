@@ -1144,6 +1144,7 @@
                                 </div>
                             </div>
 
+                            <!-- AI-анализ кандидата временно отключен.
                             <div class="border border-gray-200 rounded-lg p-3 space-y-2">
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div class="text-sm font-semibold text-gray-700">AI-анализ кандидата</div>
@@ -1172,6 +1173,7 @@
                                     <div class="text-sm text-gray-700 whitespace-pre-line">{{ aiResult.summary }}</div>
                                 </template>
                             </div>
+                            -->
                         </div>
                     </div>
                 </div>

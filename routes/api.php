@@ -6,7 +6,7 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\ChatController;
 use App\Http\Controllers\API\ResumeController;
 use App\Http\Controllers\API\ApplicationController;
-use App\Http\Controllers\API\CandidateAIController;
+// use App\Http\Controllers\API\CandidateAIController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\AdminStructureController;
 use App\Http\Controllers\API\CommissionController;
@@ -169,7 +169,8 @@ Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vac
 // Если есть страница деталей заявки
 Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
 
-Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
+// AI-анализ кандидата временно отключен.
+// Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
 
 
 Route::get('/departments', [DepartmentController::class, 'index']);
