@@ -73,6 +73,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/admin/applications/{id}/archive', [ApplicationController::class, 'archive']);
     Route::put('/admin/applications/{id}/unarchive', [ApplicationController::class, 'unarchive']);
     Route::post('/admin/applications/{id}/upload-docs', [ApplicationController::class, 'adminUploadDocs']);
+    Route::delete('/admin/applications/{id}/documents/{documentId}', [ApplicationController::class, 'adminDeleteDocument']);
     Route::put('/admin/applications/{id}/staff-details', [ApplicationController::class, 'updateStaffDetails']);
     Route::post('/admin/applications/{id}/pps-profile', [ApplicationController::class, 'updatePpsProfile']);
     Route::delete('/admin/applications/{id}/pps-profile/documents/{documentId}', [ApplicationController::class, 'deletePpsProfileDocument']);

@@ -131,17 +131,50 @@
                             </a>
 
                             <template v-if="application.documents_map && Object.keys(application.documents_map).length">
-                                <a
+                                <span
                                     v-for="item in orderedDocs(application.documents_map)"
                                     :key="item.type"
-                                    :href="item.doc.url"
-                                    target="_blank"
-                                    rel="noopener"
-                                    :download="`${item.type}-${application.id}`"
-                                    :class="`inline-flex items-center whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition ${docTypeClass(item.base)}`"
+                                    :class="`inline-flex max-w-full items-stretch overflow-hidden rounded-lg border ${docPillClass(item.base)}`"
                                 >
-                                    {{ docLabel(item.type) }}
-                                </a>
+                                    <a
+                                        :href="item.doc.url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        :download="`${item.type}-${application.id}`"
+                                        :class="`inline-flex min-w-0 max-w-[18rem] items-center px-3 py-2 text-sm font-medium transition hover:bg-white/60 ${docTextClass(item.base)}`"
+                                    >
+                                        <span class="truncate">{{ docLabel(item.type) }}</span>
+                                    </a>
+                                    <button
+                                        v-if="canDeleteApplicationDocuments && item.doc.id"
+                                        type="button"
+                                        :disabled="isDeletingApplicationDocument(item.doc.id)"
+                                        :class="`inline-flex w-9 shrink-0 items-center justify-center border-l transition disabled:cursor-not-allowed disabled:opacity-60 ${docDeleteClass(item.base)}`"
+                                        title="Удалить документ"
+                                        aria-label="Удалить документ"
+                                        @click="deleteApplicationDocument(item)"
+                                    >
+                                        <span
+                                            v-if="isDeletingApplicationDocument(item.doc.id)"
+                                            class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                                        ></span>
+                                        <svg
+                                            v-else
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            class="h-4 w-4"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M18 6 6 18" />
+                                            <path d="m6 6 12 12" />
+                                        </svg>
+                                    </button>
+                                </span>
                             </template>
 
                             <button
@@ -1155,6 +1188,7 @@ import axios from "axios";
 import Layout from "../components/Layout.vue";
 import TeacherAuditLink from "../components/TeacherAuditLink.vue";
 import UploadDocsModal from "../components/UploadDocsModal.vue";
+import { useDialogStore } from "../stores/useDialogStore";
 import {
     applicationStageOrder,
     latestStageLog,
@@ -1177,6 +1211,7 @@ import {
 } from "../utils/commissionVotes";
 
 const route = useRoute();
+const dialogStore = useDialogStore();
 
 const application = ref(null);
 const loading = ref(true);
@@ -1196,6 +1231,7 @@ const stageDrafts = ref({});
 const stageSavingByKey = ref({});
 const showUploadDocsModal = ref(false);
 const uploadDocsModalMode = ref("create");
+const deletingApplicationDocumentIds = ref([]);
 const currentYear = new Date().getFullYear();
 
 const backRoute = computed(() => ({
@@ -1274,6 +1310,12 @@ const canManageApplicationDocuments = computed(
             application.value?.documents_status
         ) &&
         application.value?.compliance_status === "not_started" &&
+        !["hired", "rejected"].includes(application.value?.hiring_status)
+);
+const canDeleteApplicationDocuments = computed(
+    () =>
+        Boolean(application.value) &&
+        !application.value?.archived_at &&
         !["hired", "rejected"].includes(application.value?.hiring_status)
 );
 const adminUploadDocsUrl = computed(() =>
@@ -1670,14 +1712,25 @@ const orderedDocs = (documentsMap) =>
                 a.index - b.index
         );
 
-const docTypeClass = (base) => {
-    if (base === "diploma")
-        return "border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white";
-    if (base === "recommendation_letter")
-        return "border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white";
-    if (base === "scientific_works")
-        return "border-cyan-600 text-cyan-700 hover:bg-cyan-600 hover:text-white";
-    return "border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white";
+const docPillClass = (base) => {
+    if (base === "diploma") return "border-sky-200 bg-sky-50";
+    if (base === "recommendation_letter") return "border-amber-200 bg-amber-50";
+    if (base === "scientific_works") return "border-cyan-200 bg-cyan-50";
+    return "border-emerald-200 bg-emerald-50";
+};
+
+const docTextClass = (base) => {
+    if (base === "diploma") return "text-sky-800";
+    if (base === "recommendation_letter") return "text-amber-800";
+    if (base === "scientific_works") return "text-cyan-800";
+    return "text-emerald-800";
+};
+
+const docDeleteClass = (base) => {
+    if (base === "diploma") return "border-sky-200 text-sky-700 hover:bg-sky-100 hover:text-red-700";
+    if (base === "recommendation_letter") return "border-amber-200 text-amber-700 hover:bg-amber-100 hover:text-red-700";
+    if (base === "scientific_works") return "border-cyan-200 text-cyan-700 hover:bg-cyan-100 hover:text-red-700";
+    return "border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-red-700";
 };
 
 const docLabel = (type) => {
@@ -1697,6 +1750,53 @@ const docLabel = (type) => {
     }
 
     return parsed.index ? `${base} #${parsed.index}` : base;
+};
+
+const isDeletingApplicationDocument = (documentId) =>
+    deletingApplicationDocumentIds.value.includes(Number(documentId));
+
+const deleteApplicationDocument = async (item) => {
+    const documentId = Number(item?.doc?.id);
+    if (!application.value || !documentId) return;
+
+    const confirmed = await dialogStore.openConfirm(
+        `Удалить документ "${docLabel(item.type)}"?`,
+        {
+            title: "Удалить документ",
+            confirmText: "Удалить",
+            cancelText: "Отмена",
+        }
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    deletingApplicationDocumentIds.value = [
+        ...deletingApplicationDocumentIds.value,
+        documentId,
+    ];
+
+    try {
+        const response = await axios.delete(
+            `/api/admin/applications/${application.value.id}/documents/${documentId}`
+        );
+        application.value = response.data.application;
+        syncStageDrafts(application.value);
+        syncPpsProfileDraft(application.value);
+        syncStaffDetailsDraft(application.value);
+        aiResult.value = application.value.ai_result || null;
+    } catch (error) {
+        alert(
+            error?.response?.data?.message ||
+                "Не удалось удалить документ."
+        );
+    } finally {
+        deletingApplicationDocumentIds.value =
+            deletingApplicationDocumentIds.value.filter(
+                (id) => id !== documentId
+            );
+    }
 };
 
 const voteDecisionLabel = (decision) => {

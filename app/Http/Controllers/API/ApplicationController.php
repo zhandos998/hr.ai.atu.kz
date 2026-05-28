@@ -536,6 +536,59 @@ class ApplicationController extends Controller
         );
     }
 
+    public function adminDeleteDocument(int $id, int $documentId)
+    {
+        $application = Application::with(['vacancy', 'status', 'documents', 'resume'])
+            ->notArchived()
+            ->findOrFail($id);
+
+        ApplicationStageManager::ensureDefaults($application);
+
+        if (in_array($application->hiring_status, ['hired', 'rejected'], true)) {
+            return response()->json([
+                'message' => 'Сейчас нельзя удалить документ.',
+            ], 403);
+        }
+
+        $document = $application->documents->firstWhere('id', $documentId);
+        if (!$document) {
+            return response()->json([
+                'message' => 'Документ не найден.',
+            ], 404);
+        }
+
+        $baseType = $this->normalizeDocumentBaseType($this->documentBaseType($document->type));
+        if (in_array($baseType, $this->requiredDocumentTypes($application), true)) {
+            $count = $application->documents
+                ->filter(fn ($item) => $this->normalizeDocumentBaseType($this->documentBaseType($item->type)) === $baseType)
+                ->count();
+
+            if ($count <= 1) {
+                $label = $baseType === 'other' ? 'другое' : 'дипломы и сертификаты';
+
+                return response()->json([
+                    'message' => "Нельзя удалить последний обязательный документ: {$label}.",
+                ], 422);
+            }
+        }
+
+        if (!empty($document->file_path)) {
+            Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        $application = $this->transformAdminApplication(
+            $this->adminApplicationsQuery()->findOrFail($id)
+        );
+
+        return response()->json([
+            'message' => 'Документ удалён.',
+            'documents_map' => $application->documents_map,
+            'application' => $application,
+        ]);
+    }
+
     private function storeApplicationDocuments(Request $request, Application $application, string $stageComment)
     {
         if (!$this->canManageDocuments($application)) {
