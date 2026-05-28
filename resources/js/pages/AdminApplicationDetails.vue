@@ -102,18 +102,26 @@
                             <div
                                 v-for="vote in application.vote_details"
                                 :key="`${application.id}-${vote.user_id}`"
-                                class="flex items-center justify-between gap-2 text-xs bg-gray-50 border border-gray-100 rounded px-2 py-1"
+                                class="text-xs bg-gray-50 border border-gray-100 rounded px-2 py-1.5"
                             >
-                                <div class="min-w-0">
-                                    <div class="truncate text-gray-700">{{ vote.name }}</div>
-                                    <div class="truncate text-gray-400">{{ vote.email }}</div>
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-gray-700">{{ vote.name }}</div>
+                                        <div class="truncate text-gray-400">{{ vote.email }}</div>
+                                    </div>
+                                    <span
+                                        class="font-semibold whitespace-nowrap px-2 py-0.5 rounded"
+                                        :class="commissionVoteDecisionClass(vote.decision, vote.hire_term_years)"
+                                    >
+                                        {{ commissionVoteDecisionLabel(vote.decision, vote.hire_term_years, application?.vacancy?.type) }}
+                                    </span>
                                 </div>
-                                <span
-                                    class="font-semibold whitespace-nowrap px-2 py-0.5 rounded"
-                                    :class="commissionVoteDecisionClass(vote.decision, vote.hire_term_years)"
+                                <div
+                                    v-if="vote.comment"
+                                    class="mt-2 whitespace-pre-line rounded-md border border-gray-100 bg-white px-2 py-1.5 text-gray-600"
                                 >
-                                    {{ commissionVoteDecisionLabel(vote.decision, vote.hire_term_years, application?.vacancy?.type) }}
-                                </span>
+                                    {{ vote.comment }}
+                                </div>
                             </div>
                         </div>
                     </div>
