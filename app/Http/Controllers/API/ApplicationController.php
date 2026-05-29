@@ -103,31 +103,71 @@ class ApplicationController extends Controller
     {
         $validated = $request->validate([
             'full_name' => 'required|string|max:255',
-            'vacancy_id' => 'required|exists:vacancies,id',
+            'vacancy_type' => 'nullable|in:staff,pps',
+            'vacancy_id' => 'nullable|exists:vacancies,id',
             'faculty_name' => 'nullable|string|max:255',
             'department_name' => 'nullable|string|max:255',
+            'department_id' => 'nullable|integer|exists:departments,id',
             'position_id' => 'nullable|integer|exists:positions,id',
             'resume' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
         ]);
 
-        $vacancy = Vacancy::findOrFail($validated['vacancy_id']);
+        $vacancy = !empty($validated['vacancy_id'])
+            ? Vacancy::findOrFail((int) $validated['vacancy_id'])
+            : null;
+        $vacancyType = $validated['vacancy_type'] ?? $vacancy?->type;
         $position = !empty($validated['position_id'])
             ? Position::query()->findOrFail((int) $validated['position_id'])
             : null;
 
-        if ($vacancy->type === 'pps' && empty($validated['faculty_name'])) {
+        if (!$vacancyType) {
+            return response()->json([
+                'message' => 'Выберите тип заявки.',
+            ], 422);
+        }
+
+        if ($vacancy && $vacancy->type !== $vacancyType) {
+            return response()->json([
+                'message' => 'Выбранная вакансия не относится к выбранному типу заявки.',
+            ], 422);
+        }
+
+        if ($vacancyType === 'staff') {
+            if (!$position) {
+                return response()->json([
+                    'message' => 'Для заявки ОУП выберите должность.',
+                ], 422);
+            }
+
+            if (empty($validated['department_id'])) {
+                return response()->json([
+                    'message' => 'Для заявки ОУП выберите департамент.',
+                ], 422);
+            }
+
+            $department = Department::query()->findOrFail((int) $validated['department_id']);
+            if ((int) $position->department_id !== (int) $department->id) {
+                return response()->json([
+                    'message' => 'Выбранная должность не относится к выбранному департаменту.',
+                ], 422);
+            }
+
+            $vacancy = $this->resolveVacancyForPosition($vacancy, $position, $vacancyType);
+        }
+
+        if ($vacancyType === 'pps' && empty($validated['faculty_name'])) {
             return response()->json([
                 'message' => 'Для заявки ППС выберите факультет.',
             ], 422);
         }
 
-        if ($vacancy->type === 'pps' && empty($validated['department_name'])) {
+        if ($vacancyType === 'pps' && empty($validated['department_name'])) {
             return response()->json([
                 'message' => 'Для заявки ППС выберите кафедру.',
             ], 422);
         }
 
-        if ($vacancy->type === 'pps') {
+        if ($vacancyType === 'pps') {
             $department = Department::query()
                 ->where('name', trim((string) $validated['department_name']))
                 ->first(['id', 'name']);
@@ -145,6 +185,12 @@ class ApplicationController extends Controller
             }
 
             if (!$position) {
+                if (!$vacancy) {
+                    return response()->json([
+                        'message' => 'Для заявки ППС выберите позицию.',
+                    ], 422);
+                }
+
                 if (!$this->isAllowedPpsVacancyTitle((string) $vacancy->title)) {
                     return response()->json([
                         'message' => 'Для заявки ППС выберите вакансию из списка должностей ППС.',
@@ -163,7 +209,7 @@ class ApplicationController extends Controller
                 );
             }
 
-            $vacancy = $this->resolveVacancyForPosition($vacancy, $position);
+            $vacancy = $this->resolveVacancyForPosition($vacancy, $position, $vacancyType);
         }
 
         $application = DB::transaction(function () use ($validated, $request, $vacancy, $position) {
@@ -304,24 +350,55 @@ class ApplicationController extends Controller
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('users', 'phone')->ignore($application->user_id),
             ],
+            'department_id' => 'nullable|integer|exists:departments,id',
+            'position_id' => 'nullable|integer|exists:positions,id',
             'vacancy_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('vacancies', 'id')->where(fn ($query) => $query->where('type', 'staff')),
             ],
         ]);
 
-        DB::transaction(function () use ($application, $validated) {
+        $vacancy = null;
+        $position = !empty($validated['position_id'])
+            ? Position::query()->findOrFail((int) $validated['position_id'])
+            : null;
+
+        if ($position) {
+            if (empty($validated['department_id'])) {
+                return response()->json([
+                    'message' => 'Для заявки ОУП выберите департамент.',
+                ], 422);
+            }
+
+            $department = Department::query()->findOrFail((int) $validated['department_id']);
+            if ((int) $position->department_id !== (int) $department->id) {
+                return response()->json([
+                    'message' => 'Выбранная должность не относится к выбранному департаменту.',
+                ], 422);
+            }
+
+            $vacancy = $this->resolveVacancyForPosition($application->vacancy, $position, 'staff');
+        } elseif (!empty($validated['vacancy_id'])) {
+            $vacancy = Vacancy::query()->where('type', 'staff')->findOrFail((int) $validated['vacancy_id']);
+        } else {
+            return response()->json([
+                'message' => 'Для заявки ОУП выберите департамент и должность.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($application, $validated, $vacancy) {
             $application->user->update([
                 'name' => trim($validated['full_name']),
                 'phone' => $this->emptyToNull(trim((string) ($validated['phone'] ?? ''))),
             ]);
 
             $application->update([
-                'vacancy_id' => (int) $validated['vacancy_id'],
+                'vacancy_id' => $vacancy->id,
             ]);
+
+            $this->attachDefaultCommissionMembers($vacancy);
         });
 
         return response()->json([
@@ -1412,22 +1489,36 @@ class ApplicationController extends Controller
         return Str::lower((string) preg_replace('/\s+/u', ' ', trim($title)));
     }
 
-    private function resolveVacancyForPosition(Vacancy $templateVacancy, Position $position): Vacancy
+    private function resolveVacancyForPosition(?Vacancy $templateVacancy, Position $position, ?string $type = null): Vacancy
     {
-        if ((int) $templateVacancy->position_id === (int) $position->id) {
+        if ($templateVacancy && (int) $templateVacancy->position_id === (int) $position->id) {
             return $templateVacancy;
         }
+
+        $vacancyType = $type ?: $templateVacancy?->type ?: 'staff';
 
         return Vacancy::query()->firstOrCreate(
             [
                 'title' => $position->name,
-                'type' => $templateVacancy->type,
+                'type' => $vacancyType,
                 'position_id' => $position->id,
             ],
             [
-                'description' => $templateVacancy->description,
+                'description' => $templateVacancy?->description
+                    ?: $this->technicalVacancyDescription($position),
             ],
         );
+    }
+
+    private function technicalVacancyDescription(Position $position): string
+    {
+        $department = $position->relationLoaded('department')
+            ? $position->department
+            : $position->department()->first(['name']);
+
+        $departmentName = $department?->name ?: 'подразделение не указано';
+
+        return "Техническая вакансия для заявки: {$position->name}. Подразделение: {$departmentName}.";
     }
 
     private function resolveApplicationPositionId(Application $application): ?int

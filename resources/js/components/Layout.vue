@@ -374,7 +374,8 @@ const qualificationRequirementsUrl = "https://library.atu.edu.kz/files/doc/23102
 const adminNavItems = [
     { to: "/admin", label: "Обзор", exact: true },
     { to: "/admin/applications", label: "Заявки" },
-    { to: "/admin/vacancies", label: "Вакансии" },
+    // Раздел вакансий временно скрыт: заявки создаются через департаменты и должности.
+    // { to: "/admin/vacancies", label: "Вакансии" },
     { to: "/admin/departments", label: "Департаменты" },
     { to: "/admin/positions", label: "Должности" },
     { to: "/admin/structure-tree", label: "Структура" },

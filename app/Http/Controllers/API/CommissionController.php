@@ -319,7 +319,6 @@ class CommissionController extends Controller
             'ppsProfile',
             'status:id,code,name',
             'commissionVotes:id,application_id,user_id,decision,hire_term_years,comment,updated_at',
-            'commissionVotes.user:id,name,email,role',
             'resume:id,application_id,file_path',
             'documents:id,application_id,type,file_path',
             'stageLogs.author:id,name',
@@ -499,20 +498,7 @@ class CommissionController extends Controller
             ] : null,
         ];
 
-        $votesByUserId = $eligibleVotes->keyBy('user_id');
-        $application->vote_details = $allMembers->map(function ($member) use ($votesByUserId) {
-            $vote = $votesByUserId->get($member->id);
-
-            return [
-                'user_id' => $member->id,
-                'name' => $member->name,
-                'email' => $member->email,
-                'decision' => $vote?->decision ?? 'pending',
-                'hire_term_years' => $vote?->hire_term_years,
-                'comment' => $vote?->comment,
-                'updated_at' => $vote?->updated_at,
-            ];
-        })->all();
+        $application->unsetRelation('commissionVotes');
 
         return $application;
     }

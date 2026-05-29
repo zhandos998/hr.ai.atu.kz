@@ -9,14 +9,6 @@
         <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Подбор</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <router-link
-            to="/admin/vacancies"
-            class="bg-[#005eb8] hover:bg-blue-700 text-white p-5 rounded-xl transition shadow min-h-[120px] flex flex-col justify-between"
-          >
-            <div class="text-lg font-semibold">Вакансии</div>
-            <div class="text-sm text-blue-100 mt-2">Создание, редактирование и удаление вакансий.</div>
-          </router-link>
-
-          <router-link
             to="/admin/applications"
             class="bg-[#005eb8] hover:bg-blue-700 text-white p-5 rounded-xl transition shadow min-h-[120px] flex flex-col justify-between"
           >

@@ -268,33 +268,6 @@
             </div>
           </section>
 
-          <section v-if="application.vote_details?.length" class="rounded-2xl border border-gray-100 bg-white p-5 shadow space-y-4">
-            <div>
-              <h2 class="text-lg font-semibold text-[#005eb8]">Голоса комиссии</h2>
-              <p class="text-sm text-gray-500">Текущее состояние голосования по заявке.</p>
-            </div>
-
-            <div class="space-y-2">
-              <div
-                v-for="vote in application.vote_details"
-                :key="`${application.id}-${vote.user_id}`"
-                class="flex flex-col gap-2 rounded-xl border border-gray-200 px-4 py-3 md:flex-row md:items-center md:justify-between"
-              >
-                <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-gray-700">{{ vote.name }}</div>
-                  <div class="truncate text-xs text-gray-400">{{ vote.email }}</div>
-                  <div v-if="vote.comment" class="mt-2 whitespace-pre-line text-sm text-gray-600">{{ vote.comment }}</div>
-                </div>
-
-                <div class="text-right">
-                  <div :class="commissionVoteDecisionClass(vote.decision, vote.hire_term_years)" class="inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-                    {{ commissionVoteDecisionLabel(vote.decision, vote.hire_term_years, application?.vacancy?.type) }}
-                  </div>
-                  <div v-if="vote.updated_at" class="mt-1 text-xs text-gray-400">{{ formatDateTime(vote.updated_at) }}</div>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
     </div>
@@ -311,7 +284,6 @@ import { stageLabel } from '../utils/applicationStages';
 import { vacancyTypeLabel } from '../utils/vacancyTypes';
 import {
   hiringTermLabel as formatHiringTermLabel,
-  voteDecisionClass as commissionVoteDecisionClass,
   voteDecisionLabel as commissionVoteDecisionLabel,
   voteResultClass as commissionVoteResultClass,
   voteResultLabel as commissionVoteResultLabel,
@@ -482,18 +454,6 @@ const formatDate = (value) => {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  });
-};
-
-const formatDateTime = (value) => {
-  if (!value) return '';
-
-  return new Date(value).toLocaleString('ru-RU', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 };
 

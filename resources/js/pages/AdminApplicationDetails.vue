@@ -285,21 +285,80 @@
                                     />
                                 </label>
 
-                                <label class="space-y-2 md:col-span-2">
-                                    <span class="text-sm font-medium text-gray-700">Вакансия ОУП</span>
-                                    <select
-                                        v-model="staffDetailsDraft.vacancy_id"
-                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                                    >
-                                        <option value="">Выберите вакансию</option>
-                                        <option
-                                            v-for="vacancy in staffVacancies"
-                                            :key="vacancy.id"
-                                            :value="String(vacancy.id)"
+                                <label class="space-y-2">
+                                    <span class="text-sm font-medium text-gray-700">Департамент</span>
+                                    <div class="relative">
+                                        <input
+                                            v-model="staffDepartmentSearch"
+                                            type="text"
+                                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                                            placeholder="Начните вводить департамент"
+                                            autocomplete="off"
+                                            :disabled="staffDepartmentOptions.length === 0"
+                                            @focus="staffDepartmentDropdownOpen = true"
+                                            @input="handleStaffDepartmentInput"
+                                            @blur="closeStaffDepartmentDropdown"
+                                        />
+                                        <div
+                                            v-if="staffDepartmentDropdownOpen && staffDepartmentSuggestions.length"
+                                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
                                         >
-                                            {{ vacancy.title }}
-                                        </option>
-                                    </select>
+                                            <button
+                                                v-for="department in staffDepartmentSuggestions"
+                                                :key="department.id"
+                                                type="button"
+                                                class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                                                @mousedown.prevent="selectStaffDepartment(department)"
+                                            >
+                                                <span class="font-medium">{{ department.name }}</span>
+                                                <span
+                                                    v-if="department.positions?.length"
+                                                    class="ml-2 text-xs text-gray-400"
+                                                >
+                                                    {{ department.positions.length }} должн.
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span
+                                        v-if="staffDepartmentSearch && staffDepartmentSuggestions.length === 0"
+                                        class="text-xs text-amber-700"
+                                    >По запросу департаменты не найдены.</span>
+                                </label>
+
+                                <label class="space-y-2">
+                                    <span class="text-sm font-medium text-gray-700">Должность</span>
+                                    <div class="relative">
+                                        <input
+                                            v-model="staffPositionSearch"
+                                            type="text"
+                                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                                            placeholder="Начните вводить должность"
+                                            autocomplete="off"
+                                            :disabled="!staffDetailsDraft.department_id || staffPositionOptions.length === 0"
+                                            @focus="staffPositionDropdownOpen = true"
+                                            @input="handleStaffPositionInput"
+                                            @blur="closeStaffPositionDropdown"
+                                        />
+                                        <div
+                                            v-if="staffPositionDropdownOpen && staffPositionSuggestions.length"
+                                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                                        >
+                                            <button
+                                                v-for="position in staffPositionSuggestions"
+                                                :key="position.id"
+                                                type="button"
+                                                class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                                                @mousedown.prevent="selectStaffPosition(position)"
+                                            >
+                                                {{ position.name }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span
+                                        v-if="staffDetailsDraft.department_id && staffPositionSearch && staffPositionSuggestions.length === 0"
+                                        class="text-xs text-amber-700"
+                                    >По запросу должности не найдены.</span>
                                 </label>
                             </div>
 
@@ -360,19 +419,39 @@
                             >Голосующие не назначены.</div>
 
                             <div class="flex flex-col md:flex-row gap-2">
-                                <select
-                                    v-model="memberToAdd"
-                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                                >
-                                    <option value="">Выберите пользователя</option>
-                                    <option
-                                        v-for="user in vacancyCandidates"
-                                        :key="user.id"
-                                        :value="user.id"
+                                <div class="relative w-full">
+                                    <input
+                                        v-model="memberSearch"
+                                        type="text"
+                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                                        placeholder="Начните вводить ФИО, email или телефон"
+                                        autocomplete="off"
+                                        :disabled="vacancyCandidates.length === 0"
+                                        @focus="memberDropdownOpen = true"
+                                        @input="handleMemberSearchInput"
+                                        @blur="closeMemberDropdown"
+                                    />
+                                    <div
+                                        v-if="memberDropdownOpen && memberSuggestions.length"
+                                        class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
                                     >
-                                        {{ candidateDisplay(user) }}
-                                    </option>
-                                </select>
+                                        <button
+                                            v-for="user in memberSuggestions"
+                                            :key="user.id"
+                                            type="button"
+                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                                            @mousedown.prevent="selectCommissionCandidate(user)"
+                                        >
+                                            <span class="font-medium">{{ user.name }}</span>
+                                            <span
+                                                v-if="user.email && !isTechnicalCandidateEmail(user.email)"
+                                                class="ml-2 text-xs text-gray-400"
+                                            >
+                                                {{ user.email }}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <button
                                     @click="addCommissionMember"
                                     :disabled="!memberToAdd"
@@ -427,12 +506,41 @@
 
                                             <label class="space-y-2">
                                                 <span class="text-sm font-medium text-gray-700">Претендуемая должность</span>
-                                                <input
-                                                    v-model="ppsProfileDraft.desired_position"
-                                                    type="text"
-                                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                                                    placeholder="Например, старший преподаватель"
-                                                />
+                                                <div class="relative">
+                                                    <input
+                                                        v-model="ppsPositionSearch"
+                                                        type="text"
+                                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                                                        placeholder="Начните вводить должность"
+                                                        autocomplete="off"
+                                                        :disabled="ppsPositionOptions.length === 0"
+                                                        @focus="ppsPositionDropdownOpen = true"
+                                                        @input="handlePpsPositionInput"
+                                                        @blur="closePpsPositionDropdown"
+                                                    />
+                                                    <div
+                                                        v-if="ppsPositionDropdownOpen && ppsPositionSuggestions.length"
+                                                        class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                                                    >
+                                                        <button
+                                                            v-for="position in ppsPositionSuggestions"
+                                                            :key="position.id"
+                                                            type="button"
+                                                            class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                                                            @mousedown.prevent="selectPpsPosition(position)"
+                                                        >
+                                                            {{ position.title }}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <span
+                                                    v-if="ppsPositionOptions.length === 0"
+                                                    class="text-xs text-amber-700"
+                                                >Для ППС пока нет доступных должностей.</span>
+                                                <span
+                                                    v-else-if="ppsPositionSearch && ppsPositionSuggestions.length === 0"
+                                                    class="text-xs text-amber-700"
+                                                >По запросу должности не найдены.</span>
                                             </label>
 
                                             <label class="space-y-2">
@@ -1121,19 +1229,39 @@
                                 >Голосующие не назначены.</div>
 
                                 <div class="flex flex-col md:flex-row gap-2">
-                                    <select
-                                        v-model="memberToAdd"
-                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                                    >
-                                        <option value="">Выберите пользователя</option>
-                                        <option
-                                            v-for="user in vacancyCandidates"
-                                            :key="user.id"
-                                            :value="user.id"
+                                    <div class="relative w-full">
+                                        <input
+                                            v-model="memberSearch"
+                                            type="text"
+                                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                                            placeholder="Начните вводить ФИО, email или телефон"
+                                            autocomplete="off"
+                                            :disabled="vacancyCandidates.length === 0"
+                                            @focus="memberDropdownOpen = true"
+                                            @input="handleMemberSearchInput"
+                                            @blur="closeMemberDropdown"
+                                        />
+                                        <div
+                                            v-if="memberDropdownOpen && memberSuggestions.length"
+                                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
                                         >
-                                            {{ candidateDisplay(user) }}
-                                        </option>
-                                    </select>
+                                            <button
+                                                v-for="user in memberSuggestions"
+                                                :key="user.id"
+                                                type="button"
+                                                class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                                                @mousedown.prevent="selectCommissionCandidate(user)"
+                                            >
+                                                <span class="font-medium">{{ user.name }}</span>
+                                                <span
+                                                    v-if="user.email && !isTechnicalCandidateEmail(user.email)"
+                                                    class="ml-2 text-xs text-gray-400"
+                                                >
+                                                    {{ user.email }}
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
                                     <button
                                         @click="addCommissionMember"
                                         :disabled="!memberToAdd"
@@ -1228,13 +1356,22 @@ const loading = ref(true);
 const errorMessage = ref("");
 const vacancyCandidates = ref([]);
 const memberToAdd = ref("");
-const staffVacancies = ref([]);
+const memberSearch = ref("");
+const memberDropdownOpen = ref(false);
+let vacancyCandidateRequestId = 0;
+const vacancies = ref([]);
 const departments = ref([]);
 const aiResult = ref(null);
 const aiLoading = ref(false);
 const aiError = ref("");
 const pdfLoading = ref(false);
 const staffDetailsSaving = ref(false);
+const ppsPositionSearch = ref("");
+const staffDepartmentSearch = ref("");
+const staffPositionSearch = ref("");
+const ppsPositionDropdownOpen = ref(false);
+const staffDepartmentDropdownOpen = ref(false);
+const staffPositionDropdownOpen = ref(false);
 const ppsProfileSaving = ref(false);
 const ppsProfileSavingSection = ref("");
 const stageDrafts = ref({});
@@ -1261,6 +1398,12 @@ const candidateDisplay = (user) => {
         ? `${name} (${email})`
         : name;
 };
+const normalizeSearchText = (value) =>
+    String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[«»"'`]/g, "")
+        .replace(/\s+/g, " ");
 
 const vacancyId = computed(
     () =>
@@ -1299,6 +1442,31 @@ const allCommissionMembers = computed(() => {
 });
 const isVacancyCommissionMember = (member) =>
     vacancyMemberIds.value.has(Number(member?.id));
+const memberSuggestions = computed(() => {
+    const query = normalizeSearchText(memberSearch.value);
+    const candidates = query
+        ? vacancyCandidates.value.filter((user) =>
+              [
+                  user?.name,
+                  user?.email,
+                  user?.phone,
+              ].some((value) => normalizeSearchText(value).includes(query))
+          )
+        : vacancyCandidates.value;
+
+    const selected = vacancyCandidates.value.find(
+        (user) => Number(user.id) === Number(memberToAdd.value)
+    );
+
+    if (
+        selected &&
+        !candidates.some((user) => Number(user.id) === Number(selected.id))
+    ) {
+        return [selected, ...candidates].slice(0, 12);
+    }
+
+    return candidates.slice(0, 12);
+});
 const canGenerateLawyerPdf = computed(() =>
     ["clear", "flagged"].includes(application.value?.compliance_status)
 );
@@ -1410,6 +1578,147 @@ const isChairDepartment = (department) => {
 
     return description === "кафедра" || name.startsWith("кафедра");
 };
+const ppsPositionOptions = computed(() => {
+    const uniqueByTitle = new Map();
+
+    for (const vacancy of vacancies.value || []) {
+        if (vacancy?.type !== "pps") {
+            continue;
+        }
+
+        const title = String(vacancy?.title || "").trim();
+        if (!title) {
+            continue;
+        }
+
+        const titleKey = normalizeSearchText(title);
+        if (!uniqueByTitle.has(titleKey)) {
+            uniqueByTitle.set(titleKey, {
+                id: vacancy.id,
+                title,
+            });
+        }
+    }
+
+    const currentTitle = String(ppsProfileDraft.value.desired_position || "").trim();
+    const currentKey = normalizeSearchText(currentTitle);
+    if (currentTitle && !uniqueByTitle.has(currentKey)) {
+        uniqueByTitle.set(currentKey, {
+            id: `current-${currentKey}`,
+            title: currentTitle,
+        });
+    }
+
+    return Array.from(uniqueByTitle.values()).sort((left, right) =>
+        String(left?.title || "").localeCompare(String(right?.title || ""), "ru")
+    );
+});
+const selectedPpsPosition = computed(() =>
+    ppsPositionOptions.value.find(
+        (position) =>
+            normalizeSearchText(position?.title) ===
+            normalizeSearchText(ppsProfileDraft.value.desired_position)
+    ) || null
+);
+const ppsPositionSuggestions = computed(() => {
+    const query = normalizeSearchText(ppsPositionSearch.value);
+    const filtered = query
+        ? ppsPositionOptions.value.filter((position) =>
+              normalizeSearchText(position?.title).includes(query)
+          )
+        : ppsPositionOptions.value;
+
+    if (
+        selectedPpsPosition.value &&
+        !filtered.some(
+            (position) =>
+                normalizeSearchText(position?.title) ===
+                normalizeSearchText(selectedPpsPosition.value?.title)
+        )
+    ) {
+        return [selectedPpsPosition.value, ...filtered].slice(0, 12);
+    }
+
+    return filtered.slice(0, 12);
+});
+const staffDepartmentOptions = computed(() =>
+    (departments.value || [])
+        .filter(
+            (department) =>
+                !isChairDepartment(department) &&
+                Array.isArray(department?.positions) &&
+                department.positions.length > 0
+        )
+        .slice()
+        .sort((left, right) =>
+            String(left?.name || "").localeCompare(
+                String(right?.name || ""),
+                "ru"
+            )
+        )
+);
+const selectedStaffDepartment = computed(() =>
+    staffDepartmentOptions.value.find(
+        (department) =>
+            String(department.id) === staffDetailsDraft.value.department_id
+    ) || null
+);
+const staffDepartmentSuggestions = computed(() => {
+    const query = normalizeSearchText(staffDepartmentSearch.value);
+    const filtered = query
+        ? staffDepartmentOptions.value.filter((department) =>
+              normalizeSearchText(department?.name).includes(query)
+          )
+        : staffDepartmentOptions.value;
+
+    if (
+        selectedStaffDepartment.value &&
+        !filtered.some(
+            (department) =>
+                String(department.id) ===
+                String(selectedStaffDepartment.value.id)
+        )
+    ) {
+        return [selectedStaffDepartment.value, ...filtered].slice(0, 12);
+    }
+
+    return filtered.slice(0, 12);
+});
+const staffPositionOptions = computed(() =>
+    (selectedStaffDepartment.value?.positions || [])
+        .slice()
+        .sort((left, right) =>
+            String(left?.name || "").localeCompare(
+                String(right?.name || ""),
+                "ru"
+            )
+        )
+);
+const selectedStaffPosition = computed(() =>
+    staffPositionOptions.value.find(
+        (position) => String(position.id) === staffDetailsDraft.value.position_id
+    ) || null
+);
+const staffPositionSuggestions = computed(() => {
+    const query = normalizeSearchText(staffPositionSearch.value);
+    const filtered = query
+        ? staffPositionOptions.value.filter((position) =>
+              normalizeSearchText(position?.name).includes(query)
+          )
+        : staffPositionOptions.value;
+
+    if (
+        selectedStaffPosition.value &&
+        !filtered.some(
+            (position) =>
+                String(position.id) === String(selectedStaffPosition.value.id)
+        )
+    ) {
+        return [selectedStaffPosition.value, ...filtered].slice(0, 12);
+    }
+
+    return filtered.slice(0, 12);
+});
 const ppsDepartmentOptions = computed(() => {
     if (!selectedPpsFaculty.value) {
         return [];
@@ -1480,6 +1789,8 @@ const closeUploadDocsModal = async (refresh = false) => {
 const emptyStaffDetailsDraft = () => ({
     full_name: "",
     phone: "",
+    department_id: "",
+    position_id: "",
     vacancy_id: "",
 });
 
@@ -1921,15 +2232,159 @@ const syncPpsProfileDraft = (item) => {
             "disciplinary_actions_info"
         ),
     };
+    syncPpsPositionSearch();
 };
 
 const syncStaffDetailsDraft = (item) => {
+    const position = item?.vacancy?.position;
     staffDetailsDraft.value = {
         ...emptyStaffDetailsDraft(),
         full_name: item?.user?.name || "",
         phone: item?.user?.phone || "",
+        department_id: position?.department_id
+            ? String(position.department_id)
+            : "",
+        position_id: position?.id ? String(position.id) : "",
         vacancy_id: item?.vacancy?.id ? String(item.vacancy.id) : "",
     };
+    syncStaffAutocompleteLabels(item);
+};
+
+const syncStaffAutocompleteLabels = (item = application.value) => {
+    const position = item?.vacancy?.position || selectedStaffPosition.value;
+    const department = selectedStaffDepartment.value;
+
+    staffDepartmentSearch.value = department?.name || "";
+    staffPositionSearch.value = position?.name || "";
+};
+
+const syncPpsPositionSearch = () => {
+    ppsPositionSearch.value = ppsProfileDraft.value.desired_position || "";
+};
+
+const selectPpsPosition = (position) => {
+    ppsProfileDraft.value.desired_position = position.title || "";
+    ppsPositionSearch.value = position.title || "";
+    ppsPositionDropdownOpen.value = false;
+};
+
+const applyExactPpsPositionSearchMatch = () => {
+    const query = normalizeSearchText(ppsPositionSearch.value);
+    if (!query) {
+        ppsProfileDraft.value.desired_position = "";
+        return;
+    }
+
+    const exactMatch = ppsPositionOptions.value.find(
+        (position) => normalizeSearchText(position?.title) === query
+    );
+
+    if (exactMatch) {
+        ppsProfileDraft.value.desired_position = exactMatch.title || "";
+        ppsPositionSearch.value = exactMatch.title || "";
+    }
+};
+
+const selectStaffDepartment = (department) => {
+    staffDetailsDraft.value.department_id = String(department.id);
+    staffDetailsDraft.value.position_id = "";
+    staffDepartmentSearch.value = department.name || "";
+    staffPositionSearch.value = "";
+    staffDepartmentDropdownOpen.value = false;
+    staffPositionDropdownOpen.value = false;
+};
+
+const selectStaffPosition = (position) => {
+    staffDetailsDraft.value.position_id = String(position.id);
+    staffPositionSearch.value = position.name || "";
+    staffPositionDropdownOpen.value = false;
+};
+
+const handleStaffDepartmentInput = () => {
+    staffDepartmentDropdownOpen.value = true;
+
+    if (
+        selectedStaffDepartment.value &&
+        normalizeSearchText(staffDepartmentSearch.value) !==
+            normalizeSearchText(selectedStaffDepartment.value.name)
+    ) {
+        staffDetailsDraft.value.department_id = "";
+        staffDetailsDraft.value.position_id = "";
+        staffPositionSearch.value = "";
+    }
+};
+
+const handlePpsPositionInput = () => {
+    ppsPositionDropdownOpen.value = true;
+
+    if (
+        selectedPpsPosition.value &&
+        normalizeSearchText(ppsPositionSearch.value) !==
+            normalizeSearchText(selectedPpsPosition.value.title)
+    ) {
+        ppsProfileDraft.value.desired_position = "";
+    }
+};
+
+const handleStaffPositionInput = () => {
+    staffPositionDropdownOpen.value = true;
+
+    if (
+        selectedStaffPosition.value &&
+        normalizeSearchText(staffPositionSearch.value) !==
+            normalizeSearchText(selectedStaffPosition.value.name)
+    ) {
+        staffDetailsDraft.value.position_id = "";
+    }
+};
+
+const closePpsPositionDropdown = () => {
+    applyExactPpsPositionSearchMatch();
+    window.setTimeout(() => {
+        ppsPositionDropdownOpen.value = false;
+    }, 120);
+};
+
+const closeStaffDepartmentDropdown = () => {
+    window.setTimeout(() => {
+        staffDepartmentDropdownOpen.value = false;
+    }, 120);
+};
+
+const closeStaffPositionDropdown = () => {
+    window.setTimeout(() => {
+        staffPositionDropdownOpen.value = false;
+    }, 120);
+};
+
+const selectCommissionCandidate = (user) => {
+    memberToAdd.value = String(user.id);
+    memberSearch.value = candidateDisplay(user);
+    memberDropdownOpen.value = false;
+};
+
+const handleMemberSearchInput = () => {
+    memberDropdownOpen.value = true;
+
+    const selected = vacancyCandidates.value.find(
+        (user) => Number(user.id) === Number(memberToAdd.value)
+    );
+
+    if (
+        selected &&
+        normalizeSearchText(memberSearch.value) !==
+            normalizeSearchText(candidateDisplay(selected))
+    ) {
+        memberToAdd.value = "";
+    }
+
+    loadVacancyCandidates(memberSearch.value);
+};
+
+const closeMemberDropdown = () => {
+    window.setTimeout(() => {
+        memberDropdownOpen.value = false;
+    }, 120);
 };
 
 const applySavedPpsProfileSection = (item, fieldKeys, documentFields = []) => {
@@ -1992,37 +2447,45 @@ const deletePpsProfileDocument = async (documentId) => {
     }
 };
 
-const loadVacancyCandidates = async () => {
+const loadVacancyCandidates = async (query = "") => {
     if (!vacancyId.value) {
+        vacancyCandidateRequestId += 1;
         vacancyCandidates.value = [];
+        memberToAdd.value = "";
+        memberSearch.value = "";
+        memberDropdownOpen.value = false;
         return;
     }
 
+    const requestId = ++vacancyCandidateRequestId;
+
     try {
         const response = await axios.get(
-            `/api/admin/vacancies/${vacancyId.value}/commission-candidates`
+            `/api/admin/vacancies/${vacancyId.value}/commission-candidates`,
+            {
+                params: {
+                    q: String(query || "").trim() || undefined,
+                },
+            }
         );
-        vacancyCandidates.value = response.data;
+        if (requestId === vacancyCandidateRequestId) {
+            vacancyCandidates.value = response.data;
+        }
     } catch (error) {
-        vacancyCandidates.value = [];
+        if (requestId === vacancyCandidateRequestId) {
+            vacancyCandidates.value = [];
+        }
         console.error(error);
     }
 };
 
-const fetchStaffVacancies = async () => {
+const fetchVacancies = async () => {
     try {
         const response = await axios.get("/api/admin/vacancies");
-        staffVacancies.value = (response.data || [])
-            .filter((vacancy) => vacancy?.type === "staff")
-            .slice()
-            .sort((left, right) =>
-                String(left?.title || "").localeCompare(
-                    String(right?.title || ""),
-                    "ru"
-                )
-            );
+        vacancies.value = response.data || [];
+        syncPpsPositionSearch();
     } catch (error) {
-        staffVacancies.value = [];
+        vacancies.value = [];
         console.error(error);
     }
 };
@@ -2031,6 +2494,7 @@ const fetchDepartments = async () => {
     try {
         const response = await axios.get("/api/admin/departments");
         departments.value = response.data || [];
+        syncStaffAutocompleteLabels();
     } catch (error) {
         departments.value = [];
         console.error(error);
@@ -2052,10 +2516,16 @@ const fetchApplication = async () => {
         aiResult.value = application.value.ai_result || null;
         aiError.value = "";
         memberToAdd.value = "";
+        memberSearch.value = "";
+        memberDropdownOpen.value = false;
         await loadVacancyCandidates();
     } catch (error) {
         application.value = null;
         staffDetailsDraft.value = emptyStaffDetailsDraft();
+        ppsPositionSearch.value = "";
+        ppsPositionDropdownOpen.value = false;
+        staffDepartmentSearch.value = "";
+        staffPositionSearch.value = "";
         ppsProfileDraft.value = emptyPpsProfileDraft();
         errorMessage.value =
             error?.response?.data?.message || "Ошибка при загрузке заявки.";
@@ -2072,8 +2542,13 @@ const saveStaffDetails = async () => {
         return;
     }
 
-    if (!staffDetailsDraft.value.vacancy_id) {
-        alert("Выберите вакансию ОУП.");
+    if (!staffDetailsDraft.value.department_id) {
+        alert("Выберите департамент.");
+        return;
+    }
+
+    if (!staffDetailsDraft.value.position_id) {
+        alert("Выберите должность.");
         return;
     }
 
@@ -2085,7 +2560,8 @@ const saveStaffDetails = async () => {
             {
                 full_name: staffDetailsDraft.value.full_name.trim(),
                 phone: staffDetailsDraft.value.phone.trim() || null,
-                vacancy_id: staffDetailsDraft.value.vacancy_id,
+                department_id: Number(staffDetailsDraft.value.department_id),
+                position_id: Number(staffDetailsDraft.value.position_id),
             }
         );
 
@@ -2107,6 +2583,7 @@ const saveStaffDetails = async () => {
 const savePpsProfile = async () => {
     if (!application.value || !isPpsApplication.value) return;
 
+    applyExactPpsPositionSearchMatch();
     ppsProfileSaving.value = true;
 
     try {
@@ -2359,6 +2836,8 @@ const addCommissionMember = async () => {
         );
 
         memberToAdd.value = "";
+        memberSearch.value = "";
+        memberDropdownOpen.value = false;
         await fetchApplication();
     } catch (error) {
         alert(
@@ -2477,7 +2956,7 @@ const generateCandidateAI = async () => {
 onMounted(async () => {
     await Promise.all([
         fetchApplication(),
-        fetchStaffVacancies(),
+        fetchVacancies(),
         fetchDepartments(),
     ]);
 });

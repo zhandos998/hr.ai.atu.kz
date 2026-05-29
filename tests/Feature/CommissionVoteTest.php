@@ -125,6 +125,37 @@ class CommissionVoteTest extends TestCase
         $this->assertDatabaseCount('application_commission_votes', 0);
     }
 
+    public function test_commission_member_does_not_receive_other_members_vote_details(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+
+        $members = User::factory()->count(3)->create();
+        foreach ($members as $member) {
+            CommissionMember::query()->create([
+                'user_id' => $member->id,
+            ]);
+        }
+
+        $application = $this->createPpsApplication();
+
+        Sanctum::actingAs($members[0]);
+        $this->postJson("/api/commission/applications/{$application->id}/vote", [
+            'decision' => 'hire',
+            'hire_term_years' => 1,
+            'comment' => 'Комментарий виден только админу и автору как свой голос.',
+        ])->assertOk();
+
+        Sanctum::actingAs($members[1]);
+        $response = $this->getJson("/api/commission/applications/{$application->id}")
+            ->assertOk()
+            ->assertJsonPath('vote_summary.voted', 1);
+
+        $payload = $response->json();
+
+        $this->assertArrayNotHasKey('vote_details', $payload);
+        $this->assertArrayNotHasKey('commission_votes', $payload);
+    }
+
     private function createPpsApplication(): Application
     {
         return $this->createHiringApplication('pps', 'Ассистент');

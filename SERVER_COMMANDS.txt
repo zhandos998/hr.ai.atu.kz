@@ -1,0 +1,175 @@
+Команды для сервера vacancy.atu.kz
+===================================
+
+1. Подключиться к серверу
+-------------------------
+
+ssh zhagparovr@172.20.252.171
+
+После входа перейти в папку проекта:
+
+cd /opt/apps/vacancy
+
+
+2. Обновить проект из Git на сервере
+------------------------------------
+
+Проверить текущие изменения:
+
+git status --short
+
+Подтянуть свежий код:
+
+git pull --ff-only origin master
+
+Пересобрать и поднять контейнеры:
+
+docker compose --env-file docker.env up -d --build
+
+Очистить и заново собрать кэш Laravel:
+
+docker compose --env-file docker.env exec -T app php artisan optimize:clear
+docker compose --env-file docker.env exec -T app php artisan optimize
+
+Проверить контейнеры:
+
+docker compose --env-file docker.env ps
+
+
+3. Миграции
+-----------
+
+Обычное обновление базы на проде:
+
+docker compose --env-file docker.env exec -T app php artisan migrate --force
+
+Запустить сидеры без удаления данных:
+
+docker compose --env-file docker.env exec -T app php artisan db:seed --force
+
+Полностью очистить базу и создать заново:
+
+docker compose --env-file docker.env exec -T app php artisan migrate:fresh --seed --force
+
+Внимание: migrate:fresh --seed удаляет все таблицы и все данные.
+На проде запускать только если точно нужно стереть заявки, пользователей,
+документы, голоса комиссии и остальные данные.
+
+
+4. Как отправить изменения с локалки в Git
+------------------------------------------
+
+На локальном компьютере в папке проекта:
+
+git status --short
+git add .
+git commit -m "Описание изменений"
+git push origin master
+
+После этого на сервере выполнить команды из раздела 2.
+
+
+5. phpMyAdmin
+-------------
+
+phpMyAdmin установлен на сервере, но открыт только внутри сервера:
+
+127.0.0.1:8093
+
+Чтобы открыть его на своем компьютере, в отдельном терминале запустить:
+
+ssh -L 8093:127.0.0.1:8093 zhagparovr@172.20.252.171
+
+Этот терминал нужно держать открытым.
+Потом открыть в браузере:
+
+http://127.0.0.1:8093
+
+Логин и пароль MySQL посмотреть на сервере:
+
+cd /opt/apps/vacancy
+grep '^DOCKER_DB_DATABASE=' docker.env
+grep '^DOCKER_DB_USERNAME=' docker.env
+grep '^DOCKER_DB_PASSWORD=' docker.env
+
+В phpMyAdmin обычно нужны:
+
+Username: значение DOCKER_DB_USERNAME
+Password: значение DOCKER_DB_PASSWORD
+
+
+6. Управление phpMyAdmin
+------------------------
+
+Запустить:
+
+cd /opt/apps/vacancy
+docker compose --env-file docker.env up -d phpmyadmin
+
+Проверить статус:
+
+docker compose --env-file docker.env ps phpmyadmin
+
+Посмотреть логи:
+
+docker compose --env-file docker.env logs -f phpmyadmin
+
+Остановить:
+
+docker compose --env-file docker.env stop phpmyadmin
+
+
+7. MySQL через консоль сервера
+------------------------------
+
+Подключиться к MySQL из контейнера db:
+
+cd /opt/apps/vacancy
+docker compose --env-file docker.env exec db mysql -u vacancy -p vacancy
+
+Если имя базы или пользователь отличаются, посмотреть их:
+
+grep '^DOCKER_DB_DATABASE=' docker.env
+grep '^DOCKER_DB_USERNAME=' docker.env
+
+
+8. Частые Docker-команды
+------------------------
+
+Список контейнеров проекта:
+
+cd /opt/apps/vacancy
+docker compose --env-file docker.env ps
+
+Логи Laravel:
+
+docker compose --env-file docker.env logs -f app
+
+Логи очереди:
+
+docker compose --env-file docker.env logs -f queue
+
+Логи nginx:
+
+docker compose --env-file docker.env logs -f nginx
+
+Перезапустить приложение:
+
+docker compose --env-file docker.env restart app queue nginx
+
+Перезапустить все контейнеры проекта:
+
+docker compose --env-file docker.env restart
+
+
+9. Проверить сайт
+-----------------
+
+Проверить ответ сайта с сервера:
+
+curl -I https://vacancy.atu.kz/
+
+Проверить локальный nginx контейнера:
+
+curl -I http://127.0.0.1:8092/
+

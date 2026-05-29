@@ -51,6 +51,7 @@
               >
                 <input
                   type="file"
+                  multiple
                   class="absolute inset-0 opacity-0 cursor-pointer"
                   :accept="acceptFor(t)"
                   @change="onPick(t, $event)"

@@ -28,7 +28,7 @@
       >
         <div>
           <h2 class="text-xl font-semibold text-[#005eb8]">Создать заявку вручную</h2>
-          <p class="text-sm text-gray-500">Введите ФИО кандидата, выберите тип вакансии, а для ППС дополнительно укажите факультет и кафедру.</p>
+          <p class="text-sm text-gray-500">Введите ФИО кандидата. Для ОУП выберите департамент и должность, для ППС — факультет, кафедру и позицию.</p>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -43,7 +43,7 @@
           </div>
 
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Тип вакансии</label>
+            <label class="block text-sm font-medium text-gray-700">Тип заявки</label>
             <select
               v-model="createForm.vacancy_type"
               class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -100,24 +100,120 @@
             </p>
           </div>
 
-          <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Вакансия</label>
-            <select
-              v-model="createForm.vacancy_id"
-              :disabled="filteredVacancies.length === 0"
-              class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">Выберите вакансию</option>
-              <option
-                v-for="vacancy in filteredVacancies"
-                :key="vacancy.id"
-                :value="String(vacancy.id)"
+          <div v-if="createForm.vacancy_type === 'staff'" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Департамент</label>
+            <div class="relative">
+              <input
+                v-model="staffDepartmentSearch"
+                type="text"
+                placeholder="Начните вводить департамент"
+                :disabled="staffDepartmentOptions.length === 0"
+                autocomplete="off"
+                class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                @focus="staffDepartmentDropdownOpen = true"
+                @input="handleStaffDepartmentInput"
+                @keydown.down.prevent="focusStaffDepartmentSuggestion"
+                @blur="closeStaffDepartmentDropdown"
+              />
+              <div
+                v-if="staffDepartmentDropdownOpen && staffDepartmentSuggestions.length"
+                class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
               >
-                {{ vacancy.title }}
-              </option>
-            </select>
-            <p v-if="filteredVacancies.length === 0" class="text-xs text-amber-700">
-              Для выбранного типа вакансий пока нет записей.
+                <button
+                  v-for="department in staffDepartmentSuggestions"
+                  :key="department.id"
+                  type="button"
+                  class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                  @mousedown.prevent="selectStaffDepartment(department)"
+                >
+                  <span class="font-medium">{{ department.name }}</span>
+                  <span v-if="department.positions?.length" class="ml-2 text-xs text-gray-400">
+                    {{ department.positions.length }} должн.
+                  </span>
+                </button>
+              </div>
+            </div>
+            <p v-if="staffDepartmentOptions.length === 0" class="text-xs text-amber-700">
+              В справочнике нет департаментов с должностями.
+            </p>
+            <p v-else-if="staffDepartmentSearch && staffDepartmentSuggestions.length === 0" class="text-xs text-amber-700">
+              По запросу департаменты не найдены.
+            </p>
+          </div>
+
+          <div v-if="createForm.vacancy_type === 'staff'" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Должность</label>
+            <div class="relative">
+              <input
+                v-model="staffPositionSearch"
+                type="text"
+                placeholder="Начните вводить должность"
+                :disabled="!createForm.department_id || staffPositionOptions.length === 0"
+                autocomplete="off"
+                class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                @focus="staffPositionDropdownOpen = true"
+                @input="handleStaffPositionInput"
+                @keydown.down.prevent="focusStaffPositionSuggestion"
+                @blur="closeStaffPositionDropdown"
+              />
+              <div
+                v-if="staffPositionDropdownOpen && staffPositionSuggestions.length"
+                class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+              >
+                <button
+                  v-for="position in staffPositionSuggestions"
+                  :key="position.id"
+                  type="button"
+                  class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                  @mousedown.prevent="selectStaffPosition(position)"
+                >
+                  {{ position.name }}
+                </button>
+              </div>
+            </div>
+            <p v-if="createForm.department_id && staffPositionOptions.length === 0" class="text-xs text-amber-700">
+              В выбранном департаменте нет должностей.
+            </p>
+            <p v-else-if="createForm.department_id && staffPositionSearch && staffPositionSuggestions.length === 0" class="text-xs text-amber-700">
+              По запросу должности не найдены.
+            </p>
+          </div>
+
+          <div v-if="createForm.vacancy_type === 'pps'" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Позиция</label>
+            <div class="relative">
+              <input
+                v-model="ppsPositionSearch"
+                type="text"
+                placeholder="Начните вводить позицию"
+                :disabled="ppsPositionOptions.length === 0"
+                autocomplete="off"
+                class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
+                @focus="ppsPositionDropdownOpen = true"
+                @input="handlePpsPositionInput"
+                @keydown.down.prevent="focusPpsPositionSuggestion"
+                @blur="closePpsPositionDropdown"
+              />
+              <div
+                v-if="ppsPositionDropdownOpen && ppsPositionSuggestions.length"
+                class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+              >
+                <button
+                  v-for="vacancy in ppsPositionSuggestions"
+                  :key="vacancy.id"
+                  type="button"
+                  class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#005eb8]"
+                  @mousedown.prevent="selectPpsPosition(vacancy)"
+                >
+                  {{ vacancy.title }}
+                </button>
+              </div>
+            </div>
+            <p v-if="ppsPositionOptions.length === 0" class="text-xs text-amber-700">
+              Для ППС пока нет доступных позиций.
+            </p>
+            <p v-else-if="ppsPositionSearch && ppsPositionSuggestions.length === 0" class="text-xs text-amber-700">
+              По запросу позиции не найдены.
             </p>
           </div>
 
@@ -135,7 +231,7 @@
           </div>
         </div>
 
-        <div v-if="createForm.full_name || selectedVacancy || createForm.faculty_name || createForm.department_name" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
+        <div v-if="createForm.full_name || selectedVacancy || selectedStaffDepartment || selectedStaffPosition || createForm.faculty_name || createForm.department_name" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
           <div class="rounded-xl bg-slate-50 px-4 py-3">
             <div class="text-xs uppercase tracking-wide text-gray-400">Кандидат</div>
             <div class="mt-1 font-medium text-gray-800">{{ createForm.full_name || 'Не указан' }}</div>
@@ -152,8 +248,16 @@
             <div class="text-xs uppercase tracking-wide text-gray-400">Кафедра</div>
             <div class="mt-1 font-medium text-gray-800">{{ createForm.department_name || 'Не указана' }}</div>
           </div>
-          <div class="rounded-xl bg-slate-50 px-4 py-3 md:col-span-2 xl:col-span-2">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Вакансия</div>
+          <div v-if="createForm.vacancy_type === 'staff'" class="rounded-xl bg-slate-50 px-4 py-3">
+            <div class="text-xs uppercase tracking-wide text-gray-400">Департамент</div>
+            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffDepartment?.name || 'Не выбран' }}</div>
+          </div>
+          <div v-if="createForm.vacancy_type === 'staff'" class="rounded-xl bg-slate-50 px-4 py-3">
+            <div class="text-xs uppercase tracking-wide text-gray-400">Должность</div>
+            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffPosition?.name || 'Не выбрана' }}</div>
+          </div>
+          <div v-if="createForm.vacancy_type === 'pps'" class="rounded-xl bg-slate-50 px-4 py-3 md:col-span-2 xl:col-span-2">
+            <div class="text-xs uppercase tracking-wide text-gray-400">Позиция</div>
             <div class="mt-1 font-medium text-gray-800">{{ selectedVacancy?.title || 'Не выбрана' }}</div>
           </div>
         </div>
@@ -504,6 +608,12 @@ const unarchivingApplicationIds = ref([]);
 const applicationArchiveMode = ref(String(route.query.archived) === '1' ? 'archived' : 'active');
 const showCreateForm = ref(false);
 const applicationSearch = ref('');
+const ppsPositionSearch = ref('');
+const staffDepartmentSearch = ref('');
+const staffPositionSearch = ref('');
+const ppsPositionDropdownOpen = ref(false);
+const staffDepartmentDropdownOpen = ref(false);
+const staffPositionDropdownOpen = ref(false);
 const stageFilters = ref({
   resume: '',
   documents: '',
@@ -517,6 +627,8 @@ const createForm = ref({
   vacancy_type: vacancyTypeTabValues.includes(String(route.query.type)) ? String(route.query.type) : 'pps',
   faculty_name: '',
   department_name: '',
+  department_id: '',
+  position_id: '',
   vacancy_id: '',
   resume: null,
 });
@@ -627,6 +739,76 @@ const filteredVacancies = computed(() => {
 });
 
 const selectedVacancy = computed(() => vacancies.value.find((vacancy) => String(vacancy.id) === createForm.value.vacancy_id) || null);
+const ppsPositionOptions = computed(() => filteredVacancies.value);
+const filteredPpsPositionOptions = computed(() => {
+  const query = normalizeVacancyMatchText(ppsPositionSearch.value);
+  const filtered = query
+    ? ppsPositionOptions.value.filter((vacancy) => normalizeVacancyMatchText(vacancy?.title).includes(query))
+    : ppsPositionOptions.value;
+
+  if (
+    selectedVacancy.value
+    && !filtered.some((vacancy) => String(vacancy.id) === String(selectedVacancy.value.id))
+  ) {
+    return [selectedVacancy.value, ...filtered];
+  }
+
+  return filtered;
+});
+const ppsPositionSuggestions = computed(() => filteredPpsPositionOptions.value.slice(0, 12));
+const staffDepartmentOptions = computed(() => (
+  (departments.value || [])
+    .filter((department) => (
+      !isChairDepartment(department)
+      && Array.isArray(department?.positions)
+      && department.positions.length > 0
+    ))
+    .slice()
+    .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || ''), 'ru'))
+));
+const selectedStaffDepartment = computed(() => (
+  staffDepartmentOptions.value.find((department) => String(department.id) === createForm.value.department_id) || null
+));
+const filteredStaffDepartmentOptions = computed(() => {
+  const query = normalizeVacancyMatchText(staffDepartmentSearch.value);
+  const filtered = query
+    ? staffDepartmentOptions.value.filter((department) => normalizeVacancyMatchText(department?.name).includes(query))
+    : staffDepartmentOptions.value;
+
+  if (
+    selectedStaffDepartment.value
+    && !filtered.some((department) => String(department.id) === String(selectedStaffDepartment.value.id))
+  ) {
+    return [selectedStaffDepartment.value, ...filtered];
+  }
+
+  return filtered;
+});
+const staffDepartmentSuggestions = computed(() => filteredStaffDepartmentOptions.value.slice(0, 12));
+const staffPositionOptions = computed(() => (
+  (selectedStaffDepartment.value?.positions || [])
+    .slice()
+    .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || ''), 'ru'))
+));
+const selectedStaffPosition = computed(() => (
+  staffPositionOptions.value.find((position) => String(position.id) === createForm.value.position_id) || null
+));
+const filteredStaffPositionOptions = computed(() => {
+  const query = normalizeVacancyMatchText(staffPositionSearch.value);
+  const filtered = query
+    ? staffPositionOptions.value.filter((position) => normalizeVacancyMatchText(position?.name).includes(query))
+    : staffPositionOptions.value;
+
+  if (
+    selectedStaffPosition.value
+    && !filtered.some((position) => String(position.id) === String(selectedStaffPosition.value.id))
+  ) {
+    return [selectedStaffPosition.value, ...filtered];
+  }
+
+  return filtered;
+});
+const staffPositionSuggestions = computed(() => filteredStaffPositionOptions.value.slice(0, 12));
 const departmentChildrenByParentId = computed(() => {
   const grouped = new Map();
 
@@ -919,11 +1101,19 @@ const goToDetails = (applicationId) => {
 };
 
 const resetCreateForm = () => {
+  ppsPositionSearch.value = '';
+  staffDepartmentSearch.value = '';
+  staffPositionSearch.value = '';
+  ppsPositionDropdownOpen.value = false;
+  staffDepartmentDropdownOpen.value = false;
+  staffPositionDropdownOpen.value = false;
   createForm.value = {
     full_name: '',
     vacancy_type: activeVacancyType.value,
     faculty_name: '',
     department_name: '',
+    department_id: '',
+    position_id: '',
     vacancy_id: '',
     resume: null,
   };
@@ -939,6 +1129,92 @@ const toggleCreateForm = () => {
 
 const handleCreateResumeUpload = (event) => {
   createForm.value.resume = event.target.files?.[0] || null;
+};
+
+const selectPpsPosition = (vacancy) => {
+  createForm.value.vacancy_id = String(vacancy.id);
+  ppsPositionSearch.value = vacancy.title || '';
+  ppsPositionDropdownOpen.value = false;
+};
+
+const selectStaffDepartment = (department) => {
+  createForm.value.department_id = String(department.id);
+  createForm.value.position_id = '';
+  staffDepartmentSearch.value = department.name || '';
+  staffPositionSearch.value = '';
+  staffDepartmentDropdownOpen.value = false;
+  staffPositionDropdownOpen.value = false;
+};
+
+const selectStaffPosition = (position) => {
+  createForm.value.position_id = String(position.id);
+  staffPositionSearch.value = position.name || '';
+  staffPositionDropdownOpen.value = false;
+};
+
+const handleStaffDepartmentInput = () => {
+  staffDepartmentDropdownOpen.value = true;
+
+  if (
+    selectedStaffDepartment.value
+    && normalizeVacancyMatchText(staffDepartmentSearch.value) !== normalizeVacancyMatchText(selectedStaffDepartment.value.name)
+  ) {
+    createForm.value.department_id = '';
+    createForm.value.position_id = '';
+    staffPositionSearch.value = '';
+  }
+};
+
+const handlePpsPositionInput = () => {
+  ppsPositionDropdownOpen.value = true;
+
+  if (
+    selectedVacancy.value
+    && normalizeVacancyMatchText(ppsPositionSearch.value) !== normalizeVacancyMatchText(selectedVacancy.value.title)
+  ) {
+    createForm.value.vacancy_id = '';
+  }
+};
+
+const handleStaffPositionInput = () => {
+  staffPositionDropdownOpen.value = true;
+
+  if (
+    selectedStaffPosition.value
+    && normalizeVacancyMatchText(staffPositionSearch.value) !== normalizeVacancyMatchText(selectedStaffPosition.value.name)
+  ) {
+    createForm.value.position_id = '';
+  }
+};
+
+const closePpsPositionDropdown = () => {
+  window.setTimeout(() => {
+    ppsPositionDropdownOpen.value = false;
+  }, 120);
+};
+
+const closeStaffDepartmentDropdown = () => {
+  window.setTimeout(() => {
+    staffDepartmentDropdownOpen.value = false;
+  }, 120);
+};
+
+const closeStaffPositionDropdown = () => {
+  window.setTimeout(() => {
+    staffPositionDropdownOpen.value = false;
+  }, 120);
+};
+
+const focusStaffDepartmentSuggestion = () => {
+  staffDepartmentDropdownOpen.value = true;
+};
+
+const focusPpsPositionSuggestion = () => {
+  ppsPositionDropdownOpen.value = true;
+};
+
+const focusStaffPositionSuggestion = () => {
+  staffPositionDropdownOpen.value = true;
 };
 
 const fetchApplications = async () => {
@@ -994,8 +1270,18 @@ const createApplication = async () => {
     return;
   }
 
-  if (!createForm.value.vacancy_id) {
-    alert('Выберите вакансию.');
+  if (createForm.value.vacancy_type === 'staff' && !createForm.value.department_id) {
+    alert('Выберите департамент.');
+    return;
+  }
+
+  if (createForm.value.vacancy_type === 'staff' && !createForm.value.position_id) {
+    alert('Выберите должность.');
+    return;
+  }
+
+  if (createForm.value.vacancy_type === 'pps' && !createForm.value.vacancy_id) {
+    alert('Выберите позицию.');
     return;
   }
 
@@ -1003,11 +1289,15 @@ const createApplication = async () => {
 
   const formData = new FormData();
   formData.append('full_name', createForm.value.full_name.trim());
-  formData.append('vacancy_id', createForm.value.vacancy_id);
+  formData.append('vacancy_type', createForm.value.vacancy_type);
 
   if (createForm.value.vacancy_type === 'pps') {
+    formData.append('vacancy_id', createForm.value.vacancy_id);
     formData.append('faculty_name', createForm.value.faculty_name.trim());
     formData.append('department_name', createForm.value.department_name.trim());
+  } else {
+    formData.append('department_id', createForm.value.department_id);
+    formData.append('position_id', createForm.value.position_id);
   }
 
   if (createForm.value.resume) {
@@ -1049,11 +1339,22 @@ watch(() => createForm.value.vacancy_type, (type) => {
 
   if (!isSelectedVacancyVisible) {
     createForm.value.vacancy_id = '';
+    ppsPositionSearch.value = '';
   }
 
   if (type !== 'pps') {
     createForm.value.faculty_name = '';
     createForm.value.department_name = '';
+    createForm.value.vacancy_id = '';
+    ppsPositionSearch.value = '';
+    ppsPositionDropdownOpen.value = false;
+  }
+
+  if (type !== 'staff') {
+    createForm.value.department_id = '';
+    createForm.value.position_id = '';
+    staffDepartmentSearch.value = '';
+    staffPositionSearch.value = '';
   }
 
   if (activeVacancyType.value !== type) {
@@ -1069,6 +1370,18 @@ watch(() => createForm.value.faculty_name, () => {
 
   if (!isSelectedDepartmentVisible) {
     createForm.value.department_name = '';
+  }
+});
+
+watch(() => createForm.value.department_id, () => {
+  staffPositionSearch.value = '';
+
+  const isSelectedPositionVisible = staffPositionOptions.value.some(
+    (position) => String(position.id) === createForm.value.position_id,
+  );
+
+  if (!isSelectedPositionVisible) {
+    createForm.value.position_id = '';
   }
 });
 
