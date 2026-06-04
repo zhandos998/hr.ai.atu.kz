@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 
 <head>
@@ -98,6 +98,13 @@
             text-indent: 24px;
         }
 
+        .conclusion {
+            border-top: 1px solid #000;
+            margin-top: 12px;
+            padding-top: 12px;
+            white-space: normal;
+        }
+
         .sign-table {
             width: 100%;
             margin-top: 18px;
@@ -152,31 +159,20 @@
         $candidateName = $application->user?->name ?: '—';
         $vacancy = $application->vacancy;
         $vacancyTitle = $vacancy?->title ?: '—';
-        $isPps = $vacancy?->type === 'pps';
-        $departmentName = $isPps
-            ? ($application->ppsProfile?->department_name ?: $application->ppsProfile?->faculty_name)
-            : ($vacancy?->position?->department?->name ?: '—');
-        $positionName = $isPps
-            ? ($application->ppsProfile?->desired_position ?: $vacancyTitle)
-            : ($vacancy?->position?->name ?: $vacancyTitle);
-        $complianceLog = $application->stageLogs
-            ->first(fn ($log) => $log->stage === 'compliance' && in_array($log->new_status, ['clear', 'flagged'], true));
-        $reviewedAt = $complianceLog?->created_at ?: $application->updated_at;
-        $reviewerName = $complianceLog?->author?->name ?: '—';
+        $departmentName = $application->ppsProfile?->department_name ?: $application->ppsProfile?->faculty_name ?: '—';
+        $positionName = $application->ppsProfile?->desired_position ?: $vacancyTitle;
         $generatedAtFormatted = \Carbon\Carbon::parse($generatedAt)->format('d.m.Y H:i');
-        $reviewedAtFormatted = $reviewedAt ? \Carbon\Carbon::parse($reviewedAt)->format('d.m.Y H:i') : '—';
         $verificationUrl = \Illuminate\Support\Facades\URL::signedRoute('applications.verify', [
             'application' => $application->id,
         ]);
         $verificationUrlDisplay = implode('<br>', array_map(fn ($chunk) => e($chunk), str_split($verificationUrl, 48)));
     @endphp
 
-    <!-- ШАПКА -->
     <div class="header">
         <table class="header-table">
             <tr>
                 <td class="left">
-                    <div class="title" style="">АҚ «Алматы Технологиялық Университеті»</div>
+                    <div class="title">АК «Алматы Технологиялық Университеті»</div>
                     Қазақстан Республикасы<br>
                     г. Алматы, ул. Толе би, 100<br>
                     Тел.: +7 (727) 293-52-98, ішкі н.: 111, 129<br>
@@ -186,7 +182,6 @@
                 </td>
 
                 <td class="center">
-
                     <div class="logo">
                         @if ($logoSrc)
                             <img src="{{ $logoSrc }}">
@@ -212,19 +207,18 @@
         </table>
     </div>
 
-    <!-- ТЕЛО -->
     <div class="body">
         <h2>ЗАКЛЮЧЕНИЕ</h2>
 
         <div class="subtitle">
-            Департамент правового обеспечения и комплаенса
+            Департамент науки
         </div>
 
         <div class="text">
             <p>
                 Кандидат <span style="text-decoration: underline;">{{ $candidateName }}</span>,
                 претендующий на вакансию <span style="text-decoration: underline;">"{{ $vacancyTitle }}"</span>,
-                рассмотрен Департаментом правового обеспечения и комплаенса.
+                рассмотрен Департаментом науки.
             </p>
 
             <p>
@@ -232,14 +226,11 @@
                 Должность: <span style="text-decoration: underline;">"{{ $positionName ?: '—' }}"</span>.
             </p>
 
-            <p>
-                По результатам юридической проверки статус заявки:
-                <span style="text-decoration: underline;">{{ $compliance }}</span>.
-                {{ $lawyerDecision }}
-            </p>
+            <div class="conclusion">
+                {!! nl2br(e($conclusion)) !!}
+            </div>
         </div>
 
-        <!-- ПОДПИСЬ -->
         <table class="sign-table">
             <tr>
                 <td>Подразделение</td>
@@ -248,15 +239,14 @@
                 <td>Дата и время</td>
             </tr>
             <tr>
-                <td>Департамент правового обеспечения и комплаенса</td>
+                <td>Департамент науки</td>
                 <td>Ответственный сотрудник / {{ $reviewerName }}</td>
-                <td>{{ $compliance }}</td>
-                <td>{{ $reviewedAtFormatted }}</td>
+                <td>Сформировано</td>
+                <td>{{ $generatedAtFormatted }}</td>
             </tr>
         </table>
     </div>
 
-    <!-- НИЗ + QR -->
     <div class="footer">
         @php
             $qr = base64_encode(
@@ -273,18 +263,14 @@
                     <img src="data:image/svg+xml;base64,{{ $qr }}" width="110" height="110">
                 </td>
                 <td>
-                <i>
-                    {{--                Данный документ сформирован в системе электронного --}}
-                    {{--                документооборота Алматинского технологического университета --}}
-                    {{--                и подписан электронной подписью.<br><br> --}}
+                    <i>
+                        Оригинал документа хранится на сервере университета.
+                        Для проверки подлинности отсканируйте QR-код или пройдите по ссылке:<br>
+                        <a class="verification-link" href="{{ $verificationUrl }}">{!! $verificationUrlDisplay !!}</a>
+                    </i><br><br>
 
-                    Оригинал документа хранится на сервере университета.
-                    Для проверки подлинности отсканируйте QR-код или пройдите по ссылке:<br>
-                    <a class="verification-link" href="{{ $verificationUrl }}">{!! $verificationUrlDisplay !!}</a>
-                </i><br><br>
-
-                <b>ID документа:</b> {{ $application->id }}<br>
-                <b>Дата формирования:</b> {{ $generatedAtFormatted }}
+                    <b>ID документа:</b> {{ $application->id }}<br>
+                    <b>Дата формирования:</b> {{ $generatedAtFormatted }}
                 </td>
             </tr>
         </table>

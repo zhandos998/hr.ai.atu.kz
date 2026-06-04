@@ -135,13 +135,13 @@ class ApplicationController extends Controller
         if ($vacancyType === 'staff') {
             if (!$position) {
                 return response()->json([
-                    'message' => 'Для заявки ОУП выберите должность.',
+                    'message' => 'Для заявки АУП выберите должность.',
                 ], 422);
             }
 
             if (empty($validated['department_id'])) {
                 return response()->json([
-                    'message' => 'Для заявки ОУП выберите департамент.',
+                    'message' => 'Для заявки АУП выберите департамент.',
                 ], 422);
             }
 
@@ -264,6 +264,7 @@ class ApplicationController extends Controller
             'academic_title' => 'nullable|string|max:4000',
             'work_experience' => 'nullable|string|max:4000',
             'scientific_works' => 'nullable|string|max:8000',
+            'science_conclusion' => 'nullable|string|max:8000',
             'digital_mooc' => 'nullable|string|max:8000',
             'final_rating_score' => 'nullable|string|max:255',
             'student_survey_results' => 'nullable|string|max:8000',
@@ -272,6 +273,7 @@ class ApplicationController extends Controller
             'open_lesson_quality' => 'nullable|string|max:8000',
             'taught_disciplines' => 'nullable|string|max:8000',
             'educational_methodical_literature' => 'nullable|string|max:8000',
+            'academic_conclusion' => 'nullable|string|max:8000',
             'educational_publication_metrics' => 'nullable|string|max:8000',
             'anti_corruption_survey_results' => 'nullable|string|max:8000',
             'disciplinary_actions_info' => 'nullable|string|max:8000',
@@ -294,6 +296,7 @@ class ApplicationController extends Controller
             'academic_title',
             'work_experience',
             'scientific_works',
+            'science_conclusion',
             'digital_mooc',
             'final_rating_score',
             'student_survey_results',
@@ -302,6 +305,7 @@ class ApplicationController extends Controller
             'open_lesson_quality',
             'taught_disciplines',
             'educational_methodical_literature',
+            'academic_conclusion',
             'educational_publication_metrics',
             'anti_corruption_survey_results',
             'disciplinary_actions_info',
@@ -340,7 +344,7 @@ class ApplicationController extends Controller
 
         if ($application->vacancy?->type !== 'staff') {
             return response()->json([
-                'message' => 'Данные ОУП доступны только для заявок ОУП.',
+                'message' => 'Данные АУП доступны только для заявок АУП.',
             ], 422);
         }
 
@@ -368,7 +372,7 @@ class ApplicationController extends Controller
         if ($position) {
             if (empty($validated['department_id'])) {
                 return response()->json([
-                    'message' => 'Для заявки ОУП выберите департамент.',
+                    'message' => 'Для заявки АУП выберите департамент.',
                 ], 422);
             }
 
@@ -384,7 +388,7 @@ class ApplicationController extends Controller
             $vacancy = Vacancy::query()->where('type', 'staff')->findOrFail((int) $validated['vacancy_id']);
         } else {
             return response()->json([
-                'message' => 'Для заявки ОУП выберите департамент и должность.',
+                'message' => 'Для заявки АУП выберите департамент и должность.',
             ], 422);
         }
 
@@ -402,7 +406,7 @@ class ApplicationController extends Controller
         });
 
         return response()->json([
-            'message' => 'Данные ОУП обновлены.',
+            'message' => 'Данные АУП обновлены.',
             'application' => $this->transformAdminApplication(
                 $this->adminApplicationsQuery()->findOrFail($application->id)
             ),

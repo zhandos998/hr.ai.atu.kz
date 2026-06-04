@@ -100,7 +100,7 @@ import Layout from '../components/Layout.vue';
 
 const typeOptions = [
   { value: 'pps', label: 'ППС' },
-  { value: 'staff', label: 'ОУП' },
+  { value: 'staff', label: 'АУП' },
 ];
 
 const members = ref([]);

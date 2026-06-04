@@ -45,7 +45,6 @@ class PpsCommissionSeeder extends Seeder
             $user->forceFill([
                 'name' => $name,
                 'email_verified_at' => $user->email_verified_at ?: now(),
-                'password' => Hash::make('1234'),
             ])->save();
 
             return $user;
@@ -84,7 +83,7 @@ class PpsCommissionSeeder extends Seeder
             'Василина Гулзира' => 'vasilina.g@atu.edu.kz',
             'Ахметова Нурсулу' => 'n.ahmetova@atu.edu.kz',
             'Балхыбекова Коркем' => 'k.balkhybekova@atu.edu.kz',
-            'Алиев Баходир' => 'a.bahodir@atu.edu.kz',
+            'Алиев Баходир' => 'b.aliev@atu.edu.kz',
             'Нурахметов Бауржан' => 'b.nurakhmetov@atu.edu.kz',
         ];
     }

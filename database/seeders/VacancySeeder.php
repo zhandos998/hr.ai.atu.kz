@@ -83,7 +83,7 @@ class VacancySeeder extends Seeder
                     ->where(function ($inner) {
                         $inner
                             ->whereNull('position_id')
-                            ->where('title', 'ОУП');
+                            ->whereIn('title', ['ОУП', 'АУП']);
                     })
                     ->orWhereHas('position', function ($inner) {
                         $inner->whereIn('name', self::PPS_TITLES);

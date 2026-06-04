@@ -260,8 +260,8 @@
                             class="border border-gray-200 rounded-lg p-4 space-y-4"
                         >
                             <div>
-                                <div class="text-sm font-semibold text-gray-800">Данные кандидата ОУП</div>
-                                <p class="text-xs text-gray-500">Основные данные заявки ОУП можно редактировать отдельно от профиля ППС.</p>
+                                <div class="text-sm font-semibold text-gray-800">Данные кандидата АУП</div>
+                                <p class="text-xs text-gray-500">Основные данные заявки АУП можно редактировать отдельно от профиля ППС.</p>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -369,7 +369,7 @@
                                     class="inline-flex items-center justify-center rounded-lg bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:bg-gray-300"
                                     @click="saveStaffDetails"
                                 >
-                                    {{ staffDetailsSaving ? 'Сохранение...' : 'Сохранить данные ОУП' }}
+                                    {{ staffDetailsSaving ? 'Сохранение...' : 'Сохранить данные АУП' }}
                                 </button>
                             </div>
                         </div>
@@ -879,8 +879,26 @@
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            <label class="space-y-2 block">
+                                                <span class="text-sm font-medium text-gray-700">Заключение</span>
+                                                <textarea
+                                                    v-model="ppsProfileDraft.science_conclusion"
+                                                    rows="5"
+                                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                                    placeholder="Укажите заключение"
+                                                ></textarea>
+                                            </label>
                                         </div>
-                                        <div class="flex justify-end">
+                                        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                            <button
+                                                type="button"
+                                                :disabled="!canGenerateSciencePdf || sciencePdfLoading || ppsProfileSaving"
+                                                class="inline-flex items-center justify-center rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                @click="openAdminScienceResponsePdf"
+                                            >
+                                                {{ sciencePdfLoading ? 'Генерация PDF...' : 'Сгенерировать' }}
+                                            </button>
                                             <button
                                                 type="button"
                                                 :disabled="ppsProfileSaving"
@@ -1002,7 +1020,16 @@
                                                 </span>
                                             </div>
                                         </div>
-                                        <div class="flex justify-end">
+                                        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                            <button
+                                                v-if="section.key === 'academic'"
+                                                type="button"
+                                                :disabled="!canGenerateAcademicPdf || academicPdfLoading || ppsProfileSaving"
+                                                class="inline-flex items-center justify-center rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                @click="openAdminAcademicResponsePdf"
+                                            >
+                                                {{ academicPdfLoading ? 'Генерация PDF...' : 'Сгенерировать' }}
+                                            </button>
                                             <button
                                                 type="button"
                                                 :disabled="ppsProfileSaving"
@@ -1116,6 +1143,13 @@
                       <div class="text-sm font-medium text-gray-700">Учебно-методическая литература</div>
                       <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
                         {{ application.pps_profile?.educational_methodical_literature || 'Заполняет директор Департамента академического развития.' }}
+                      </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                      <div class="text-sm font-medium text-gray-700">Заключение</div>
+                      <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
+                        {{ application.pps_profile?.academic_conclusion || 'Заполняет директор Департамента академического развития.' }}
                       </div>
                     </div>
                   </div>
@@ -1365,6 +1399,8 @@ const aiResult = ref(null);
 const aiLoading = ref(false);
 const aiError = ref("");
 const pdfLoading = ref(false);
+const academicPdfLoading = ref(false);
+const sciencePdfLoading = ref(false);
 const staffDetailsSaving = ref(false);
 const ppsPositionSearch = ref("");
 const staffDepartmentSearch = ref("");
@@ -1469,6 +1505,12 @@ const memberSuggestions = computed(() => {
 });
 const canGenerateLawyerPdf = computed(() =>
     ["clear", "flagged"].includes(application.value?.compliance_status)
+);
+const canGenerateAcademicPdf = computed(() =>
+    Boolean(ppsProfileDraft.value.academic_conclusion?.trim())
+);
+const canGenerateSciencePdf = computed(() =>
+    Boolean(ppsProfileDraft.value.science_conclusion?.trim())
 );
 const isPpsApplication = computed(
     () => application.value?.vacancy?.type === "pps"
@@ -1808,6 +1850,7 @@ const emptyPpsProfileDraft = () => ({
     academic_title: "",
     work_experience: "",
     scientific_works: "",
+    science_conclusion: "",
     digital_mooc: "",
     final_rating_score: "",
     student_survey_results: "",
@@ -1816,6 +1859,7 @@ const emptyPpsProfileDraft = () => ({
     open_lesson_quality: "",
     taught_disciplines: "",
     educational_methodical_literature: "",
+    academic_conclusion: "",
     educational_publication_metrics: "",
     anti_corruption_survey_results: "",
     disciplinary_actions_info: "",
@@ -1948,6 +1992,12 @@ const ppsExtraSections = [
                 placeholder:
                     "Укажите сведения по учебно-методической литературе",
                 rows: 4,
+            },
+            {
+                key: "academic_conclusion",
+                label: "Заключение",
+                placeholder: "Укажите заключение",
+                rows: 5,
             },
         ],
     },
@@ -2202,6 +2252,7 @@ const syncPpsProfileDraft = (item) => {
         academic_title: ppsProfileFieldValue(item, "academic_title"),
         work_experience: ppsProfileFieldValue(item, "work_experience"),
         scientific_works: ppsProfileFieldValue(item, "scientific_works"),
+        science_conclusion: ppsProfileFieldValue(item, "science_conclusion"),
         digital_mooc: ppsProfileFieldValue(item, "digital_mooc"),
         final_rating_score: ppsProfileFieldValue(item, "final_rating_score"),
         student_survey_results: ppsProfileFieldValue(
@@ -2219,6 +2270,7 @@ const syncPpsProfileDraft = (item) => {
             item,
             "educational_methodical_literature"
         ),
+        academic_conclusion: ppsProfileFieldValue(item, "academic_conclusion"),
         educational_publication_metrics: ppsProfileFieldValue(
             item,
             "educational_publication_metrics"
@@ -2573,7 +2625,7 @@ const saveStaffDetails = async () => {
     } catch (error) {
         alert(
             error?.response?.data?.message ||
-                "Ошибка при сохранении данных ОУП."
+                "Ошибка при сохранении данных АУП."
         );
     } finally {
         staffDetailsSaving.value = false;
@@ -2625,6 +2677,10 @@ const savePpsProfile = async () => {
             ppsProfileDraft.value.scientific_works || ""
         );
         formData.append(
+            "science_conclusion",
+            ppsProfileDraft.value.science_conclusion || ""
+        );
+        formData.append(
             "digital_mooc",
             ppsProfileDraft.value.digital_mooc || ""
         );
@@ -2652,6 +2708,10 @@ const savePpsProfile = async () => {
         formData.append(
             "educational_methodical_literature",
             ppsProfileDraft.value.educational_methodical_literature || ""
+        );
+        formData.append(
+            "academic_conclusion",
+            ppsProfileDraft.value.academic_conclusion || ""
         );
         formData.append(
             "educational_publication_metrics",
@@ -2781,7 +2841,7 @@ const saveMainPpsProfile = () =>
 const saveScientificPpsProfile = () =>
     savePpsProfileSection({
         key: "scientific",
-        fieldKeys: ["scientific_works", "digital_mooc"],
+        fieldKeys: ["scientific_works", "science_conclusion", "digital_mooc"],
         documentFields: [
             "scientific_works_documents",
             "digital_mooc_documents",
@@ -2913,6 +2973,183 @@ const openLawyerResponsePdf = async () => {
         );
     } finally {
         pdfLoading.value = false;
+    }
+};
+
+const openAdminAcademicResponsePdf = async () => {
+    if (!application.value || !isPpsApplication.value || !canGenerateAcademicPdf.value) {
+        alert("Заполните заключение перед генерацией PDF.");
+        return;
+    }
+
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) {
+        previewWindow.opener = null;
+        previewWindow.document.title = "PDF заключения";
+        previewWindow.document.body.innerHTML =
+            '<p style="font-family:sans-serif;padding:16px">Подготовка PDF...</p>';
+    }
+
+    academicPdfLoading.value = true;
+
+    try {
+        const formData = new FormData();
+        formData.append(
+            "open_lesson_quality",
+            ppsProfileDraft.value.open_lesson_quality || ""
+        );
+        formData.append(
+            "taught_disciplines",
+            ppsProfileDraft.value.taught_disciplines || ""
+        );
+        formData.append(
+            "educational_methodical_literature",
+            ppsProfileDraft.value.educational_methodical_literature || ""
+        );
+        formData.append(
+            "academic_conclusion",
+            ppsProfileDraft.value.academic_conclusion || ""
+        );
+
+        const saveResponse = await axios.post(
+            `/api/admin/applications/${application.value.id}/pps-profile`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        application.value = saveResponse.data.application;
+        applySavedPpsProfileSection(application.value, [
+            "open_lesson_quality",
+            "taught_disciplines",
+            "educational_methodical_literature",
+            "academic_conclusion",
+        ]);
+
+        const response = await axios.get(
+            `/api/admin/applications/${application.value.id}/academic-response-pdf`,
+            {
+                responseType: "blob",
+            }
+        );
+
+        const blobUrl = window.URL.createObjectURL(
+            new Blob([response.data], { type: "application/pdf" })
+        );
+
+        if (previewWindow) {
+            previewWindow.location.href = blobUrl;
+        } else {
+            window.open(blobUrl, "_blank");
+        }
+
+        window.setTimeout(() => {
+            window.URL.revokeObjectURL(blobUrl);
+        }, 60_000);
+    } catch (error) {
+        if (previewWindow) {
+            previewWindow.close();
+        }
+
+        alert(
+            error?.response?.data?.message ||
+                "Ошибка при генерации PDF заключения."
+        );
+    } finally {
+        academicPdfLoading.value = false;
+    }
+};
+
+const openAdminScienceResponsePdf = async () => {
+    if (!application.value || !isPpsApplication.value || !canGenerateSciencePdf.value) {
+        alert("Заполните заключение перед генерацией PDF.");
+        return;
+    }
+
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) {
+        previewWindow.opener = null;
+        previewWindow.document.title = "PDF заключения";
+        previewWindow.document.body.innerHTML =
+            '<p style="font-family:sans-serif;padding:16px">Подготовка PDF...</p>';
+    }
+
+    sciencePdfLoading.value = true;
+
+    try {
+        const formData = new FormData();
+        formData.append(
+            "scientific_works",
+            ppsProfileDraft.value.scientific_works || ""
+        );
+        formData.append(
+            "science_conclusion",
+            ppsProfileDraft.value.science_conclusion || ""
+        );
+        formData.append(
+            "digital_mooc",
+            ppsProfileDraft.value.digital_mooc || ""
+        );
+
+        for (const file of ppsProfileDraft.value.scientific_works_documents ||
+            []) {
+            formData.append("scientific_works_documents[]", file);
+        }
+        for (const file of ppsProfileDraft.value.digital_mooc_documents || []) {
+            formData.append("digital_mooc_documents[]", file);
+        }
+
+        const saveResponse = await axios.post(
+            `/api/admin/applications/${application.value.id}/pps-profile`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        application.value = saveResponse.data.application;
+        applySavedPpsProfileSection(
+            application.value,
+            ["scientific_works", "science_conclusion", "digital_mooc"],
+            ["scientific_works_documents", "digital_mooc_documents"]
+        );
+
+        const response = await axios.get(
+            `/api/admin/applications/${application.value.id}/science-response-pdf`,
+            {
+                responseType: "blob",
+            }
+        );
+
+        const blobUrl = window.URL.createObjectURL(
+            new Blob([response.data], { type: "application/pdf" })
+        );
+
+        if (previewWindow) {
+            previewWindow.location.href = blobUrl;
+        } else {
+            window.open(blobUrl, "_blank");
+        }
+
+        window.setTimeout(() => {
+            window.URL.revokeObjectURL(blobUrl);
+        }, 60_000);
+    } catch (error) {
+        if (previewWindow) {
+            previewWindow.close();
+        }
+
+        alert(
+            error?.response?.data?.message ||
+                "Ошибка при генерации PDF заключения."
+        );
+    } finally {
+        sciencePdfLoading.value = false;
     }
 };
 

@@ -22,17 +22,18 @@ class CommissionCandidateUserSeeder extends Seeder
             'email' => $email,
         ]);
 
-        $user->forceFill([
+        $attributes = [
             'name' => $name,
             'email_verified_at' => $user->email_verified_at ?: now(),
-            'password' => Hash::make('1234'),
-        ]);
+        ];
 
         if (!$user->exists) {
-            $user->phone = null;
-            $user->role = 'user';
+            $attributes['password'] = Hash::make('1234');
+            $attributes['phone'] = null;
+            $attributes['role'] = 'user';
         }
 
+        $user->forceFill($attributes);
         $user->save();
     }
 

@@ -79,6 +79,8 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/applications/{id}/pps-profile/documents/{documentId}', [ApplicationController::class, 'deletePpsProfileDocument']);
     Route::put('/admin/applications/{id}', [ApplicationController::class, 'updateStatus']);
     Route::get('/admin/applications/{id}/lawyer-response-pdf', [ApplicationController::class, 'adminLawyerResponsePdf']);
+    Route::get('/admin/applications/{id}/academic-response-pdf', [AcademicApplicationController::class, 'academicResponsePdf']);
+    Route::get('/admin/applications/{id}/science-response-pdf', [ScienceApplicationController::class, 'scienceResponsePdf']);
 
     Route::put('/admin/applications/{id}/accept-resume', [ApplicationController::class, 'acceptResume']);
     Route::put('/admin/applications/{id}/reject-resume', [ApplicationController::class, 'rejectResume']);
@@ -117,6 +119,7 @@ Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {
 Route::middleware(['auth:sanctum', 'science'])->group(function () {
     Route::get('/science/applications', [ScienceApplicationController::class, 'queue']);
     Route::get('/science/applications/{id}', [ScienceApplicationController::class, 'show']);
+    Route::get('/science/applications/{id}/science-response-pdf', [ScienceApplicationController::class, 'scienceResponsePdf']);
     Route::post('/science/applications/{id}/scientific-works', [ScienceApplicationController::class, 'updateScientificWorks']);
     Route::delete('/science/applications/{applicationId}/scientific-works-documents/{documentId}', [ScienceApplicationController::class, 'deleteScientificWorksDocument']);
 });
@@ -138,6 +141,7 @@ Route::middleware(['auth:sanctum', 'strategy'])->group(function () {
 Route::middleware(['auth:sanctum', 'academic'])->group(function () {
     Route::get('/academic/applications', [AcademicApplicationController::class, 'queue']);
     Route::get('/academic/applications/{id}', [AcademicApplicationController::class, 'show']);
+    Route::get('/academic/applications/{id}/academic-response-pdf', [AcademicApplicationController::class, 'academicResponsePdf']);
     Route::post('/academic/applications/{id}/academic-review', [AcademicApplicationController::class, 'updateAcademicReview']);
     Route::delete('/academic/applications/{applicationId}/academic-documents/{documentId}', [AcademicApplicationController::class, 'deleteAcademicDocument']);
 });

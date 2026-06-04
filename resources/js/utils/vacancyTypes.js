@@ -1,6 +1,6 @@
 export const vacancyTypeMeta = {
   staff: {
-    label: 'ОУП',
+    label: 'АУП',
   },
   pps: {
     label: 'ППС',

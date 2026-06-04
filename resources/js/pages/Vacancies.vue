@@ -75,7 +75,7 @@ onMounted(() => {
 
 const types = [
   { label: 'Все', value: 'all' },
-  { label: 'ОУП', value: 'staff' },
+  { label: 'АУП', value: 'staff' },
   { label: 'ППС', value: 'pps' },
 ];
 const filterType = ref('all');

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPpsProfile;
 use App\Models\ApplicationPpsProfileDocument;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -60,6 +62,7 @@ class AcademicApplicationController extends Controller
             'open_lesson_quality' => 'nullable|string|max:8000',
             'taught_disciplines' => 'nullable|string|max:8000',
             'educational_methodical_literature' => 'nullable|string|max:8000',
+            'academic_conclusion' => 'nullable|string|max:8000',
         ]);
 
         $profile = $application->ppsProfile ?: new ApplicationPpsProfile([
@@ -69,6 +72,7 @@ class AcademicApplicationController extends Controller
         $profile->open_lesson_quality = $this->emptyToNull($validated['open_lesson_quality'] ?? null);
         $profile->taught_disciplines = $this->emptyToNull($validated['taught_disciplines'] ?? null);
         $profile->educational_methodical_literature = $this->emptyToNull($validated['educational_methodical_literature'] ?? null);
+        $profile->academic_conclusion = $this->emptyToNull($validated['academic_conclusion'] ?? null);
         $profile->save();
 
         $application = $this->academicApplicationsQuery()->findOrFail($id);
@@ -115,6 +119,55 @@ class AcademicApplicationController extends Controller
         return response()->json([
             'message' => 'Документ академического развития удалён.',
             'application' => $this->transformApplication($application),
+        ]);
+    }
+
+    public function academicResponsePdf(Request $request, int $id)
+    {
+        $application = Application::with([
+            'user:id,name,email,phone',
+            'vacancy:id,title,type,position_id',
+            'vacancy.position:id,department_id,name',
+            'vacancy.position.department:id,name',
+            'ppsProfile:id,application_id,desired_position,faculty_name,department_name,academic_conclusion',
+            'status:id,code,name',
+        ])->notArchived()->findOrFail($id);
+
+        if ($application->vacancy?->type !== 'pps') {
+            return response()->json([
+                'message' => 'PDF заключения доступен только для заявок ППС.',
+            ], 422);
+        }
+
+        $conclusion = trim((string) $application->ppsProfile?->academic_conclusion);
+        if ($conclusion === '') {
+            return response()->json([
+                'message' => 'Заполните заключение перед генерацией PDF.',
+            ], 422);
+        }
+
+        $html = view('pdf.academic-response', [
+            'application' => $application,
+            'conclusion' => $conclusion,
+            'reviewerName' => $request->user()?->name ?: '—',
+            'generatedAt' => now()->format('Y-m-d H:i:s'),
+        ])->render();
+
+        $options = new Options();
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $filename = "academic_response_application_{$application->id}.pdf";
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$filename}\"",
         ]);
     }
 

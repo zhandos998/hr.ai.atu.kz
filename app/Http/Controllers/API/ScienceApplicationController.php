@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPpsProfile;
 use App\Models\ApplicationPpsProfileDocument;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +60,7 @@ class ScienceApplicationController extends Controller
 
         $validated = $request->validate([
             'scientific_works' => 'nullable|string|max:8000',
+            'science_conclusion' => 'nullable|string|max:8000',
             'documents' => 'nullable|array',
             'documents.*' => 'file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
@@ -67,6 +70,7 @@ class ScienceApplicationController extends Controller
         ]);
 
         $profile->scientific_works = $this->emptyToNull($validated['scientific_works'] ?? null);
+        $profile->science_conclusion = $this->emptyToNull($validated['science_conclusion'] ?? null);
 
         $profile->save();
 
@@ -132,6 +136,55 @@ class ScienceApplicationController extends Controller
         return response()->json([
             'message' => 'Р”РѕРєСѓРјРµРЅС‚ РЅР°СѓС‡РЅС‹С… С‚СЂСѓРґРѕРІ СѓРґР°Р»С‘РЅ.',
             'application' => $this->transformApplication($application),
+        ]);
+    }
+
+    public function scienceResponsePdf(Request $request, int $id)
+    {
+        $application = Application::with([
+            'user:id,name,email,phone',
+            'vacancy:id,title,type,position_id',
+            'vacancy.position:id,department_id,name',
+            'vacancy.position.department:id,name',
+            'ppsProfile:id,application_id,desired_position,faculty_name,department_name,scientific_works,science_conclusion',
+            'status:id,code,name',
+        ])->notArchived()->findOrFail($id);
+
+        if ($application->vacancy?->type !== 'pps') {
+            return response()->json([
+                'message' => 'PDF заключения доступен только для заявок ППС.',
+            ], 422);
+        }
+
+        $conclusion = trim((string) $application->ppsProfile?->science_conclusion);
+        if ($conclusion === '') {
+            return response()->json([
+                'message' => 'Заполните заключение перед генерацией PDF.',
+            ], 422);
+        }
+
+        $html = view('pdf.science-response', [
+            'application' => $application,
+            'conclusion' => $conclusion,
+            'reviewerName' => $request->user()?->name ?: '—',
+            'generatedAt' => now()->format('Y-m-d H:i:s'),
+        ])->render();
+
+        $options = new Options();
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $filename = "science_response_application_{$application->id}.pdf";
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$filename}\"",
         ]);
     }
 

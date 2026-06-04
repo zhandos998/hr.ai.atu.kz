@@ -4,7 +4,7 @@
       <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Право и комплаенс</h1>
-          <p class="text-sm text-gray-500">Очередь директора Департамента правового обеспечения и комплаенса по заявкам ППС и ОУП.</p>
+          <p class="text-sm text-gray-500">Очередь директора Департамента правового обеспечения и комплаенса по заявкам ППС и АУП.</p>
         </div>
         <div class="text-sm text-gray-500">
           Всего заявок: <span class="font-semibold text-gray-700">{{ applications.length }}</span>

@@ -51,6 +51,10 @@
           <div class="mt-4 text-sm text-gray-600 line-clamp-3 min-h-[60px]">
             {{ app.pps_profile?.scientific_works || 'Научные труды пока не заполнены.' }}
           </div>
+          <div class="mt-2 text-sm text-gray-600 line-clamp-2">
+            <span class="font-medium text-gray-700">Заключение:</span>
+            {{ app.pps_profile?.science_conclusion || 'не заполнено' }}
+          </div>
 
           <div class="mt-4 flex items-center justify-between text-sm">
             <span class="text-gray-400">ID заявки: {{ app.id }}</span>
@@ -72,7 +76,9 @@ const applications = ref([]);
 const loading = ref(true);
 
 const scientificWorksReady = (application) => Boolean(
-  application?.pps_profile?.scientific_works || (application?.pps_profile?.scientific_works_documents || []).length,
+  application?.pps_profile?.scientific_works
+  || application?.pps_profile?.science_conclusion
+  || (application?.pps_profile?.scientific_works_documents || []).length,
 );
 
 const fetchApplications = async () => {

@@ -40,7 +40,7 @@
               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#005eb8] transition"
             >
               <option disabled value="">Выберите тип</option>
-              <option value="staff">ОУП</option>
+              <option value="staff">АУП</option>
               <option value="pps">ППС</option>
             </select>
           </label>
