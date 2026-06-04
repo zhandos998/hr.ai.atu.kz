@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPpsProfile;
 use App\Models\ApplicationPpsProfileDocument;
+use App\Models\User;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 class AcademicApplicationController extends Controller
 {
     private const ACADEMIC_REVIEW_CATEGORY = 'academic_review';
+    private const ACADEMIC_REVIEWER_EMAIL = 'n.ahmetova@atu.edu.kz';
 
     public function queue()
     {
@@ -149,7 +151,7 @@ class AcademicApplicationController extends Controller
         $html = view('pdf.academic-response', [
             'application' => $application,
             'conclusion' => $conclusion,
-            'reviewerName' => $request->user()?->name ?: '—',
+            'reviewerName' => $this->academicReviewerName(),
             'generatedAt' => now()->format('Y-m-d H:i:s'),
         ])->render();
 
@@ -265,6 +267,18 @@ class AcademicApplicationController extends Controller
         $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
 
         return $file->storeAs($directory, $filename, 'public');
+    }
+
+    private function academicReviewerName(): string
+    {
+        return User::query()
+            ->where('email', self::ACADEMIC_REVIEWER_EMAIL)
+            ->value('name')
+            ?: User::query()
+                ->where('role', 'academic_director')
+                ->orderBy('id')
+                ->value('name')
+            ?: '—';
     }
 
     private function emptyToNull($value)

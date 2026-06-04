@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPpsProfile;
 use App\Models\ApplicationPpsProfileDocument;
+use App\Models\User;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 class ScienceApplicationController extends Controller
 {
     private const SCIENTIFIC_WORKS_CATEGORY = 'scientific_works';
+    private const SCIENCE_REVIEWER_EMAIL = 'd.dzhurinskaya@atu.edu.kz';
 
     public function queue()
     {
@@ -166,7 +168,7 @@ class ScienceApplicationController extends Controller
         $html = view('pdf.science-response', [
             'application' => $application,
             'conclusion' => $conclusion,
-            'reviewerName' => $request->user()?->name ?: '—',
+            'reviewerName' => $this->scienceReviewerName(),
             'generatedAt' => now()->format('Y-m-d H:i:s'),
         ])->render();
 
@@ -286,6 +288,18 @@ class ScienceApplicationController extends Controller
         $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
 
         return $file->storeAs($directory, $filename, 'public');
+    }
+
+    private function scienceReviewerName(): string
+    {
+        return User::query()
+            ->where('email', self::SCIENCE_REVIEWER_EMAIL)
+            ->value('name')
+            ?: User::query()
+                ->where('role', 'science_director')
+                ->orderBy('id')
+                ->value('name')
+            ?: '—';
     }
 
     private function emptyToNull($value)
