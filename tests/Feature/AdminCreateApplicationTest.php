@@ -81,4 +81,58 @@ class AdminCreateApplicationTest extends TestCase
         $this->assertSame('Факультет информационных технологий', $application->ppsProfile?->faculty_name);
         $this->assertSame('Кафедра «Информационные системы»', $application->ppsProfile?->department_name);
     }
+
+    public function test_kshit_pps_application_adds_pazylkhaiyr_to_vacancy_commission(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $commissionMember = User::factory()->create([
+            'name' => 'Пазылхайыр Бауыржан',
+            'email' => 'b.pazylkhaiyr@atu.edu.kz',
+        ]);
+
+        $faculty = Department::query()->create([
+            'name' => 'Другое',
+            'description' => 'Факультет',
+        ]);
+
+        $department = Department::query()->create([
+            'parent_id' => $faculty->id,
+            'name' => 'КШИТ',
+            'description' => 'Кафедра',
+        ]);
+
+        $position = Position::query()->create([
+            'department_id' => $department->id,
+            'name' => 'Ассистент',
+        ]);
+
+        $vacancy = Vacancy::query()->create([
+            'title' => 'Ассистент',
+            'description' => 'Конкурс на должность ассистента.',
+            'type' => 'pps',
+            'position_id' => $position->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->post('/api/admin/applications', [
+            'full_name' => 'Кандидат КШИТ',
+            'vacancy_id' => $vacancy->id,
+            'faculty_name' => 'Другое',
+            'department_name' => 'КШИТ',
+        ], [
+            'Accept' => 'application/json',
+        ])->assertCreated();
+
+        $this->assertTrue(
+            $vacancy->commissionMembers()
+                ->where('users.id', $commissionMember->id)
+                ->exists()
+        );
+    }
 }

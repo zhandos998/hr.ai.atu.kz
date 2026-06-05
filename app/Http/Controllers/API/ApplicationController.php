@@ -29,6 +29,9 @@ use InvalidArgumentException;
 
 class ApplicationController extends Controller
 {
+    private const KSHIT_DEPARTMENT_NAME = 'КШИТ';
+    private const KSHIT_COMMISSION_MEMBER_EMAIL = 'b.pazylkhaiyr@atu.edu.kz';
+
     private const PPS_VACANCY_TITLES = [
         'Ассистент',
         'Ассистент-профессор',
@@ -229,7 +232,12 @@ class ApplicationController extends Controller
                 );
             }
 
-            $this->attachDefaultCommissionMembers($vacancy, $validated['faculty_name'] ?? null);
+            $this->attachDefaultCommissionMembers(
+                $vacancy,
+                $validated['faculty_name'] ?? null,
+                true,
+                $validated['department_name'] ?? null,
+            );
 
             return $application;
         });
@@ -280,6 +288,7 @@ class ApplicationController extends Controller
         ], $this->ppsProfileCategoryValidationRules()));
 
         $oldFacultyName = $application->ppsProfile?->faculty_name;
+        $oldDepartmentName = $application->ppsProfile?->department_name;
         $profile = $application->ppsProfile ?: new ApplicationPpsProfile([
             'application_id' => $application->id,
         ]);
@@ -322,10 +331,21 @@ class ApplicationController extends Controller
         $profile->save();
 
         if (
-            $request->exists('faculty_name')
-            && trim((string) $oldFacultyName) !== trim((string) $profile->faculty_name)
+            (
+                $request->exists('faculty_name')
+                && trim((string) $oldFacultyName) !== trim((string) $profile->faculty_name)
+            )
+            || (
+                $request->exists('department_name')
+                && trim((string) $oldDepartmentName) !== trim((string) $profile->department_name)
+            )
         ) {
-            $this->attachDefaultCommissionMembers($application->vacancy, $profile->faculty_name, false);
+            $this->attachDefaultCommissionMembers(
+                $application->vacancy,
+                $profile->faculty_name,
+                false,
+                $profile->department_name,
+            );
         }
 
         $this->storePpsProfileCategoryDocuments($request, $profile, $application->id);
@@ -1207,7 +1227,12 @@ class ApplicationController extends Controller
         return $application;
     }
 
-    private function attachDefaultCommissionMembers(Vacancy $vacancy, ?string $facultyName = null, bool $includeMain = true): void
+    private function attachDefaultCommissionMembers(
+        Vacancy $vacancy,
+        ?string $facultyName = null,
+        bool $includeMain = true,
+        ?string $departmentName = null,
+    ): void
     {
         $memberIds = $includeMain
             ? CommissionMember::query()
@@ -1221,6 +1246,17 @@ class ApplicationController extends Controller
                 ->pluck('user_id');
 
             $memberIds = $memberIds->merge($facultyMemberIds);
+        }
+
+        if (
+            $vacancy->type === CommissionMember::TYPE_PPS
+            && trim((string) $departmentName) === self::KSHIT_DEPARTMENT_NAME
+        ) {
+            $kshitMemberId = User::query()
+                ->where('email', self::KSHIT_COMMISSION_MEMBER_EMAIL)
+                ->value('id');
+
+            $memberIds = $memberIds->when($kshitMemberId, fn ($ids) => $ids->push($kshitMemberId));
         }
 
         $memberIds = $memberIds
