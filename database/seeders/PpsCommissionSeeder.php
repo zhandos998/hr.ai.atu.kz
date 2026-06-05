@@ -126,6 +126,10 @@ class PpsCommissionSeeder extends Seeder
                 'name' => 'Сарттарова Ляззат',
                 'email' => 'l.sarttarova@atu.edu.kz',
             ],
+            'Другое' => [
+                'name' => 'Пазылхайыр Бауыржан',
+                'email' => 'b.pazylkhaiyr@atu.edu.kz',
+            ],
         ];
     }
 }

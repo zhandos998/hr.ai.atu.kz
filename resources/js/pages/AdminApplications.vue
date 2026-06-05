@@ -832,6 +832,15 @@ const departmentChildrenByParentId = computed(() => {
 const hasDescribedFaculties = computed(() => (
   (departments.value || []).some((department) => String(department?.description || '').trim().toLowerCase() === 'факультет')
 ));
+const compareFacultyNames = (left, right) => {
+  const leftName = String(left?.name || '').trim();
+  const rightName = String(right?.name || '').trim();
+
+  if (leftName === 'Другое' && rightName !== 'Другое') return 1;
+  if (rightName === 'Другое' && leftName !== 'Другое') return -1;
+
+  return leftName.localeCompare(rightName, 'ru');
+};
 const facultyOptions = computed(() => (
   (departments.value || [])
     .filter((department) => (
@@ -841,7 +850,7 @@ const facultyOptions = computed(() => (
         : departmentChildrenByParentId.value.has(Number(department?.id)))
     ))
     .slice()
-    .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || ''), 'ru'))
+    .sort(compareFacultyNames)
 ));
 const selectedFaculty = computed(() => (
   facultyOptions.value.find((faculty) => faculty.name === createForm.value.faculty_name) || null

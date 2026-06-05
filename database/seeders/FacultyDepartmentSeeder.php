@@ -42,6 +42,9 @@ class FacultyDepartmentSeeder extends Seeder
                 'Кафедра «Туризм и сервисное обслуживание»',
                 'Кафедра «Экономика и менеджмент»',
             ],
+            'Другое' => [
+                'КШИТ',
+            ],
         ];
 
         foreach ($structure as $facultyName => $departmentNames) {

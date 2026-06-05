@@ -1576,6 +1576,15 @@ const hasDescribedFaculties = computed(() =>
                 .toLowerCase() === "факультет"
     )
 );
+const compareFacultyNames = (left, right) => {
+    const leftName = String(left?.name || "").trim();
+    const rightName = String(right?.name || "").trim();
+
+    if (leftName === "Другое" && rightName !== "Другое") return 1;
+    if (rightName === "Другое" && leftName !== "Другое") return -1;
+
+    return leftName.localeCompare(rightName, "ru");
+};
 const ppsFacultyOptions = computed(() =>
     (departments.value || [])
         .filter(
@@ -1590,12 +1599,7 @@ const ppsFacultyOptions = computed(() =>
                       ))
         )
         .slice()
-        .sort((left, right) =>
-            String(left?.name || "").localeCompare(
-                String(right?.name || ""),
-                "ru"
-            )
-        )
+        .sort(compareFacultyNames)
 );
 const selectedPpsFaculty = computed(() =>
     ppsFacultyOptions.value.find(

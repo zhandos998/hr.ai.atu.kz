@@ -71,6 +71,16 @@ class UserSeeder extends Seeder
         ]);
 
         User::updateOrCreate([
+            'email' => 'b.pazylkhaiyr@atu.edu.kz',
+        ], [
+            'name' => 'Пазылхайыр Бауыржан',
+            'phone' => null,
+            'email_verified_at' => now(),
+            'password' => Hash::make('8111'),
+            'role' => 'user',
+        ]);
+
+        User::updateOrCreate([
             'email' => 'b.esembaeva@atu.edu.kz',
         ], [
             'name' => 'Есембаева Балзада',
