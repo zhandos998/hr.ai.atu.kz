@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             ApplicationSeeder::class,
             ApplicationStatusSeeder::class,
             PpsCommissionSeeder::class,
+            KshitCommissionSeeder::class,
         ]);
     }
 }
