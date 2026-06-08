@@ -414,7 +414,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Вакансия"
+                      label="Претендуемая должность"
                       column="vacancy"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -1003,7 +1003,13 @@ const stageDotClass = (stage, app) => {
   return `${base} bg-slate-300 ring-slate-100`;
 };
 
-const vacancyTitle = (app) => app?.vacancy?.title || 'Без названия';
+const vacancyTitle = (app) => {
+  if (app?.vacancy?.type === 'pps') {
+    return app?.pps_profile?.desired_position || app?.vacancy?.title || 'Должность не указана';
+  }
+
+  return app?.vacancy?.position?.name || app?.vacancy?.title || 'Должность не указана';
+};
 
 const applicationProfileLabel = (app) => {
   if (app?.vacancy?.type === 'pps') {
