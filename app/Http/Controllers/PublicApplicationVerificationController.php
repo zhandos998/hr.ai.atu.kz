@@ -92,7 +92,6 @@ class PublicApplicationVerificationController extends Controller
                     ['label' => 'Качество открытого занятия', 'value' => $profile->open_lesson_quality],
                     ['label' => 'Преподаваемые дисциплины', 'value' => $profile->taught_disciplines],
                     ['label' => 'Учебно-методическая литература', 'value' => $profile->educational_methodical_literature],
-                    ['label' => 'Невыполнение индивидуального плана', 'value' => $profile->individual_plan_nonfulfillment],
                     ['label' => 'Заключение', 'value' => $profile->academic_conclusion],
                 ],
             ],

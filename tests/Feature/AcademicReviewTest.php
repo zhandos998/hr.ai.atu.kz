@@ -47,16 +47,13 @@ class AcademicReviewTest extends TestCase
             'open_lesson_quality' => 'Открытое занятие проведено качественно.',
             'taught_disciplines' => 'Информационные системы',
             'educational_methodical_literature' => 'Учебно-методические материалы представлены.',
-            'individual_plan_nonfulfillment' => 'Невыполнения индивидуального плана не выявлены.',
             'academic_conclusion' => 'Рекомендован к дальнейшему рассмотрению.',
         ])
             ->assertOk()
-            ->assertJsonPath('application.pps_profile.individual_plan_nonfulfillment', 'Невыполнения индивидуального плана не выявлены.')
             ->assertJsonPath('application.pps_profile.academic_conclusion', 'Рекомендован к дальнейшему рассмотрению.');
 
         $this->assertDatabaseHas('application_pps_profiles', [
             'application_id' => $application->id,
-            'individual_plan_nonfulfillment' => 'Невыполнения индивидуального плана не выявлены.',
             'academic_conclusion' => 'Рекомендован к дальнейшему рассмотрению.',
         ]);
     }

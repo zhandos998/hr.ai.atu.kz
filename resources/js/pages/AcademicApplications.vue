@@ -62,10 +62,6 @@
               {{ app.pps_profile?.educational_methodical_literature || 'не заполнено' }}
             </div>
             <div class="line-clamp-2">
-              <span class="font-medium text-gray-700">Индивидуальный план:</span>
-              {{ app.pps_profile?.individual_plan_nonfulfillment || 'не заполнено' }}
-            </div>
-            <div class="line-clamp-2">
               <span class="font-medium text-gray-700">Заключение:</span>
               {{ app.pps_profile?.academic_conclusion || 'не заполнено' }}
             </div>
@@ -94,7 +90,6 @@ const academicReady = (application) => Boolean(
   application?.pps_profile?.open_lesson_quality
   || application?.pps_profile?.taught_disciplines
   || application?.pps_profile?.educational_methodical_literature
-  || application?.pps_profile?.individual_plan_nonfulfillment
   || application?.pps_profile?.academic_conclusion,
 );
 

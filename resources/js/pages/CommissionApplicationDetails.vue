@@ -429,10 +429,6 @@ const ppsSections = [
                 label: "Учебно-методическая литература",
             },
             {
-                key: "individual_plan_nonfulfillment",
-                label: "Невыполнение индивидуального плана",
-            },
-            {
                 key: "academic_conclusion",
                 label: "Заключение",
             },

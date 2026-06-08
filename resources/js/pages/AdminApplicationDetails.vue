@@ -1140,13 +1140,6 @@
                     </div>
 
                     <div class="md:col-span-3">
-                      <div class="text-sm font-medium text-gray-700">Невыполнение индивидуального плана</div>
-                      <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
-                        {{ application.pps_profile?.individual_plan_nonfulfillment || 'Заполняет директор Департамента академического развития.' }}
-                      </div>
-                    </div>
-
-                    <div class="md:col-span-3">
                       <div class="text-sm font-medium text-gray-700">Заключение</div>
                       <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
                         {{ application.pps_profile?.academic_conclusion || 'Заполняет директор Департамента академического развития.' }}
@@ -1991,13 +1984,6 @@ const ppsExtraSections = [
                 rows: 4,
             },
             {
-                key: "individual_plan_nonfulfillment",
-                label: "Невыполнение индивидуального плана",
-                placeholder:
-                    "Укажите сведения по невыполнению индивидуального плана",
-                rows: 4,
-            },
-            {
                 key: "academic_conclusion",
                 label: "Заключение",
                 placeholder: "Укажите заключение",
@@ -2696,10 +2682,6 @@ const savePpsProfile = async () => {
             "student_survey_results",
             ppsProfileDraft.value.student_survey_results || ""
         );
-        formData.append(
-            "individual_plan_nonfulfillment",
-            ppsProfileDraft.value.individual_plan_nonfulfillment || ""
-        );
         formData.append("krk", ppsProfileDraft.value.krk || "");
         formData.append(
             "open_lesson_quality",
@@ -2712,10 +2694,6 @@ const savePpsProfile = async () => {
         formData.append(
             "educational_methodical_literature",
             ppsProfileDraft.value.educational_methodical_literature || ""
-        );
-        formData.append(
-            "individual_plan_nonfulfillment",
-            ppsProfileDraft.value.individual_plan_nonfulfillment || ""
         );
         formData.append(
             "academic_conclusion",
@@ -3034,7 +3012,6 @@ const openAdminAcademicResponsePdf = async () => {
             "open_lesson_quality",
             "taught_disciplines",
             "educational_methodical_literature",
-            "individual_plan_nonfulfillment",
             "academic_conclusion",
         ]);
 
