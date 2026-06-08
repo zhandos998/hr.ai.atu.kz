@@ -174,6 +174,16 @@
                         </label>
 
                         <label class="space-y-2 block">
+                            <span class="text-sm font-medium text-gray-700">Невыполнение индивидуального плана</span>
+                            <textarea
+                                v-model="academicDraft.individual_plan_nonfulfillment"
+                                rows="5"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                placeholder="Укажите сведения по невыполнению индивидуального плана"
+                            ></textarea>
+                        </label>
+
+                        <label class="space-y-2 block">
                             <span class="text-sm font-medium text-gray-700">Заключение</span>
                             <textarea
                                 v-model="academicDraft.academic_conclusion"
@@ -218,6 +228,7 @@ const academicDraft = ref({
     open_lesson_quality: "",
     taught_disciplines: "",
     educational_methodical_literature: "",
+    individual_plan_nonfulfillment: "",
     academic_conclusion: "",
 });
 
@@ -238,9 +249,10 @@ const docLabels = {
 
 const academicReady = computed(() =>
     Boolean(
-        application.value?.pps_profile?.open_lesson_quality ||
+            application.value?.pps_profile?.open_lesson_quality ||
             application.value?.pps_profile?.taught_disciplines ||
             application.value?.pps_profile?.educational_methodical_literature ||
+            application.value?.pps_profile?.individual_plan_nonfulfillment ||
             application.value?.pps_profile?.academic_conclusion
     )
 );
@@ -330,6 +342,9 @@ const syncDraft = () => {
         educational_methodical_literature:
             application.value?.pps_profile?.educational_methodical_literature ||
             "",
+        individual_plan_nonfulfillment:
+            application.value?.pps_profile?.individual_plan_nonfulfillment ||
+            "",
         academic_conclusion:
             application.value?.pps_profile?.academic_conclusion || "",
     };
@@ -369,6 +384,10 @@ const persistAcademicReview = async () => {
     formData.append(
         "educational_methodical_literature",
         academicDraft.value.educational_methodical_literature || ""
+    );
+    formData.append(
+        "individual_plan_nonfulfillment",
+        academicDraft.value.individual_plan_nonfulfillment || ""
     );
     formData.append(
         "academic_conclusion",

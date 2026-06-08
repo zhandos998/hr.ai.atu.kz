@@ -402,7 +402,7 @@ const ppsSections = [
     {
         title: "Стратегическое развитие",
         description:
-            "Итоговый рейтинг, анкетирование студентов, индивидуальный план и КРК.",
+            "Итоговый рейтинг, анкетирование студентов и КРК.",
         columnsClass: "md:grid-cols-1",
         fields: [
             { key: "final_rating_score", label: "Итоговый рейтинговый балл" },
@@ -410,17 +410,13 @@ const ppsSections = [
                 key: "student_survey_results",
                 label: "Результаты анкетирования студентов о деятельности ППС",
             },
-            {
-                key: "individual_plan_nonfulfillment",
-                label: "Невыполнение индивидуального плана",
-            },
             { key: "krk", label: "КРК" },
         ],
     },
     {
         title: "Академическое развитие",
         description:
-            "Открытое занятие, дисциплины и учебно-методическая литература.",
+            "Открытое занятие, дисциплины, индивидуальный план и учебно-методическая литература.",
         columnsClass: "md:grid-cols-1",
         fields: [
             {
@@ -431,6 +427,10 @@ const ppsSections = [
             {
                 key: "educational_methodical_literature",
                 label: "Учебно-методическая литература",
+            },
+            {
+                key: "individual_plan_nonfulfillment",
+                label: "Невыполнение индивидуального плана",
             },
             {
                 key: "academic_conclusion",

@@ -1087,18 +1087,11 @@
                   </div>
                 </div>
                 <div class="space-y-3 md:col-span-2 rounded-xl border border-gray-200 bg-slate-50 px-4 py-4">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <div class="text-sm font-medium text-gray-700">Итоговый рейтинговый балл</div>
                       <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
                         {{ application.pps_profile?.final_rating_score || 'Заполняет директор Департамента стратегического развития.' }}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div class="text-sm font-medium text-gray-700">Невыполнение индивидуального плана</div>
-                      <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
-                        {{ application.pps_profile?.individual_plan_nonfulfillment || 'Заполняет директор Департамента стратегического развития.' }}
                       </div>
                     </div>
 
@@ -1143,6 +1136,13 @@
                       <div class="text-sm font-medium text-gray-700">Учебно-методическая литература</div>
                       <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
                         {{ application.pps_profile?.educational_methodical_literature || 'Заполняет директор Департамента академического развития.' }}
+                      </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                      <div class="text-sm font-medium text-gray-700">Невыполнение индивидуального плана</div>
+                      <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
+                        {{ application.pps_profile?.individual_plan_nonfulfillment || 'Заполняет директор Департамента академического развития.' }}
                       </div>
                     </div>
 
@@ -1939,7 +1939,7 @@ const ppsExtraSections = [
         key: "strategy",
         title: "Показатели стратегического развития",
         description:
-            "Итоговый рейтинг, анкетирование студентов, индивидуальный план и КРК.",
+            "Итоговый рейтинг, анкетирование студентов и КРК.",
         columnsClass: "md:grid-cols-1",
         fields: [
             {
@@ -1956,13 +1956,6 @@ const ppsExtraSections = [
                 rows: 4,
             },
             {
-                key: "individual_plan_nonfulfillment",
-                label: "Невыполнение индивидуального плана",
-                placeholder:
-                    "Укажите сведения по невыполнению индивидуального плана",
-                rows: 4,
-            },
-            {
                 key: "krk",
                 label: "КРК",
                 placeholder: "Укажите сведения по КРК",
@@ -1974,7 +1967,7 @@ const ppsExtraSections = [
         key: "academic",
         title: "Академическое развитие",
         description:
-            "Открытое занятие, дисциплины и учебно-методическая литература.",
+            "Открытое занятие, дисциплины, индивидуальный план и учебно-методическая литература.",
         columnsClass: "md:grid-cols-1",
         fields: [
             {
@@ -1995,6 +1988,13 @@ const ppsExtraSections = [
                 label: "Учебно-методическая литература",
                 placeholder:
                     "Укажите сведения по учебно-методической литературе",
+                rows: 4,
+            },
+            {
+                key: "individual_plan_nonfulfillment",
+                label: "Невыполнение индивидуального плана",
+                placeholder:
+                    "Укажите сведения по невыполнению индивидуального плана",
                 rows: 4,
             },
             {
@@ -2714,6 +2714,10 @@ const savePpsProfile = async () => {
             ppsProfileDraft.value.educational_methodical_literature || ""
         );
         formData.append(
+            "individual_plan_nonfulfillment",
+            ppsProfileDraft.value.individual_plan_nonfulfillment || ""
+        );
+        formData.append(
             "academic_conclusion",
             ppsProfileDraft.value.academic_conclusion || ""
         );
@@ -3030,6 +3034,7 @@ const openAdminAcademicResponsePdf = async () => {
             "open_lesson_quality",
             "taught_disciplines",
             "educational_methodical_literature",
+            "individual_plan_nonfulfillment",
             "academic_conclusion",
         ]);
 

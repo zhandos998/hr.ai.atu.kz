@@ -59,7 +59,6 @@ class StrategyApplicationController extends Controller
         $validated = $request->validate([
             'final_rating_score' => 'nullable|string|max:255',
             'student_survey_results' => 'nullable|string|max:8000',
-            'individual_plan_nonfulfillment' => 'nullable|string|max:8000',
             'krk' => 'nullable|string|max:8000',
         ]);
 
@@ -69,7 +68,6 @@ class StrategyApplicationController extends Controller
 
         $profile->final_rating_score = $this->emptyToNull($validated['final_rating_score'] ?? null);
         $profile->student_survey_results = $this->emptyToNull($validated['student_survey_results'] ?? null);
-        $profile->individual_plan_nonfulfillment = $this->emptyToNull($validated['individual_plan_nonfulfillment'] ?? null);
         $profile->krk = $this->emptyToNull($validated['krk'] ?? null);
         $profile->save();
 

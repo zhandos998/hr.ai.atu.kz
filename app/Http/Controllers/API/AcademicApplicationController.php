@@ -64,6 +64,7 @@ class AcademicApplicationController extends Controller
             'open_lesson_quality' => 'nullable|string|max:8000',
             'taught_disciplines' => 'nullable|string|max:8000',
             'educational_methodical_literature' => 'nullable|string|max:8000',
+            'individual_plan_nonfulfillment' => 'nullable|string|max:8000',
             'academic_conclusion' => 'nullable|string|max:8000',
         ]);
 
@@ -74,6 +75,7 @@ class AcademicApplicationController extends Controller
         $profile->open_lesson_quality = $this->emptyToNull($validated['open_lesson_quality'] ?? null);
         $profile->taught_disciplines = $this->emptyToNull($validated['taught_disciplines'] ?? null);
         $profile->educational_methodical_literature = $this->emptyToNull($validated['educational_methodical_literature'] ?? null);
+        $profile->individual_plan_nonfulfillment = $this->emptyToNull($validated['individual_plan_nonfulfillment'] ?? null);
         $profile->academic_conclusion = $this->emptyToNull($validated['academic_conclusion'] ?? null);
         $profile->save();
 

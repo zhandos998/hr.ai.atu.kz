@@ -164,16 +164,6 @@
                         </label>
 
                         <label class="space-y-2 block">
-                            <span class="text-sm font-medium text-gray-700">Невыполнение индивидуального плана</span>
-                            <textarea
-                                v-model="strategyDraft.individual_plan_nonfulfillment"
-                                rows="5"
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                                placeholder="Укажите сведения по невыполнению индивидуального плана"
-                            ></textarea>
-                        </label>
-
-                        <label class="space-y-2 block">
                             <span class="text-sm font-medium text-gray-700">КРК</span>
                             <textarea
                                 v-model="strategyDraft.krk"
@@ -206,7 +196,6 @@ const errorMessage = ref("");
 const strategyDraft = ref({
     final_rating_score: "",
     student_survey_results: "",
-    individual_plan_nonfulfillment: "",
     krk: "",
 });
 
@@ -229,7 +218,6 @@ const strategyReady = computed(() =>
     Boolean(
         application.value?.pps_profile?.final_rating_score ||
             application.value?.pps_profile?.student_survey_results ||
-            application.value?.pps_profile?.individual_plan_nonfulfillment ||
             application.value?.pps_profile?.krk
     )
 );
@@ -312,9 +300,6 @@ const syncDraft = () => {
             application.value?.pps_profile?.final_rating_score || "",
         student_survey_results:
             application.value?.pps_profile?.student_survey_results || "",
-        individual_plan_nonfulfillment:
-            application.value?.pps_profile?.individual_plan_nonfulfillment ||
-            "",
         krk: application.value?.pps_profile?.krk || "",
     };
 };
@@ -352,10 +337,6 @@ const saveStrategyReview = async () => {
         formData.append(
             "student_survey_results",
             strategyDraft.value.student_survey_results || ""
-        );
-        formData.append(
-            "individual_plan_nonfulfillment",
-            strategyDraft.value.individual_plan_nonfulfillment || ""
         );
         formData.append("krk", strategyDraft.value.krk || "");
 

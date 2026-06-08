@@ -54,10 +54,6 @@
               {{ app.pps_profile?.final_rating_score || 'не заполнено' }}
             </div>
             <div class="line-clamp-2">
-              <span class="font-medium text-gray-700">Индивидуальный план:</span>
-              {{ app.pps_profile?.individual_plan_nonfulfillment || 'не заполнено' }}
-            </div>
-            <div class="line-clamp-2">
               <span class="font-medium text-gray-700">КРК:</span>
               {{ app.pps_profile?.krk || 'не заполнено' }}
             </div>
@@ -85,7 +81,6 @@ const loading = ref(true);
 const strategyReady = (application) => Boolean(
   application?.pps_profile?.final_rating_score
   || application?.pps_profile?.student_survey_results
-  || application?.pps_profile?.individual_plan_nonfulfillment
   || application?.pps_profile?.krk,
 );
 
