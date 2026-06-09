@@ -1478,15 +1478,15 @@ class ApplicationController extends Controller
         $positionId = $this->resolveApplicationPositionId($application);
         $application->ai_position_id = $positionId;
 
-        if (!$workerId || !$positionId) {
+        if (!$workerId) {
             $application->ai_result = null;
 
             return $application;
         }
 
         $result = CandidateAIResult::query()
-            ->where('worker_id', $workerId)
-            ->where('position_id', $positionId)
+            ->where('application_id', $application->id)
+            ->where('lang', 'ru')
             ->orderByDesc('updated_at')
             ->first([
                 'score',

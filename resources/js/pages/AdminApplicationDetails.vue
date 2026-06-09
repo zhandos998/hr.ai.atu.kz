@@ -1299,7 +1299,6 @@
                                 </div>
                             </div>
 
-                            <!-- AI-анализ кандидата временно отключен.
                             <div class="border border-gray-200 rounded-lg p-3 space-y-2">
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div class="text-sm font-semibold text-gray-700">AI-анализ кандидата</div>
@@ -1328,7 +1327,6 @@
                                     <div class="text-sm text-gray-700 whitespace-pre-line">{{ aiResult.summary }}</div>
                                 </template>
                             </div>
-                            -->
                         </div>
                     </div>
                 </div>
@@ -3140,20 +3138,12 @@ const openAdminScienceResponsePdf = async () => {
 };
 
 const generateCandidateAI = async () => {
-    const workerId = application.value?.user?.id;
-    const positionId =
-        application.value?.ai_position_id ||
-        application.value?.vacancy?.position_id;
+    const applicationId = application.value?.id;
 
     aiError.value = "";
 
-    if (!workerId) {
-        aiError.value = "Не найден ID кандидата.";
-        return;
-    }
-
-    if (!positionId) {
-        aiError.value = "У вакансии не указана должность (position_id).";
+    if (!applicationId) {
+        aiError.value = "Не найден ID заявки.";
         return;
     }
 
@@ -3161,9 +3151,9 @@ const generateCandidateAI = async () => {
 
     try {
         const response = await axios.post("/api/check-candidate", {
-            worker_id: Number(workerId),
-            position_id: Number(positionId),
+            application_id: Number(applicationId),
             lang: "ru",
+            force: true,
         });
 
         aiResult.value = response.data;

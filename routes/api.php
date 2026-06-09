@@ -6,7 +6,7 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\ChatController;
 use App\Http\Controllers\API\ResumeController;
 use App\Http\Controllers\API\ApplicationController;
-// use App\Http\Controllers\API\CandidateAIController;
+use App\Http\Controllers\API\CandidateAIController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\AdminStructureController;
 use App\Http\Controllers\API\CommissionController;
@@ -81,6 +81,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/applications/{id}/lawyer-response-pdf', [ApplicationController::class, 'adminLawyerResponsePdf']);
     Route::get('/admin/applications/{id}/academic-response-pdf', [AcademicApplicationController::class, 'academicResponsePdf']);
     Route::get('/admin/applications/{id}/science-response-pdf', [ScienceApplicationController::class, 'scienceResponsePdf']);
+    Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
 
     Route::put('/admin/applications/{id}/accept-resume', [ApplicationController::class, 'acceptResume']);
     Route::put('/admin/applications/{id}/reject-resume', [ApplicationController::class, 'rejectResume']);
@@ -172,10 +173,6 @@ Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacanci
 Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
 // Если есть страница деталей заявки
 Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
-
-// AI-анализ кандидата временно отключен.
-// Route::post('/check-candidate', [CandidateAIController::class, 'analyze']);
-
 
 Route::get('/departments', [DepartmentController::class, 'index']);
 // Route::get('/positions', [DepartmentController::class, 'index']);

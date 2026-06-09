@@ -8,6 +8,7 @@ class CandidateAIResult extends Model
 {
     protected $table = 'candidate_ai_results';
     protected $fillable = [
+        'application_id',
         'worker_id',
         'position_id',
         'lang',
