@@ -9,31 +9,52 @@
       </div>
 
       <div v-else class="space-y-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <button
-            v-for="type in applicationTypeTabs"
-            :key="type.value"
-            :class="activeVacancyType === type.value
-              ? 'bg-[#005eb8] text-white border-[#005eb8]'
-              : 'bg-white text-[#005eb8] border-[#005eb8] hover:bg-[#005eb8] hover:text-white'"
-            class="inline-flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-semibold transition"
-            @click="activeVacancyType = type.value"
-          >
-            <span>{{ type.label }}</span>
-            <span
-              :class="activeVacancyType === type.value ? 'bg-white/20 text-white' : 'bg-blue-50 text-[#005eb8]'"
-              class="inline-flex min-w-7 justify-center rounded-full px-2 py-0.5 text-xs"
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              v-for="type in applicationTypeTabs"
+              :key="type.value"
+              :class="activeVacancyType === type.value
+                ? 'bg-[#005eb8] text-white border-[#005eb8]'
+                : 'bg-white text-[#005eb8] border-[#005eb8] hover:bg-[#005eb8] hover:text-white'"
+              class="inline-flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-semibold transition"
+              @click="activeVacancyType = type.value"
             >
-              {{ type.count }}
-            </span>
-          </button>
+              <span>{{ type.label }}</span>
+              <span
+                :class="activeVacancyType === type.value ? 'bg-white/20 text-white' : 'bg-blue-50 text-[#005eb8]'"
+                class="inline-flex min-w-7 justify-center rounded-full px-2 py-0.5 text-xs"
+              >
+                {{ type.count }}
+              </span>
+            </button>
+          </div>
+
+          <label class="relative block w-full lg:max-w-md">
+            <span class="sr-only">Поиск заявок</span>
+            <input
+              v-model="searchQuery"
+              type="search"
+              class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 shadow-sm outline-none transition focus:border-[#005eb8] focus:ring-2 focus:ring-blue-100"
+              placeholder="Поиск по кандидату, должности, кафедре"
+            >
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Очистить поиск"
+              @click="searchQuery = ''"
+            >
+              ×
+            </button>
+          </label>
         </div>
 
         <div
           v-if="filteredApplications.length === 0"
           class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
         >
-          В разделе {{ activeVacancyTypeLabel }} заявок для голосования пока нет.
+          {{ emptyStateText }}
         </div>
 
         <template v-else>
@@ -200,6 +221,7 @@ const router = useRouter();
 const applications = ref([]);
 const comments = ref({});
 const loading = ref(true);
+const searchQuery = ref('');
 const activeVacancyType = ref(
   vacancyTypeTabValues.includes(String(route.query.type))
     ? String(route.query.type)
@@ -219,8 +241,47 @@ const applicationTypeTabs = computed(() => vacancyTypeTabValues.map((type) => ({
   count: applicationsByVacancyType.value[type]?.length || 0,
 })));
 
-const filteredApplications = computed(() => applicationsByVacancyType.value[activeVacancyType.value] || []);
+const selectedTypeApplications = computed(() => applicationsByVacancyType.value[activeVacancyType.value] || []);
+
+const normalizeSearchText = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[«»"'`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const applicationSearchText = (app) => normalizeSearchText([
+  app.id,
+  app.vacancy?.title,
+  app.vacancy?.position?.name,
+  vacancyTypeLabel(app?.vacancy?.type),
+  app.user?.name,
+  app.user?.email,
+  app.user?.phone,
+  app.pps_profile?.desired_position,
+  app.pps_profile?.faculty_name,
+  app.pps_profile?.department_name,
+  app.ppsProfile?.desired_position,
+  app.ppsProfile?.faculty_name,
+  app.ppsProfile?.department_name,
+].filter(Boolean).join(' '));
+
+const filteredApplications = computed(() => {
+  const query = normalizeSearchText(searchQuery.value);
+  if (!query) return selectedTypeApplications.value;
+
+  return selectedTypeApplications.value.filter((app) =>
+    applicationSearchText(app).includes(query)
+  );
+});
 const activeVacancyTypeLabel = computed(() => vacancyTypeLabel(activeVacancyType.value));
+const emptyStateText = computed(() => {
+  if (searchQuery.value.trim()) {
+    return `По запросу "${searchQuery.value.trim()}" в разделе ${activeVacancyTypeLabel.value} ничего не найдено.`;
+  }
+
+  return `В разделе ${activeVacancyTypeLabel.value} заявок для голосования пока нет.`;
+});
 
 const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
 const detailsRoute = (application) => ({
