@@ -401,8 +401,7 @@ const ppsSections = [
     },
     {
         title: "Стратегическое развитие",
-        description:
-            "Итоговый рейтинг, анкетирование студентов и КРК.",
+        description: "Итоговый рейтинг, анкетирование студентов и КМК.",
         columnsClass: "md:grid-cols-1",
         fields: [
             { key: "final_rating_score", label: "Итоговый рейтинговый балл" },
@@ -410,7 +409,7 @@ const ppsSections = [
                 key: "student_survey_results",
                 label: "Результаты анкетирования студентов о деятельности ППС",
             },
-            { key: "krk", label: "КРК" },
+            { key: "krk", label: "КМК" },
         ],
     },
     {

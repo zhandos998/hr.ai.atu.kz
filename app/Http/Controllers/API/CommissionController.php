@@ -250,52 +250,6 @@ class CommissionController extends Controller
             ]
         );
 
-        $application->loadMissing('vacancy.commissionMembers', 'ppsProfile:id,application_id,faculty_name');
-
-        $allowedIds = $this->allowedMemberIds($application, $this->globalMembers($vacancyType));
-
-        $votes = ApplicationCommissionVote::query()
-            ->where('application_id', $application->id)
-            ->whereIn('user_id', $allowedIds)
-            ->get(['decision', 'hire_term_years']);
-
-        $summary = $this->calculateVoteSummary(
-            $votes,
-            count($allowedIds),
-            $isPpsApplication
-        );
-
-        if ($summary['result'] === 'approved') {
-            $hiringStatus = 'hired';
-            if ($isPpsApplication) {
-                $hiringStatus = (int) $summary['approved_term_years'] === 3 ? 'hired_3_year' : 'hired_1_year';
-            }
-
-            ApplicationStageManager::setStage(
-                $application,
-                'hiring',
-                $hiringStatus,
-                $this->voteDecisionComment($summary, $isPpsApplication),
-                $request->user()?->id
-            );
-
-            Application::query()
-                ->whereKey($application->id)
-                ->update(['hiring_term_years' => $summary['approved_term_years']]);
-        } elseif ($summary['result'] === 'rejected') {
-            ApplicationStageManager::setStage(
-                $application,
-                'hiring',
-                'rejected',
-                $this->voteDecisionComment($summary, $isPpsApplication),
-                $request->user()?->id
-            );
-
-            Application::query()
-                ->whereKey($application->id)
-                ->update(['hiring_term_years' => null]);
-        }
-
         $application = $this->commissionApplicationsQuery($request, true, false)->findOrFail($application->id);
 
         return response()->json([
@@ -473,11 +427,8 @@ class CommissionController extends Controller
 
         $allowedIds = $allMembers->pluck('id')->all();
         $eligibleVotes = ($application->commissionVotes ?? collect())->whereIn('user_id', $allowedIds);
-        $summary = $this->calculateVoteSummary(
-            $eligibleVotes,
-            count($allowedIds),
-            $application->vacancy?->type === 'pps'
-        );
+        $summary = $this->calculateVoteSummary($eligibleVotes);
+        $result = $this->voteResultFromApplication($application);
         $myVote = $eligibleVotes->firstWhere('user_id', $userId);
 
         $application->vote_summary = [
@@ -488,8 +439,8 @@ class CommissionController extends Controller
             'reject' => $summary['reject'],
             'voted' => $eligibleVotes->count(),
             'pending' => max(count($allowedIds) - $eligibleVotes->count(), 0),
-            'result' => $summary['result'],
-            'approved_term_years' => $summary['approved_term_years'],
+            'result' => $result['result'],
+            'approved_term_years' => $result['approved_term_years'],
             'my_vote' => $myVote ? [
                 'decision' => $myVote->decision,
                 'hire_term_years' => $myVote->hire_term_years,
@@ -555,7 +506,7 @@ class CommissionController extends Controller
         return $this->facultyMembersCache[$facultyName];
     }
 
-    private function calculateVoteSummary(Collection $votes, int $membersCount, bool $isPpsApplication): array
+    private function calculateVoteSummary(Collection $votes): array
     {
         $hireVotes = $votes->where('decision', 'hire')->count();
         $hireOneYearVotes = $votes
@@ -567,46 +518,35 @@ class CommissionController extends Controller
             ->where('hire_term_years', 3)
             ->count();
         $rejectVotes = $votes->where('decision', 'reject')->count();
-        $half = $membersCount > 0 ? $membersCount / 2 : 0;
-
-        $result = 'pending';
-        $approvedTermYears = null;
-
-        if ($isPpsApplication) {
-            if ($hireOneYearVotes > $half) {
-                $result = 'approved';
-                $approvedTermYears = 1;
-            } elseif ($hireThreeYearVotes > $half) {
-                $result = 'approved';
-                $approvedTermYears = 3;
-            } elseif ($rejectVotes > $half) {
-                $result = 'rejected';
-            }
-        } else {
-            if ($hireVotes > $half) {
-                $result = 'approved';
-            } elseif ($rejectVotes > $half) {
-                $result = 'rejected';
-            }
-        }
 
         return [
             'hire' => $hireVotes,
             'hire_1_year' => $hireOneYearVotes,
             'hire_3_year' => $hireThreeYearVotes,
             'reject' => $rejectVotes,
-            'result' => $result,
-            'approved_term_years' => $approvedTermYears,
         ];
     }
 
-    private function voteDecisionComment(array $summary, bool $isPpsApplication): string
+    private function voteResultFromApplication(Application $application): array
     {
-        if ($isPpsApplication) {
-            return "Автоматически установлено по итогам голосования комиссии: {$summary['hire_1_year']} за на 1 год, {$summary['hire_3_year']} за на 3 года, {$summary['reject']} против.";
+        if ($application->hiring_status === 'hired') {
+            return [
+                'result' => 'approved',
+                'approved_term_years' => $application->hiring_term_years,
+            ];
         }
 
-        return "Автоматически установлено по итогам голосования комиссии: {$summary['hire']} за, {$summary['reject']} против.";
+        if ($application->hiring_status === 'rejected') {
+            return [
+                'result' => 'rejected',
+                'approved_term_years' => null,
+            ];
+        }
+
+        return [
+            'result' => 'pending',
+            'approved_term_years' => null,
+        ];
     }
 
     private function attachDocumentUrls(Application $application): Application

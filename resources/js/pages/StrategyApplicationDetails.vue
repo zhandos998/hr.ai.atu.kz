@@ -164,12 +164,12 @@
                         </label>
 
                         <label class="space-y-2 block">
-                            <span class="text-sm font-medium text-gray-700">КРК</span>
+                            <span class="text-sm font-medium text-gray-700">КМК</span>
                             <textarea
                                 v-model="strategyDraft.krk"
                                 rows="5"
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                                placeholder="Укажите сведения по КРК"
+                                placeholder="Укажите сведения по КМК"
                             ></textarea>
                         </label>
                     </section>

@@ -40,7 +40,7 @@ class CommissionVoteTest extends TestCase
         $this->assertDatabaseCount('application_commission_votes', 0);
     }
 
-    public function test_pps_majority_vote_sets_three_year_term(): void
+    public function test_pps_majority_vote_does_not_auto_finalize_application(): void
     {
         $this->seed(ApplicationStatusSeeder::class);
 
@@ -68,19 +68,19 @@ class CommissionVoteTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('application.hiring_status', 'hired')
-            ->assertJsonPath('application.hiring_term_years', 3)
-            ->assertJsonPath('application.vote_summary.result', 'approved')
-            ->assertJsonPath('application.vote_summary.approved_term_years', 3)
+            ->assertJsonPath('application.hiring_status', 'voting')
+            ->assertJsonPath('application.hiring_term_years', null)
+            ->assertJsonPath('application.vote_summary.result', 'pending')
+            ->assertJsonPath('application.vote_summary.approved_term_years', null)
             ->assertJsonPath('application.vote_summary.hire_3_year', 2)
             ->assertJsonPath('application.vote_summary.reject', 0);
 
         $application->refresh();
 
-        $this->assertSame('hired', $application->hiring_status);
-        $this->assertSame(3, $application->hiring_term_years);
+        $this->assertSame('voting', $application->hiring_status);
+        $this->assertNull($application->hiring_term_years);
         $this->assertSame(
-            'completed',
+            'corruption_not_found',
             ApplicationStatus::query()->find($application->status_id)?->code
         );
 

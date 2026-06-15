@@ -1193,7 +1193,6 @@ class ApplicationController extends Controller
         $votes = ($application->commissionVotes ?? collect())->whereIn('user_id', $assignedIds);
         $summary = $this->calculateVoteSummary(
             $votes,
-            $membersCount,
             $application->vacancy?->type === 'pps',
             $application->hiring_term_years
         );
@@ -1272,7 +1271,7 @@ class ApplicationController extends Controller
         $vacancy->commissionMembers()->syncWithoutDetaching($memberIds);
     }
 
-    private function calculateVoteSummary($votes, int $membersCount, bool $isPpsApplication, ?int $currentHiringTermYears = null): array
+    private function calculateVoteSummary($votes, bool $isPpsApplication, ?int $currentHiringTermYears = null): array
     {
         $hireVotes = $votes->where('decision', 'hire')->count();
         $hireOneYearVotes = $votes
@@ -1284,18 +1283,7 @@ class ApplicationController extends Controller
             ->where('hire_term_years', 3)
             ->count();
         $rejectVotes = $votes->where('decision', 'reject')->count();
-        $half = $membersCount > 0 ? $membersCount / 2 : 0;
-        $approvedTermYears = null;
-
-        if ($isPpsApplication) {
-            if ($hireOneYearVotes > $half) {
-                $approvedTermYears = 1;
-            } elseif ($hireThreeYearVotes > $half) {
-                $approvedTermYears = 3;
-            } elseif ($currentHiringTermYears) {
-                $approvedTermYears = $currentHiringTermYears;
-            }
-        }
+        $approvedTermYears = $isPpsApplication ? $currentHiringTermYears : null;
 
         return [
             'hire' => $hireVotes,

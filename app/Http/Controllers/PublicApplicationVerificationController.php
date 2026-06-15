@@ -83,7 +83,7 @@ class PublicApplicationVerificationController extends Controller
                 'fields' => [
                     ['label' => 'Итоговый рейтинговый балл', 'value' => $profile->final_rating_score],
                     ['label' => 'Результаты анкетирования студентов', 'value' => $profile->student_survey_results],
-                    ['label' => 'КРК', 'value' => $profile->krk],
+                    ['label' => 'КМК', 'value' => $profile->krk],
                 ],
             ],
             [
@@ -105,5 +105,4 @@ class PublicApplicationVerificationController extends Controller
             ],
         ];
     }
-
 }

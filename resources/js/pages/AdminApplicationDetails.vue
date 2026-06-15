@@ -1096,7 +1096,7 @@
                     </div>
 
                     <div>
-                      <div class="text-sm font-medium text-gray-700">КРК</div>
+                      <div class="text-sm font-medium text-gray-700">КМК</div>
                       <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
                         {{ application.pps_profile?.krk || 'Заполняет директор Департамента стратегического развития.' }}
                       </div>
@@ -1473,11 +1473,9 @@ const memberSuggestions = computed(() => {
     const query = normalizeSearchText(memberSearch.value);
     const candidates = query
         ? vacancyCandidates.value.filter((user) =>
-              [
-                  user?.name,
-                  user?.email,
-                  user?.phone,
-              ].some((value) => normalizeSearchText(value).includes(query))
+              [user?.name, user?.email, user?.phone].some((value) =>
+                  normalizeSearchText(value).includes(query)
+              )
           )
         : vacancyCandidates.value;
 
@@ -1637,7 +1635,9 @@ const ppsPositionOptions = computed(() => {
         }
     }
 
-    const currentTitle = String(ppsProfileDraft.value.desired_position || "").trim();
+    const currentTitle = String(
+        ppsProfileDraft.value.desired_position || ""
+    ).trim();
     const currentKey = normalizeSearchText(currentTitle);
     if (currentTitle && !uniqueByTitle.has(currentKey)) {
         uniqueByTitle.set(currentKey, {
@@ -1647,15 +1647,19 @@ const ppsPositionOptions = computed(() => {
     }
 
     return Array.from(uniqueByTitle.values()).sort((left, right) =>
-        String(left?.title || "").localeCompare(String(right?.title || ""), "ru")
+        String(left?.title || "").localeCompare(
+            String(right?.title || ""),
+            "ru"
+        )
     );
 });
-const selectedPpsPosition = computed(() =>
-    ppsPositionOptions.value.find(
-        (position) =>
-            normalizeSearchText(position?.title) ===
-            normalizeSearchText(ppsProfileDraft.value.desired_position)
-    ) || null
+const selectedPpsPosition = computed(
+    () =>
+        ppsPositionOptions.value.find(
+            (position) =>
+                normalizeSearchText(position?.title) ===
+                normalizeSearchText(ppsProfileDraft.value.desired_position)
+        ) || null
 );
 const ppsPositionSuggestions = computed(() => {
     const query = normalizeSearchText(ppsPositionSearch.value);
@@ -1694,11 +1698,12 @@ const staffDepartmentOptions = computed(() =>
             )
         )
 );
-const selectedStaffDepartment = computed(() =>
-    staffDepartmentOptions.value.find(
-        (department) =>
-            String(department.id) === staffDetailsDraft.value.department_id
-    ) || null
+const selectedStaffDepartment = computed(
+    () =>
+        staffDepartmentOptions.value.find(
+            (department) =>
+                String(department.id) === staffDetailsDraft.value.department_id
+        ) || null
 );
 const staffDepartmentSuggestions = computed(() => {
     const query = normalizeSearchText(staffDepartmentSearch.value);
@@ -1731,10 +1736,12 @@ const staffPositionOptions = computed(() =>
             )
         )
 );
-const selectedStaffPosition = computed(() =>
-    staffPositionOptions.value.find(
-        (position) => String(position.id) === staffDetailsDraft.value.position_id
-    ) || null
+const selectedStaffPosition = computed(
+    () =>
+        staffPositionOptions.value.find(
+            (position) =>
+                String(position.id) === staffDetailsDraft.value.position_id
+        ) || null
 );
 const staffPositionSuggestions = computed(() => {
     const query = normalizeSearchText(staffPositionSearch.value);
@@ -1929,8 +1936,7 @@ const ppsExtraSections = [
     {
         key: "strategy",
         title: "Показатели стратегического развития",
-        description:
-            "Итоговый рейтинг, анкетирование студентов и КРК.",
+        description: "Итоговый рейтинг, анкетирование студентов и КМК.",
         columnsClass: "md:grid-cols-1",
         fields: [
             {
@@ -1948,8 +1954,8 @@ const ppsExtraSections = [
             },
             {
                 key: "krk",
-                label: "КРК",
-                placeholder: "Укажите сведения по КРК",
+                label: "КМК",
+                placeholder: "Укажите сведения по КМК",
                 rows: 4,
             },
         ],
@@ -2086,9 +2092,12 @@ const docTextClass = (base) => {
 };
 
 const docDeleteClass = (base) => {
-    if (base === "diploma") return "border-sky-200 text-sky-700 hover:bg-sky-100 hover:text-red-700";
-    if (base === "recommendation_letter") return "border-amber-200 text-amber-700 hover:bg-amber-100 hover:text-red-700";
-    if (base === "scientific_works") return "border-cyan-200 text-cyan-700 hover:bg-cyan-100 hover:text-red-700";
+    if (base === "diploma")
+        return "border-sky-200 text-sky-700 hover:bg-sky-100 hover:text-red-700";
+    if (base === "recommendation_letter")
+        return "border-amber-200 text-amber-700 hover:bg-amber-100 hover:text-red-700";
+    if (base === "scientific_works")
+        return "border-cyan-200 text-cyan-700 hover:bg-cyan-100 hover:text-red-700";
     return "border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-red-700";
 };
 
@@ -2146,10 +2155,7 @@ const deleteApplicationDocument = async (item) => {
         syncStaffDetailsDraft(application.value);
         aiResult.value = application.value.ai_result || null;
     } catch (error) {
-        alert(
-            error?.response?.data?.message ||
-                "Не удалось удалить документ."
-        );
+        alert(error?.response?.data?.message || "Не удалось удалить документ.");
     } finally {
         deletingApplicationDocumentIds.value =
             deletingApplicationDocumentIds.value.filter(
@@ -2961,7 +2967,11 @@ const openLawyerResponsePdf = async () => {
 };
 
 const openAdminAcademicResponsePdf = async () => {
-    if (!application.value || !isPpsApplication.value || !canGenerateAcademicPdf.value) {
+    if (
+        !application.value ||
+        !isPpsApplication.value ||
+        !canGenerateAcademicPdf.value
+    ) {
         alert("Заполните заключение перед генерацией PDF.");
         return;
     }
@@ -3048,7 +3058,11 @@ const openAdminAcademicResponsePdf = async () => {
 };
 
 const openAdminScienceResponsePdf = async () => {
-    if (!application.value || !isPpsApplication.value || !canGenerateSciencePdf.value) {
+    if (
+        !application.value ||
+        !isPpsApplication.value ||
+        !canGenerateSciencePdf.value
+    ) {
         alert("Заполните заключение перед генерацией PDF.");
         return;
     }
