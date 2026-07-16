@@ -61,6 +61,7 @@
                                 Срок найма: {{ formatHiringTermLabel(application.hiring_term_years) }}
                             </p>
                             <p class="mt-2 text-sm text-gray-500">Дата подачи: {{ formatDate(application.created_at) }}</p>
+                            <p class="text-sm text-gray-500">Дата голосования: {{ formatDate(application.voting_started_at, 'Не назначено') }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-2 text-xs">
@@ -400,6 +401,18 @@ const ppsSections = [
         ],
     },
     {
+        title: "Повышение квалификации",
+        description: "Сведения о повышении квалификации преподавателя.",
+        columnsClass: "md:grid-cols-1",
+        fields: [
+            {
+                key: "professional_development",
+                label: "Повышение квалификации",
+                documentsField: "professional_development_documents",
+            },
+        ],
+    },
+    {
         title: "Стратегическое развитие",
         description: "Итоговый рейтинг, анкетирование студентов и КМК.",
         columnsClass: "md:grid-cols-1",
@@ -556,8 +569,8 @@ const voteDecisionClass = (decision) => {
     return "bg-gray-100 text-gray-700";
 };
 
-const formatDate = (value) => {
-    if (!value) return "Не указана";
+const formatDate = (value, fallback = "Не указана") => {
+    if (!value) return fallback;
 
     return new Date(value).toLocaleDateString("ru-RU", {
         year: "numeric",

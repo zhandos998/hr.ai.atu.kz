@@ -68,6 +68,7 @@ class PublicApplicationVerificationController extends Controller
                     ['label' => 'Научная степень / докторантура', 'value' => $profile->scientific_degree],
                     ['label' => 'Учёное звание', 'value' => $profile->academic_title],
                     ['label' => 'Стаж работы', 'value' => $profile->work_experience],
+                    ['label' => 'Повышение квалификации', 'value' => $profile->professional_development],
                 ],
             ],
             [

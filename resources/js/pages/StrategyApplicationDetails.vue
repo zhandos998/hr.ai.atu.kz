@@ -54,6 +54,7 @@
                         <!-- <p class="text-sm text-gray-600">{{ application.user?.email }}</p> -->
                         <p class="text-sm text-gray-600">Телефон: {{ application.user?.phone || 'Не указан' }}</p>
                         <p class="text-sm text-gray-500 mt-2">Дата подачи: {{ formatDate(application.created_at) }}</p>
+                        <p class="text-sm text-gray-500">Дата голосования: {{ application.voting_started_at ? formatDate(application.voting_started_at) : 'Не назначено' }}</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-2 text-xs">

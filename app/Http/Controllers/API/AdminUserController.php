@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
 {
-    private const ALLOWED_ROLES = ['user', 'lawyer', 'science_director', 'digital_director', 'strategy_director', 'academic_director', 'library_director', 'admin'];
+    private const ALLOWED_ROLES = ['user', 'lawyer', 'science_director', 'digital_director', 'strategy_director', 'academic_director', 'library_director', 'professional_development_director', 'admin'];
     private const LEGACY_ROLE_ALIASES = [
         'compliance_director' => 'lawyer',
     ];

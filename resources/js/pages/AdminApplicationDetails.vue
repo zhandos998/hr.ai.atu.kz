@@ -72,6 +72,60 @@
                                 Срок найма: {{ formatHiringTermLabel(application.hiring_term_years) }}
                             </p>
                             <p class="text-gray-500 text-sm">Дата подачи: {{ formatDate(application.created_at) }}</p>
+                            <div class="rounded-xl border border-gray-200 bg-slate-50 p-3">
+                                <label class="block text-xs font-semibold uppercase text-gray-500">
+                                    Дата голосования
+                                </label>
+                                <div class="mt-2 flex flex-wrap items-center gap-2">
+                                    <input
+                                        v-model="votingDateDraft"
+                                        type="date"
+                                        :disabled="!canEditVotingDate || votingDateSaving"
+                                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                                        @input.stop
+                                    />
+                                    <input
+                                        v-model="votingOrderDraft"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="№"
+                                        :disabled="!canEditVotingDate || votingDateSaving"
+                                        class="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                                        @input.stop
+                                    />
+                                    <button
+                                        v-if="isVotingScheduleDraftChanged"
+                                        type="button"
+                                        :disabled="!canEditVotingDate || votingDateSaving"
+                                        class="rounded-lg bg-[#005eb8] px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                                        @click="saveVotingDate"
+                                    >
+                                        Сохранить
+                                    </button>
+                                    <button
+                                        v-if="isVotingScheduleDraftChanged"
+                                        type="button"
+                                        :disabled="!canEditVotingDate || votingDateSaving"
+                                        class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        @click="syncVotingDateDraft(application)"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
+                                        v-if="votingDateDraft || votingOrderDraft"
+                                        type="button"
+                                        :disabled="!canEditVotingDate || votingDateSaving"
+                                        class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        @click="clearVotingDateDraft"
+                                    >
+                                        Очистить
+                                    </button>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-500">
+                                    {{ votingDateSaving ? 'Сохранение...' : `Текущая дата: ${formatDate(application.voting_started_at, 'Не назначено')}` }}
+                                </p>
+                            </div>
                             <p class="text-gray-500 text-sm">ID кандидата: {{ application.user?.id }}</p>
                             <TeacherAuditLink
                                 v-if="isPpsApplication"
@@ -1183,6 +1237,26 @@
                   </div>
                 </div>
                 <div class="space-y-3 md:col-span-2 rounded-xl border border-gray-200 bg-slate-50 px-4 py-4">
+                  <div>
+                    <div class="text-sm font-medium text-gray-700">Повышение квалификации</div>
+                    <div class="mt-2 text-sm text-gray-600 whitespace-pre-line">
+                      {{ application.pps_profile?.professional_development || 'Заполняет ответственный за повышение квалификации.' }}
+                    </div>
+                  </div>
+                  <div v-if="(application.pps_profile?.professional_development_documents || []).length" class="flex flex-wrap gap-2">
+                    <a
+                      v-for="document in application.pps_profile.professional_development_documents"
+                      :key="document.id"
+                      :href="document.url"
+                      target="_blank"
+                      rel="noopener"
+                      class="inline-flex items-center text-sm font-medium text-[#005eb8] hover:underline"
+                    >
+                      {{ document.name }}
+                    </a>
+                  </div>
+                </div>
+                <div class="space-y-3 md:col-span-2 rounded-xl border border-gray-200 bg-slate-50 px-4 py-4">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <div class="text-sm font-medium text-gray-700">Результаты анкетирования по вопросам противодействия коррупции</div>
@@ -1403,6 +1477,9 @@ const ppsProfileSaving = ref(false);
 const ppsProfileSavingSection = ref("");
 const stageDrafts = ref({});
 const stageSavingByKey = ref({});
+const votingDateDraft = ref("");
+const votingOrderDraft = ref("");
+const votingDateSaving = ref(false);
 const showUploadDocsModal = ref(false);
 const uploadDocsModalMode = ref("create");
 const deletingApplicationDocumentIds = ref([]);
@@ -1412,6 +1489,18 @@ const backRoute = computed(() => ({
     name: "AdminApplications",
     query: route.query.type ? { type: String(route.query.type) } : {},
 }));
+
+const canEditVotingDate = computed(() => !application.value?.archived_at);
+const savedVotingDate = computed(() => dateInputValue(application.value?.voting_date));
+const savedVotingOrder = computed(() => {
+    const value = Number(application.value?.voting_order);
+
+    return Number.isInteger(value) && value > 0 ? String(value) : "";
+});
+const isVotingScheduleDraftChanged = computed(() => (
+    String(votingDateDraft.value || "") !== savedVotingDate.value ||
+    String(votingOrderDraft.value || "") !== savedVotingOrder.value
+));
 
 const isTechnicalCandidateEmail = (email) =>
     String(email || "")
@@ -1851,6 +1940,7 @@ const emptyPpsProfileDraft = () => ({
     scientific_degree: "",
     academic_title: "",
     work_experience: "",
+    professional_development: "",
     scientific_works: "",
     science_conclusion: "",
     digital_mooc: "",
@@ -1871,6 +1961,7 @@ const emptyPpsProfileDraft = () => ({
     academic_title_documents: [],
     scientific_works_documents: [],
     digital_mooc_documents: [],
+    professional_development_documents: [],
 });
 
 const ppsProfileDraft = ref(emptyPpsProfileDraft());
@@ -1929,6 +2020,21 @@ const ppsExtraSections = [
                 key: "digital_mooc",
                 label: "Наличие ЦОР / МООК",
                 placeholder: "Укажите сведения по ЦОР / МООК",
+                rows: 4,
+            },
+        ],
+    },
+    {
+        key: "professional_development",
+        title: "Повышение квалификации",
+        description: "Данные, которые заполняет ответственный за повышение квалификации.",
+        columnsClass: "md:grid-cols-1",
+        documentField: "professional_development_documents",
+        fields: [
+            {
+                key: "professional_development",
+                label: "Повышение квалификации",
+                placeholder: "Укажите сведения о повышении квалификации",
                 rows: 4,
             },
         ],
@@ -2178,14 +2284,20 @@ const voteDecisionClass = (decision) => {
 
 const vacancyTitle = (item) => item?.vacancy?.title || "Без названия";
 
-const formatDate = (value) => {
-    if (!value) return "Не указана";
+const formatDate = (value, fallback = "Не указана") => {
+    if (!value) return fallback;
 
     return new Date(value).toLocaleDateString("ru-RU", {
         year: "numeric",
         month: "long",
         day: "numeric",
     });
+};
+
+const dateInputValue = (value) => {
+    const normalized = String(value || "").slice(0, 10);
+
+    return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 };
 
 const formatDateTime = (value) => {
@@ -2218,6 +2330,12 @@ const syncStageDrafts = (item) => {
     );
 };
 
+const syncVotingDateDraft = (item) => {
+    votingDateDraft.value = dateInputValue(item?.voting_date);
+    const order = Number(item?.voting_order);
+    votingOrderDraft.value = Number.isInteger(order) && order > 0 ? String(order) : "";
+};
+
 const ppsProfileFieldValue = (item, field) => {
     const profile = item?.pps_profile;
 
@@ -2245,6 +2363,10 @@ const syncPpsProfileDraft = (item) => {
         scientific_degree: ppsProfileFieldValue(item, "scientific_degree"),
         academic_title: ppsProfileFieldValue(item, "academic_title"),
         work_experience: ppsProfileFieldValue(item, "work_experience"),
+        professional_development: ppsProfileFieldValue(
+            item,
+            "professional_development"
+        ),
         scientific_works: ppsProfileFieldValue(item, "scientific_works"),
         science_conclusion: ppsProfileFieldValue(item, "science_conclusion"),
         digital_mooc: ppsProfileFieldValue(item, "digital_mooc"),
@@ -2557,6 +2679,7 @@ const fetchApplication = async () => {
         );
         application.value = response.data;
         syncStageDrafts(application.value);
+        syncVotingDateDraft(application.value);
         syncPpsProfileDraft(application.value);
         syncStaffDetailsDraft(application.value);
         aiResult.value = application.value.ai_result || null;
@@ -2665,6 +2788,10 @@ const savePpsProfile = async () => {
         formData.append(
             "work_experience",
             ppsProfileDraft.value.work_experience || ""
+        );
+        formData.append(
+            "professional_development",
+            ppsProfileDraft.value.professional_development || ""
         );
         formData.append(
             "scientific_works",
@@ -2848,6 +2975,61 @@ const saveExtraPpsProfileSection = (section) =>
         errorMessage: `РћС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё СЃРµРєС†РёРё "${section.title}".`,
     });
 
+const saveVotingDate = async () => {
+    if (!application.value || !canEditVotingDate.value) return;
+
+    const draftDate = String(votingDateDraft.value || "").trim();
+    if (draftDate && !/^\d{4}-\d{2}-\d{2}$/.test(draftDate)) {
+        alert("Введите дату полностью в формате ГГГГ-ММ-ДД.");
+        syncVotingDateDraft(application.value);
+        return;
+    }
+
+    const draftOrder = String(votingOrderDraft.value || "").trim();
+    if (draftOrder && (!/^\d+$/.test(draftOrder) || Number(draftOrder) < 1)) {
+        alert("Введите номер в очереди положительным числом.");
+        syncVotingDateDraft(application.value);
+        return;
+    }
+
+    const votingDate = draftDate || null;
+    const votingOrder = draftOrder ? Number(draftOrder) : null;
+    if (
+        (savedVotingDate.value || null) === votingDate &&
+        (savedVotingOrder.value ? Number(savedVotingOrder.value) : null) === votingOrder
+    ) {
+        return;
+    }
+
+    votingDateSaving.value = true;
+
+    try {
+        const response = await axios.put(
+            `/api/admin/applications/${application.value.id}/voting-date`,
+            {
+                voting_date: votingDate,
+                voting_order: votingOrder,
+            }
+        );
+
+        application.value = response.data.application;
+        syncVotingDateDraft(application.value);
+    } catch (error) {
+        alert(
+            error?.response?.data?.message ||
+                "Ошибка при сохранении даты голосования."
+        );
+        syncVotingDateDraft(application.value);
+    } finally {
+        votingDateSaving.value = false;
+    }
+};
+
+const clearVotingDateDraft = () => {
+    votingDateDraft.value = "";
+    votingOrderDraft.value = "";
+};
+
 const saveStage = async (stage) => {
     if (!application.value) return;
 
@@ -2864,6 +3046,7 @@ const saveStage = async (stage) => {
         );
         application.value = response.data.application;
         syncStageDrafts(application.value);
+        syncVotingDateDraft(application.value);
     } catch (error) {
         alert(
             error?.response?.data?.message ||

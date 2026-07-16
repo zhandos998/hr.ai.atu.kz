@@ -226,6 +226,11 @@
                                 class="text-[#005eb8] hover:text-blue-700 font-medium transition"
                             >Библиотека</router-link>
                             <router-link
+                                v-if="authStore.role === 'professional_development_director'"
+                                to="/professional-development/applications"
+                                class="text-[#005eb8] hover:text-blue-700 font-medium transition"
+                            >Повышение квалификации</router-link>
+                            <router-link
                                 v-if="hasLegalAccess"
                                 to="/compliance/applications"
                                 class="text-[#005eb8] hover:text-blue-700 font-medium transition"
@@ -317,6 +322,12 @@
                         class="text-[#005eb8] hover:text-blue-700 font-medium transition py-1"
                         @click="closeMobileMenu"
                     >Библиотека</router-link>
+                    <router-link
+                        v-if="authStore.role === 'professional_development_director'"
+                        to="/professional-development/applications"
+                        class="text-[#005eb8] hover:text-blue-700 font-medium transition py-1"
+                        @click="closeMobileMenu"
+                    >Повышение квалификации</router-link>
                     <router-link
                         v-if="hasLegalAccess"
                         to="/compliance/applications"

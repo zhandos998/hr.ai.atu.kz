@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'strategy' => \App\Http\Middleware\IsStrategyDirector::class,
             'academic' => \App\Http\Middleware\IsAcademicDirector::class,
             'library' => \App\Http\Middleware\IsLibraryDirector::class,
+            'professional_development' => \App\Http\Middleware\IsProfessionalDevelopmentDirector::class,
             'commission' => \App\Http\Middleware\IsCommissionMember::class,
         ]);
         $middleware->api([

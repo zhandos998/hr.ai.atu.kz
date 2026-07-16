@@ -102,6 +102,32 @@ class ApplicationController extends Controller
         ]);
     }
 
+    public function updateVotingDate(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'voting_date' => 'nullable|date',
+            'voting_order' => 'nullable|integer|min:1|max:9999',
+        ]);
+
+        $application = Application::query()
+            ->notArchived()
+            ->findOrFail($id);
+
+        $application->forceFill([
+            'voting_date' => $validated['voting_date'] ?? null,
+            'voting_order' => $validated['voting_order'] ?? null,
+        ])->save();
+
+        return response()->json([
+            'message' => $application->voting_date
+                ? 'Дата голосования обновлена.'
+                : 'Дата голосования очищена.',
+            'application' => $this->transformAdminApplication(
+                $this->adminApplicationsQuery()->findOrFail($application->id)
+            ),
+        ]);
+    }
+
     public function adminStore(Request $request)
     {
         $validated = $request->validate([
@@ -271,6 +297,7 @@ class ApplicationController extends Controller
             'scientific_degree' => 'nullable|string|max:4000',
             'academic_title' => 'nullable|string|max:4000',
             'work_experience' => 'nullable|string|max:4000',
+            'professional_development' => 'nullable|string|max:8000',
             'scientific_works' => 'nullable|string|max:8000',
             'science_conclusion' => 'nullable|string|max:8000',
             'digital_mooc' => 'nullable|string|max:8000',
@@ -304,6 +331,7 @@ class ApplicationController extends Controller
             'scientific_degree',
             'academic_title',
             'work_experience',
+            'professional_development',
             'scientific_works',
             'science_conclusion',
             'digital_mooc',
@@ -1382,6 +1410,10 @@ class ApplicationController extends Controller
             'digital_mooc_documents' => [
                 'category' => 'digital_mooc',
                 'directory' => 'digital-mooc',
+            ],
+            'professional_development_documents' => [
+                'category' => 'professional_development',
+                'directory' => 'professional-development',
             ],
         ];
     }

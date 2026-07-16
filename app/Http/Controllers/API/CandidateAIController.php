@@ -133,6 +133,7 @@ class CandidateAIController extends Controller
                 'magistracy' => $ppsProfile->magistracy,
                 'scientific_degree' => $ppsProfile->scientific_degree,
                 'academic_title' => $ppsProfile->academic_title,
+                'professional_development' => $ppsProfile->professional_development,
                 'scientific_works' => $ppsProfile->scientific_works,
                 'science_conclusion' => $ppsProfile->science_conclusion,
                 'digital_mooc' => $ppsProfile->digital_mooc,

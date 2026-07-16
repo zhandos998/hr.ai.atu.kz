@@ -50,6 +50,72 @@
           </label>
         </div>
 
+        <div class="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+          <div class="mb-2 text-xs font-semibold uppercase text-gray-500">Дата голосования</div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-semibold text-gray-500 shadow-sm transition hover:border-[#005eb8] hover:text-[#005eb8]"
+              aria-label="Прокрутить даты влево"
+              @click="scrollVotingDates('left')"
+            >
+              ‹
+            </button>
+            <div class="relative min-w-0 flex-1">
+              <div
+                ref="votingDateScroller"
+                class="scrollbar-none overflow-x-auto scroll-smooth"
+              >
+                <div class="flex min-w-max gap-2">
+                  <button
+                    type="button"
+                    :class="activeVotingDate === 'all'
+                      ? 'bg-[#005eb8] text-white border-[#005eb8]'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-[#005eb8] hover:text-[#005eb8]'"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                    @click="activeVotingDate = 'all'"
+                  >
+                    <span>Все</span>
+                    <span
+                      :class="activeVotingDate === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'"
+                      class="inline-flex min-w-7 justify-center rounded-full px-2 py-0.5 text-xs"
+                    >
+                      {{ selectedTypeApplications.length }}
+                    </span>
+                  </button>
+
+                  <button
+                    v-for="date in votingDateTabs"
+                    :key="date.value"
+                    type="button"
+                    :class="activeVotingDate === date.value
+                      ? 'bg-[#005eb8] text-white border-[#005eb8]'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-[#005eb8] hover:text-[#005eb8]'"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                    @click="activeVotingDate = date.value"
+                  >
+                    <span>{{ date.label }}</span>
+                    <span
+                      :class="activeVotingDate === date.value ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'"
+                      class="inline-flex min-w-7 justify-center rounded-full px-2 py-0.5 text-xs"
+                    >
+                      {{ date.count }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-semibold text-gray-500 shadow-sm transition hover:border-[#005eb8] hover:text-[#005eb8]"
+              aria-label="Прокрутить даты вправо"
+              @click="scrollVotingDates('right')"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+
         <div
           v-if="filteredApplications.length === 0"
           class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
@@ -59,15 +125,21 @@
 
         <template v-else>
           <div
-            v-for="app in filteredApplications"
+            v-for="(app, index) in filteredApplications"
             :key="app.id"
             class="bg-white rounded-xl shadow border border-gray-100 p-4 space-y-3"
           >
-            <div>
-              <h2 class="text-lg font-semibold text-[#005eb8]">{{ app.vacancy?.title || 'Заявка' }}</h2>
-              <p class="text-sm text-gray-500">Тип вакансии: {{ vacancyTypeLabel(app?.vacancy?.type) }}</p>
-              <p class="text-sm text-gray-700">Кандидат: {{ app.user?.name }} ({{ app.user?.email }})</p>
-              <p class="text-sm text-gray-700">Телефон: {{ app.user?.phone || 'Не указан' }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-[#005eb8]">{{ app.vacancy?.title || 'Заявка' }}</h2>
+                <p class="text-sm text-gray-500">Тип вакансии: {{ vacancyTypeLabel(app?.vacancy?.type) }}</p>
+                <p class="text-sm text-gray-700">Кандидат: {{ app.user?.name }} ({{ app.user?.email }})</p>
+                <p class="text-sm text-gray-700">Телефон: {{ app.user?.phone || 'Не указан' }}</p>
+                <p class="text-sm text-gray-500">Дата голосования: {{ formatDate(app.voting_started_at, 'Не назначено') }}</p>
+              </div>
+              <div class="inline-flex shrink-0 items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-[#005eb8]">
+                № {{ votingSequenceLabel(app, index) }}
+              </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
@@ -222,6 +294,8 @@ const applications = ref([]);
 const comments = ref({});
 const loading = ref(true);
 const searchQuery = ref('');
+const activeVotingDate = ref('all');
+const votingDateScroller = ref(null);
 const activeVacancyType = ref(
   vacancyTypeTabValues.includes(String(route.query.type))
     ? String(route.query.type)
@@ -242,6 +316,106 @@ const applicationTypeTabs = computed(() => vacancyTypeTabValues.map((type) => ({
 })));
 
 const selectedTypeApplications = computed(() => applicationsByVacancyType.value[activeVacancyType.value] || []);
+
+const scrollVotingDates = (direction) => {
+  const scroller = votingDateScroller.value;
+  if (!scroller) return;
+
+  const distance = Math.max(220, Math.floor(scroller.clientWidth * 0.75));
+  scroller.scrollBy({
+    left: direction === 'left' ? -distance : distance,
+    behavior: 'smooth',
+  });
+};
+
+const votingDateKey = (value) => {
+  if (!value) return 'none';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'none';
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const votingDateLabel = (key) => {
+  if (key === 'none') return 'Не назначено';
+
+  return new Date(`${key}T00:00:00`).toLocaleDateString('ru-RU', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const votingOrderValue = (app) => {
+  const value = Number(app?.voting_order);
+
+  return Number.isInteger(value) && value > 0 ? value : Number.MAX_SAFE_INTEGER;
+};
+
+const votingSequenceLabel = (app, index) => {
+  const value = Number(app?.voting_order);
+
+  return Number.isInteger(value) && value > 0 ? value : index + 1;
+};
+
+const applicationCreatedAtTime = (app) => {
+  const value = Date.parse(app?.created_at || '');
+
+  return Number.isNaN(value) ? 0 : value;
+};
+
+const sortVotingApplications = (items) => items.slice().sort((left, right) => {
+  const leftDate = votingDateKey(left?.voting_started_at);
+  const rightDate = votingDateKey(right?.voting_started_at);
+
+  if (leftDate !== rightDate) {
+    if (leftDate === 'none') return 1;
+    if (rightDate === 'none') return -1;
+    return rightDate.localeCompare(leftDate);
+  }
+
+  return (
+    votingOrderValue(left) - votingOrderValue(right)
+    || applicationCreatedAtTime(left) - applicationCreatedAtTime(right)
+    || Number(left?.id || 0) - Number(right?.id || 0)
+  );
+});
+
+const votingDateTabs = computed(() => {
+  const counts = new Map();
+
+  selectedTypeApplications.value.forEach((app) => {
+    const key = votingDateKey(app.voting_started_at);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .sort(([left], [right]) => {
+      if (left === 'none') return 1;
+      if (right === 'none') return -1;
+      return right.localeCompare(left);
+    })
+    .map(([value, count]) => ({
+      value,
+      label: votingDateLabel(value),
+      count,
+    }));
+});
+
+const dateFilteredApplications = computed(() => {
+  if (activeVotingDate.value === 'all') return sortVotingApplications(selectedTypeApplications.value);
+
+  return sortVotingApplications(
+    selectedTypeApplications.value.filter((app) =>
+      votingDateKey(app.voting_started_at) === activeVotingDate.value
+    )
+  );
+});
 
 const normalizeSearchText = (value) =>
   String(value || '')
@@ -268,16 +442,23 @@ const applicationSearchText = (app) => normalizeSearchText([
 
 const filteredApplications = computed(() => {
   const query = normalizeSearchText(searchQuery.value);
-  if (!query) return selectedTypeApplications.value;
+  if (!query) return dateFilteredApplications.value;
 
-  return selectedTypeApplications.value.filter((app) =>
+  return dateFilteredApplications.value.filter((app) =>
     applicationSearchText(app).includes(query)
   );
 });
 const activeVacancyTypeLabel = computed(() => vacancyTypeLabel(activeVacancyType.value));
+const activeVotingDateLabel = computed(() =>
+  activeVotingDate.value === 'all' ? 'все даты' : votingDateLabel(activeVotingDate.value)
+);
 const emptyStateText = computed(() => {
   if (searchQuery.value.trim()) {
-    return `По запросу "${searchQuery.value.trim()}" в разделе ${activeVacancyTypeLabel.value} ничего не найдено.`;
+    return `По запросу "${searchQuery.value.trim()}" в разделе ${activeVacancyTypeLabel.value} за ${activeVotingDateLabel.value} ничего не найдено.`;
+  }
+
+  if (activeVotingDate.value !== 'all') {
+    return `В разделе ${activeVacancyTypeLabel.value} за ${activeVotingDateLabel.value} заявок для голосования нет.`;
   }
 
   return `В разделе ${activeVacancyTypeLabel.value} заявок для голосования пока нет.`;
@@ -340,6 +521,16 @@ const docLabel = (type) => {
   return parsed.index ? `${base} #${parsed.index}` : base;
 };
 
+const formatDate = (value, fallback = 'Не указана') => {
+  if (!value) return fallback;
+
+  return new Date(value).toLocaleDateString('ru-RU', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 const syncActiveVacancyType = () => {
   if (applicationsByVacancyType.value[activeVacancyType.value]?.length) {
     return;
@@ -349,9 +540,20 @@ const syncActiveVacancyType = () => {
   activeVacancyType.value = fallbackType || 'pps';
 };
 
+const latestVotingDateValue = () => (
+  votingDateTabs.value.find((date) => date.value !== 'none')?.value
+  || votingDateTabs.value[0]?.value
+  || 'all'
+);
+
+const selectLatestVotingDate = () => {
+  activeVotingDate.value = latestVotingDateValue();
+};
+
 watch(activeVacancyType, (value) => {
   const currentType = route.query.type ? String(route.query.type) : null;
   if (currentType === value) {
+    selectLatestVotingDate();
     return;
   }
 
@@ -361,6 +563,13 @@ watch(activeVacancyType, (value) => {
       type: value,
     },
   });
+  selectLatestVotingDate();
+});
+
+watch(votingDateTabs, (tabs) => {
+  if (activeVotingDate.value === 'all' || !tabs.some((date) => date.value === activeVotingDate.value)) {
+    selectLatestVotingDate();
+  }
 });
 
 const fetchQueue = async () => {
@@ -369,6 +578,7 @@ const fetchQueue = async () => {
     const response = await axios.get('/api/commission/applications');
     applications.value = response.data;
     syncActiveVacancyType();
+    selectLatestVotingDate();
   } catch (error) {
     alert(errorText(error));
   } finally {
@@ -392,3 +602,13 @@ const vote = async (applicationId, decision, hireTermYears = null) => {
 onMounted(fetchQueue);
 </script>
 
+<style scoped>
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+</style>

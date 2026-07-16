@@ -89,6 +89,11 @@ class User extends Authenticatable
         return $this->role === 'library_director';
     }
 
+    public function isProfessionalDevelopmentDirector()
+    {
+        return $this->role === 'professional_development_director';
+    }
+
     public function isComplianceDirector()
     {
         return $this->isLawyer();

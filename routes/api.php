@@ -16,6 +16,7 @@ use App\Http\Controllers\API\DigitalApplicationController;
 use App\Http\Controllers\API\StrategyApplicationController;
 use App\Http\Controllers\API\AcademicApplicationController;
 use App\Http\Controllers\API\LibraryApplicationController;
+use App\Http\Controllers\API\ProfessionalDevelopmentApplicationController;
 use App\Http\Controllers\API\ComplianceApplicationController;
 use App\Http\Controllers\API\PdfParseController;
 use App\Http\Controllers\API\TeacherAuditController;
@@ -72,6 +73,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/applications/{id}', [ApplicationController::class, 'adminShow']);
     Route::put('/admin/applications/{id}/archive', [ApplicationController::class, 'archive']);
     Route::put('/admin/applications/{id}/unarchive', [ApplicationController::class, 'unarchive']);
+    Route::put('/admin/applications/{id}/voting-date', [ApplicationController::class, 'updateVotingDate']);
     Route::post('/admin/applications/{id}/upload-docs', [ApplicationController::class, 'adminUploadDocs']);
     Route::delete('/admin/applications/{id}/documents/{documentId}', [ApplicationController::class, 'adminDeleteDocument']);
     Route::put('/admin/applications/{id}/staff-details', [ApplicationController::class, 'updateStaffDetails']);
@@ -152,6 +154,13 @@ Route::middleware(['auth:sanctum', 'library'])->group(function () {
     Route::get('/library/applications/{id}', [LibraryApplicationController::class, 'show']);
     Route::post('/library/applications/{id}/library-metrics', [LibraryApplicationController::class, 'updateLibraryMetrics']);
     Route::delete('/library/applications/{applicationId}/library-documents/{documentId}', [LibraryApplicationController::class, 'deleteLibraryDocument']);
+});
+
+Route::middleware(['auth:sanctum', 'professional_development'])->group(function () {
+    Route::get('/professional-development/applications', [ProfessionalDevelopmentApplicationController::class, 'queue']);
+    Route::get('/professional-development/applications/{id}', [ProfessionalDevelopmentApplicationController::class, 'show']);
+    Route::post('/professional-development/applications/{id}/professional-development', [ProfessionalDevelopmentApplicationController::class, 'updateProfessionalDevelopment']);
+    Route::delete('/professional-development/applications/{applicationId}/professional-development-documents/{documentId}', [ProfessionalDevelopmentApplicationController::class, 'deleteProfessionalDevelopmentDocument']);
 });
 
 Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {

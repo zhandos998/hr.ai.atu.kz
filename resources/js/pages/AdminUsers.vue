@@ -243,6 +243,7 @@ const roleOptions = [
   { value: 'strategy_director', label: 'Директор по стратегии' },
   { value: 'academic_director', label: 'Академический директор' },
   { value: 'library_director', label: 'Научная библиотека' },
+  { value: 'professional_development_director', label: 'Повышение квалификации' },
   { value: 'admin', label: 'Администратор' },
 ];
 

@@ -8,8 +8,14 @@ class Application extends Model
 {
     protected $guarded = [];
 
+    protected $appends = [
+        'voting_started_at',
+    ];
+
     protected $casts = [
         'archived_at' => 'datetime',
+        'voting_date' => 'date:Y-m-d',
+        'voting_order' => 'integer',
     ];
 
     public function scopeNotArchived($query)
@@ -65,5 +71,14 @@ class Application extends Model
     public function commissionVotes()
     {
         return $this->hasMany(ApplicationCommissionVote::class);
+    }
+
+    public function getVotingStartedAtAttribute(): ?string
+    {
+        if (!$this->voting_date) {
+            return null;
+        }
+
+        return $this->voting_date->format('Y-m-d\T00:00:00');
     }
 }

@@ -20,6 +20,7 @@
               <p class="text-sm text-gray-700">Кандидат: {{ app.user?.name }} ({{ app.user?.email }})</p>
               <p class="text-sm text-gray-700">Телефон: {{ app.user?.phone || 'Не указан' }}</p>
               <p class="text-sm text-gray-500">Дата подачи: {{ formatDate(app.created_at) }}</p>
+              <p class="text-sm text-gray-500">Дата голосования: {{ app.voting_started_at ? formatDate(app.voting_started_at) : 'Не назначено' }}</p>
             </div>
 
             <div

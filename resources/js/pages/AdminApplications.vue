@@ -528,6 +528,61 @@
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 align-top text-gray-600">
                     <div>{{ formatDate(app.created_at) }}</div>
+                    <div class="mt-2 space-y-1">
+                      <div class="text-xs text-gray-400">
+                        Голосование: {{ formatDate(app.voting_started_at, 'Не назначено') }}
+                      </div>
+                      <div
+                        v-if="applicationArchiveMode === 'active'"
+                        class="flex flex-wrap items-center gap-1"
+                      >
+                        <input
+                          v-model="votingDateDrafts[app.id]"
+                          type="date"
+                          :disabled="isVotingDateSaving(app.id)"
+                          class="w-36 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                          @click.stop
+                          @keydown.stop
+                          @input.stop
+                        />
+                        <input
+                          v-model="votingOrderDrafts[app.id]"
+                          type="number"
+                          min="1"
+                          step="1"
+                          placeholder="№"
+                          :disabled="isVotingDateSaving(app.id)"
+                          class="w-16 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                          @click.stop
+                          @keydown.stop
+                          @input.stop
+                        />
+                        <button
+                          v-if="votingScheduleDraftChanged(app)"
+                          type="button"
+                          :disabled="isVotingDateSaving(app.id)"
+                          class="rounded-lg bg-[#005eb8] px-2 py-1 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                          @click.stop="updateApplicationVotingDate(app)"
+                        >
+                          Сохранить
+                        </button>
+                        <button
+                          v-if="votingScheduleDraftChanged(app)"
+                          type="button"
+                          :disabled="isVotingDateSaving(app.id)"
+                          class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          @click.stop="resetVotingScheduleDraft(app)"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                      <div
+                        v-if="isVotingDateSaving(app.id)"
+                        class="text-xs text-gray-400"
+                      >
+                        Сохранение...
+                      </div>
+                    </div>
                     <div v-if="applicationArchiveMode === 'archived'" class="mt-1 text-xs text-gray-400">
                       Архив: {{ formatDate(app.archived_at) }}
                     </div>
@@ -537,6 +592,25 @@
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 align-top text-right">
                     <div class="flex flex-wrap justify-end gap-2">
+                      <select
+                        v-if="applicationArchiveMode === 'active'"
+                        :value="quickHiringSelectValue(app)"
+                        :disabled="!canQuickUpdateHiring(app) || isHiringQuickSaving(app.id)"
+                        :title="quickHiringTitle(app)"
+                        class="w-44 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                        @click.stop
+                        @mousedown.stop
+                        @change.stop="quickUpdateHiringStatus(app, $event.target.value)"
+                      >
+                        <option value="" disabled>Принятие на работу</option>
+                        <option
+                          v-for="option in quickHiringStatusOptions"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ option.label }}
+                        </option>
+                      </select>
                       <button
                         type="button"
                         class="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#005eb8] transition hover:bg-blue-50"
@@ -605,6 +679,10 @@ const loading = ref(true);
 const creatingApplication = ref(false);
 const archivingApplicationIds = ref([]);
 const unarchivingApplicationIds = ref([]);
+const hiringQuickSavingIds = ref([]);
+const votingDateSavingIds = ref([]);
+const votingDateDrafts = ref({});
+const votingOrderDrafts = ref({});
 const applicationArchiveMode = ref(String(route.query.archived) === '1' ? 'archived' : 'active');
 const showCreateForm = ref(false);
 const applicationSearch = ref('');
@@ -663,6 +741,12 @@ const emptyApplicationsMessage = computed(() => (
     ? `В архиве ${activeVacancyTypeLabel.value} заявок пока нет.`
     : `В разделе ${activeVacancyTypeLabel.value} заявок пока нет.`
 ));
+const quickHiringStatusOptions = [
+  { value: 'voting', label: 'Голосование' },
+  { value: 'hired_1_year', label: 'Взять на 1 год' },
+  { value: 'hired_3_year', label: 'Взять на 3 года' },
+];
+const quickHiringStatusValues = new Set(quickHiringStatusOptions.map((option) => option.value));
 
 const stageFilterOptions = computed(() => Object.fromEntries(
   applicationStageOrder.map((stage) => [stage, stageOptions(stage)]),
@@ -878,6 +962,157 @@ const errorText = (error) => error?.response?.data?.message || 'Ошибка. П
 
 const isArchivingApplication = (applicationId) => archivingApplicationIds.value.includes(applicationId);
 const isUnarchivingApplication = (applicationId) => unarchivingApplicationIds.value.includes(applicationId);
+const isHiringQuickSaving = (applicationId) => hiringQuickSavingIds.value.includes(applicationId);
+const isVotingDateSaving = (applicationId) => votingDateSavingIds.value.includes(applicationId);
+
+const votingDateInputValue = (app) => {
+  const value = String(app?.voting_date || '').slice(0, 10);
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+};
+
+const votingDateDraftValue = (app) => (
+  votingDateDrafts.value[app?.id] ?? votingDateInputValue(app)
+);
+
+const votingOrderInputValue = (app) => {
+  const value = Number(app?.voting_order);
+
+  return Number.isInteger(value) && value > 0 ? String(value) : '';
+};
+
+const votingOrderDraftValue = (app) => (
+  votingOrderDrafts.value[app?.id] ?? votingOrderInputValue(app)
+);
+
+const votingScheduleDraftChanged = (app) => (
+  String(votingDateDraftValue(app) || '') !== votingDateInputValue(app)
+  || String(votingOrderDraftValue(app) || '') !== votingOrderInputValue(app)
+);
+
+const resetVotingScheduleDraft = (app) => {
+  if (!app?.id) return;
+
+  votingDateDrafts.value = {
+    ...votingDateDrafts.value,
+    [app.id]: votingDateInputValue(app),
+  };
+  votingOrderDrafts.value = {
+    ...votingOrderDrafts.value,
+    [app.id]: votingOrderInputValue(app),
+  };
+};
+
+const syncVotingDateDrafts = () => {
+  votingDateDrafts.value = Object.fromEntries(
+    (applications.value || []).map((app) => [app.id, votingDateInputValue(app)])
+  );
+  votingOrderDrafts.value = Object.fromEntries(
+    (applications.value || []).map((app) => [app.id, votingOrderInputValue(app)])
+  );
+};
+
+const canQuickUpdateHiring = (app) => (
+  applicationArchiveMode.value === 'active'
+  && app?.compliance_status === 'clear'
+);
+
+const quickHiringTitle = (app) => (
+  canQuickUpdateHiring(app)
+    ? 'Быстро изменить статус этапа "Принятие на работу"'
+    : 'Доступно после положительной проверки комплаенса'
+);
+
+const quickHiringSelectValue = (app) => {
+  const value = normalizedStageStatus('hiring', app?.hiring_status, app);
+
+  return quickHiringStatusValues.has(value) ? value : '';
+};
+
+const replaceApplicationInList = (updatedApplication) => {
+  if (!updatedApplication?.id) return;
+
+  applications.value = applications.value.map((app) => (
+    app.id === updatedApplication.id ? updatedApplication : app
+  ));
+  resetVotingScheduleDraft(updatedApplication);
+};
+
+const quickUpdateHiringStatus = async (app, status) => {
+  if (!app?.id || !quickHiringStatusValues.has(status)) {
+    return;
+  }
+
+  if (status === quickHiringSelectValue(app)) {
+    return;
+  }
+
+  if (!canQuickUpdateHiring(app)) {
+    alert('Принятие на работу доступно только после положительной проверки комплаенса.');
+    return;
+  }
+
+  hiringQuickSavingIds.value = [...hiringQuickSavingIds.value, app.id];
+
+  try {
+    const response = await axios.put(`/api/admin/applications/${app.id}`, {
+      stage: 'hiring',
+      stage_status: status,
+      comment: null,
+    });
+
+    replaceApplicationInList(response.data?.application);
+    alert(response.data?.message || 'Статус принятия на работу обновлен.');
+  } catch (error) {
+    alert(errorText(error));
+  } finally {
+    hiringQuickSavingIds.value = hiringQuickSavingIds.value.filter((id) => id !== app.id);
+  }
+};
+
+const updateApplicationVotingDate = async (app) => {
+  if (!app?.id) {
+    return;
+  }
+
+  const draftDate = String(votingDateDraftValue(app) || '').trim();
+  if (draftDate && !/^\d{4}-\d{2}-\d{2}$/.test(draftDate)) {
+    alert('Введите дату полностью в формате ГГГГ-ММ-ДД.');
+    resetVotingScheduleDraft(app);
+    return;
+  }
+
+  const draftOrder = String(votingOrderDraftValue(app) || '').trim();
+  if (draftOrder && (!/^\d+$/.test(draftOrder) || Number(draftOrder) < 1)) {
+    alert('Введите номер в очереди положительным числом.');
+    resetVotingScheduleDraft(app);
+    return;
+  }
+
+  const normalizedDate = draftDate || null;
+  const normalizedOrder = draftOrder ? Number(draftOrder) : null;
+  if (
+    (votingDateInputValue(app) || null) === normalizedDate
+    && (votingOrderInputValue(app) ? Number(votingOrderInputValue(app)) : null) === normalizedOrder
+  ) {
+    return;
+  }
+
+  votingDateSavingIds.value = [...votingDateSavingIds.value, app.id];
+
+  try {
+    const response = await axios.put(`/api/admin/applications/${app.id}/voting-date`, {
+      voting_date: normalizedDate,
+      voting_order: normalizedOrder,
+    });
+
+    replaceApplicationInList(response.data?.application);
+  } catch (error) {
+    alert(errorText(error));
+  } finally {
+    votingDateSavingIds.value = votingDateSavingIds.value.filter((id) => id !== app.id);
+  }
+};
 
 const archiveApplication = async (app) => {
   if (!app?.id) return;
@@ -1039,8 +1274,8 @@ const setSort = (column) => {
   sortDirection.value = ['created_at', 'votes'].includes(column) ? 'desc' : 'asc';
 };
 
-const formatDate = (value) => {
-  if (!value) return 'Не указана';
+const formatDate = (value, fallback = 'Не указана') => {
+  if (!value) return fallback;
 
   return new Date(value).toLocaleDateString('ru-RU', {
     year: 'numeric',
@@ -1242,6 +1477,7 @@ const fetchApplications = async () => {
       },
     });
     applications.value = response.data;
+    syncVotingDateDrafts();
     syncActiveVacancyType();
   } catch (error) {
     alert(errorText(error));
@@ -1330,6 +1566,7 @@ const createApplication = async () => {
         createdApplication,
         ...applications.value.filter((app) => app.id !== createdApplication.id),
       ];
+      resetVotingScheduleDraft(createdApplication);
 
       if (vacancyTypeTabValues.includes(String(createdApplication?.vacancy?.type))) {
         activeVacancyType.value = String(createdApplication.vacancy.type);

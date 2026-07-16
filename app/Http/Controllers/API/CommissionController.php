@@ -606,6 +606,7 @@ class CommissionController extends Controller
             'academic_title_documents' => ['category' => 'academic_title'],
             'scientific_works_documents' => ['category' => 'scientific_works'],
             'digital_mooc_documents' => ['category' => 'digital_mooc'],
+            'professional_development_documents' => ['category' => 'professional_development'],
             'strategy_documents' => ['category' => 'strategy_review'],
             'academic_documents' => ['category' => 'academic_review'],
             'library_documents' => ['category' => 'library_metrics'],

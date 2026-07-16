@@ -43,6 +43,8 @@ const routes = [
   { path: '/academic/applications/:id', name: 'AcademicApplicationDetails', component: () => import('../pages/AcademicApplicationDetails.vue'), meta: { requiresAuth: true, requiresAcademicDirector: true } },
   { path: '/library/applications', name: 'LibraryApplications', component: () => import('../pages/LibraryApplications.vue'), meta: { requiresAuth: true, requiresLibraryDirector: true } },
   { path: '/library/applications/:id', name: 'LibraryApplicationDetails', component: () => import('../pages/LibraryApplicationDetails.vue'), meta: { requiresAuth: true, requiresLibraryDirector: true } },
+  { path: '/professional-development/applications', name: 'ProfessionalDevelopmentApplications', component: () => import('../pages/ProfessionalDevelopmentApplications.vue'), meta: { requiresAuth: true, requiresProfessionalDevelopmentDirector: true } },
+  { path: '/professional-development/applications/:id', name: 'ProfessionalDevelopmentApplicationDetails', component: () => import('../pages/ProfessionalDevelopmentApplicationDetails.vue'), meta: { requiresAuth: true, requiresProfessionalDevelopmentDirector: true } },
   { path: '/compliance/applications', name: 'ComplianceApplications', component: () => import('../pages/ComplianceApplications.vue'), meta: { requiresAuth: true, requiresLawyer: true } },
   { path: '/compliance/applications/:id', name: 'ComplianceApplicationDetails', component: () => import('../pages/ComplianceApplicationDetails.vue'), meta: { requiresAuth: true, requiresLawyer: true } },
   { path: '/commission/applications', name: 'CommissionApplications', component: () => import('../pages/CommissionApplications.vue'), meta: { requiresAuth: true, requiresCommission: true } },
@@ -79,6 +81,7 @@ router.beforeEach(async (to, from, next) => {
     || to.meta.requiresStrategyDirector
     || to.meta.requiresAcademicDirector
     || to.meta.requiresLibraryDirector
+    || to.meta.requiresProfessionalDevelopmentDirector
     || to.meta.requiresCommission) && !authStore.user) {
     const user = await authStore.fetchUser();
     role = user ? normalizeRole(user.role) : null;
@@ -109,6 +112,10 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.requiresLibraryDirector && role !== 'library_director') {
+    return denyAccess(next);
+  }
+
+  if (to.meta.requiresProfessionalDevelopmentDirector && role !== 'professional_development_director') {
     return denyAccess(next);
   }
 

@@ -262,6 +262,7 @@ class AdminStructureController extends Controller
             'strategy_director',
             'academic_director',
             'library_director',
+            'professional_development_director',
         ], User::LEGAL_ROLE_ALIASES)));
     }
 }

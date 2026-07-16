@@ -1801,16 +1801,21 @@ class DepartmentPositionSeeder extends Seeder
         ];
 
         foreach ($data as $value) {
-            $d = Department::create([
+            $department = Department::query()->firstOrCreate([
                 'name' => $value['name'],
             ]);
+
             foreach ($value['positions'] as $position) {
-                $p = Position::create([
-                    'department_id' => $d->id,
-                    'name' => $position['name'],
-                    'duties' => $position['duties'],
-                    'qualification' => $position['qualification'],
-                ]);
+                Position::query()->updateOrCreate(
+                    [
+                        'department_id' => $department->id,
+                        'name' => $position['name'],
+                    ],
+                    [
+                        'duties' => $position['duties'],
+                        'qualification' => $position['qualification'],
+                    ],
+                );
             }
         }
     }
