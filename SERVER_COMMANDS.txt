@@ -173,3 +173,40 @@ curl -I https://vacancy.atu.kz/
 
 curl -I http://127.0.0.1:8092/
 
+
+10. Ежедневный бэкап базы MySQL на 14 дней
+------------------------------------------
+
+Сделать бэкап вручную:
+
+cd /opt/apps/vacancy
+bash scripts/backup-database.sh
+
+Файлы сохраняются тут:
+
+/opt/apps/vacancy/backups/mysql/
+
+Скрипт хранит последние 14 файлов бэкапа и удаляет более старые.
+
+Добавить ежедневный запуск через cron:
+
+crontab -e
+
+Добавить строку, например на каждый день в 03:15:
+
+15 3 * * * cd /opt/apps/vacancy && /usr/bin/env bash scripts/backup-database.sh >> /opt/apps/vacancy/storage/logs/db-backup.log 2>&1
+
+Посмотреть созданные бэкапы:
+
+ls -lh /opt/apps/vacancy/backups/mysql/
+
+Посмотреть лог cron-бэкапа:
+
+tail -n 100 /opt/apps/vacancy/storage/logs/db-backup.log
+
+Восстановить базу из бэкапа:
+
+cd /opt/apps/vacancy
+gunzip -c backups/mysql/vacancy_YYYYMMDD_HHMMSS.sql.gz | docker compose --env-file docker.env exec -T db sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u "$MYSQL_USER" "$MYSQL_DATABASE"'
+
+Внимание: восстановление перезаписывает данные в текущей базе.

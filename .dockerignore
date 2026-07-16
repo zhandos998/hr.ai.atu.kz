@@ -23,6 +23,7 @@ storage/logs/*
 !storage/logs/.gitignore
 bootstrap/cache/*
 !bootstrap/cache/.gitignore
+backups
 .phpunit.result.cache
 tests
 output_pages
