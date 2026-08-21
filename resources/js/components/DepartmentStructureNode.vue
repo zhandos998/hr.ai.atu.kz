@@ -8,7 +8,7 @@
       <div>
         <div class="font-semibold text-[#005eb8]">{{ department.name }}</div>
         <div class="text-xs text-gray-500">
-          Должностей: {{ department.positions?.length || 0 }} • Подотделов: {{ department.children?.length || 0 }}
+          {{ t('admin.structure.positionsCount') }}: {{ department.positions?.length || 0 }} • {{ t('admin.structure.childrenCount') }}: {{ department.children?.length || 0 }}
         </div>
       </div>
       <span class="text-[#005eb8] text-lg">{{ expanded ? '−' : '+' }}</span>
@@ -20,7 +20,7 @@
       </p>
 
       <div v-if="department.positions?.length" class="space-y-2">
-        <div class="text-sm font-semibold text-gray-700">Должности</div>
+        <div class="text-sm font-semibold text-gray-700">{{ t('admin.departments.positions') }}</div>
         <ul class="space-y-2">
           <li
             v-for="position in department.positions"
@@ -29,18 +29,18 @@
           >
             <div class="font-medium text-gray-800">{{ position.name }}</div>
             <div v-if="position.duties" class="text-sm text-gray-700 mt-1 whitespace-pre-line">
-              <span class="font-semibold">Должностные обязанности:</span> {{ position.duties }}
+              <span class="font-semibold">{{ t('admin.structure.positionDuties') }}:</span> {{ position.duties }}
             </div>
             <div v-if="position.qualification" class="text-sm text-gray-700 mt-1 whitespace-pre-line">
-              <span class="font-semibold">Требования к квалификации:</span> {{ position.qualification }}
+              <span class="font-semibold">{{ t('admin.structure.positionQualification') }}:</span> {{ position.qualification }}
             </div>
           </li>
         </ul>
       </div>
-      <div v-else class="text-sm text-gray-500">В этом подразделении пока нет должностей.</div>
+      <div v-else class="text-sm text-gray-500">{{ t('admin.structure.noPositions') }}</div>
 
       <div v-if="department.children?.length" class="space-y-3 pl-4 border-l-2 border-blue-100">
-        <div class="text-sm font-semibold text-gray-700">Подотделы</div>
+        <div class="text-sm font-semibold text-gray-700">{{ t('admin.structure.childrenCount') }}</div>
         <DepartmentStructureNode
           v-for="child in department.children"
           :key="child.id"
@@ -56,6 +56,10 @@
 </template>
 
 <script setup>
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
+
 defineOptions({
   name: 'DepartmentStructureNode',
 });

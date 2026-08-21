@@ -136,6 +136,40 @@ class AdminUserController extends Controller
         ]);
     }
 
+    public function impersonate(Request $request, int $id): JsonResponse
+    {
+        $admin = $request->user();
+        $user = User::query()
+            ->with([
+                'positions:id,name,department_id',
+                'positions.department:id,name',
+                'commissionMember:id,user_id,is_pps,is_staff',
+                'commissionVacancies:id',
+                'ppsFacultyCommissionMemberships:id,user_id',
+            ])
+            ->findOrFail($id);
+
+        if ((int) $admin->id === (int) $user->id) {
+            return response()->json([
+                'message' => 'Нельзя войти от имени текущего пользователя.',
+            ], 422);
+        }
+
+        $token = $user->createToken("impersonated_by_{$admin->id}")->plainTextToken;
+
+        return response()->json([
+            'message' => "Вход выполнен от имени пользователя {$user->name}.",
+            'token' => $token,
+            'user' => $this->transformUser($user),
+            'impersonator' => [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => self::normalizeRole($admin->role),
+            ],
+        ]);
+    }
+
     private static function normalizeRole(?string $role): ?string
     {
         return self::LEGACY_ROLE_ALIASES[$role] ?? $role;

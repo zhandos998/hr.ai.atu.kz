@@ -1,13 +1,12 @@
 <template>
   <Layout>
     <div class="max-w-3xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex items-center justify-between gap-3">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Добавить департамент</h1>
+      <div class="flex justify-end">
         <router-link
           to="/admin/departments"
           class="border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold py-2 px-4 rounded-lg transition"
         >
-          Назад
+          {{ t('common.back') }}
         </router-link>
       </div>
 
@@ -17,7 +16,7 @@
             v-model="form.parent_id"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           >
-            <option value="">Без родительского департамента</option>
+            <option value="">{{ t('admin.departmentForm.noParent') }}</option>
             <option v-for="department in departments" :key="department.id" :value="department.id">
               {{ department.full_name }}
             </option>
@@ -26,13 +25,13 @@
           <input
             v-model="form.name"
             type="text"
-            placeholder="Название департамента или подотдела"
+            :placeholder="t('admin.departmentForm.namePlaceholder')"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           />
 
           <textarea
             v-model="form.description"
-            placeholder="Описание (необязательно)"
+            :placeholder="t('admin.departmentForm.descriptionPlaceholder')"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           />
 
@@ -41,7 +40,7 @@
             :disabled="submitting"
             class="bg-[#005eb8] hover:bg-blue-700 text-white font-semibold py-2 rounded-lg w-full transition cursor-pointer disabled:opacity-70"
           >
-            {{ submitting ? 'Сохранение...' : 'Сохранить департамент' }}
+            {{ submitting ? t('common.saving') : t('admin.departmentForm.saveDepartment') }}
           </button>
         </form>
       </section>
@@ -55,13 +54,15 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import { decorateDepartments } from '../utils/departments';
+import { useI18n } from '../i18n';
 
 const router = useRouter();
+const { t } = useI18n();
 const submitting = ref(false);
 const departments = ref([]);
 const form = ref({ name: '', description: '', parent_id: '' });
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const fetchDepartments = async () => {
   try {
@@ -74,14 +75,14 @@ const fetchDepartments = async () => {
 
 const createDepartment = async () => {
   if (!form.value.name.trim()) {
-    alert('Введите название департамента.');
+    alert(t('admin.departmentForm.validationName'));
     return;
   }
 
   submitting.value = true;
   try {
     await axios.post('/api/admin/departments', form.value);
-    alert('Департамент добавлен.');
+    alert(t('admin.departmentForm.created'));
     router.push('/admin/departments');
   } catch (error) {
     alert(errorText(error));

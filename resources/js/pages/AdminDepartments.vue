@@ -1,47 +1,43 @@
 <template>
   <Layout>
-    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Департаменты и подотделы</h1>
-          <p class="text-sm text-gray-500">Структура подразделений, факультетов, кафедр и связанных должностей.</p>
-        </div>
-        <router-link
-          to="/admin/departments/create"
-          class="inline-flex items-center justify-center rounded-xl bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-        >
-          Добавить департамент
-        </router-link>
-      </div>
+    <template #adminHeaderActions>
+      <router-link
+        to="/admin/departments/create"
+        class="inline-flex items-center justify-center rounded-md bg-[#2f5fb8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#244f9d]"
+      >
+        {{ t('admin.actions.addDepartment') }}
+      </router-link>
+    </template>
 
+    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <section class="space-y-4">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div class="text-sm text-gray-500 md:self-center">
-            Показано: <span class="font-semibold text-gray-700">{{ filteredDepartments.length }}</span>
+            {{ t('admin.departments.shown') }}: <span class="font-semibold text-gray-700">{{ filteredDepartments.length }}</span>
             <span class="text-gray-400"> / {{ departments.length }}</span>
           </div>
           <input
             v-model="search"
             type="text"
-            placeholder="Поиск по названию или описанию"
+            :placeholder="t('admin.departments.searchPlaceholder')"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
           <select
             v-model="typeFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все типы</option>
-            <option value="faculty">Факультеты</option>
-            <option value="department">Кафедры</option>
-            <option value="root">Только верхний уровень</option>
-            <option value="child">Только подотделы</option>
+            <option value="">{{ t('admin.departments.allTypes') }}</option>
+            <option value="faculty">{{ t('admin.departments.faculties') }}</option>
+            <option value="department">{{ t('admin.departments.departments') }}</option>
+            <option value="root">{{ t('admin.departments.rootOnly') }}</option>
+            <option value="child">{{ t('admin.departments.childrenOnly') }}</option>
           </select>
           <select
             v-model="parentFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все родители</option>
-            <option value="none">Без родителя</option>
+            <option value="">{{ t('admin.departments.allParents') }}</option>
+            <option value="none">{{ t('admin.departments.withoutParent') }}</option>
             <option
               v-for="department in decoratedDepartments"
               :key="department.id"
@@ -52,13 +48,13 @@
           </select>
         </div>
 
-        <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
+        <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
 
         <div
           v-else-if="filteredDepartments.length === 0"
           class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
         >
-          Ничего не найдено.
+          {{ t('admin.departments.empty') }}
         </div>
 
         <div v-else class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -68,7 +64,7 @@
                 <tr>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Подразделение"
+                      :label="t('admin.departments.unit')"
                       column="name"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -77,7 +73,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Родитель"
+                      :label="t('admin.departments.parent')"
                       column="parent"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -86,7 +82,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Тип / описание"
+                      :label="t('admin.departments.typeDescription')"
                       column="type"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -95,7 +91,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Должности"
+                      :label="t('admin.departments.positions')"
                       column="positions"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -104,14 +100,14 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Подотделы"
+                      :label="t('admin.departments.children')"
                       column="children"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
                       @sort="setSort"
                     />
                   </th>
-                  <th class="px-4 py-3 text-right">Действия</th>
+                  <th class="px-4 py-3 text-right">{{ t('admin.departments.actions') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 bg-white">
@@ -136,7 +132,7 @@
                   </td>
                   <td class="px-4 py-3 align-top text-gray-600">
                     <div class="max-w-[260px] whitespace-normal break-words">
-                      {{ parentDepartmentName(department) || 'Нет' }}
+                      {{ parentDepartmentName(department) || t('admin.departments.noParent') }}
                     </div>
                   </td>
                   <td class="px-4 py-3 align-top">
@@ -164,14 +160,14 @@
                         :to="`/admin/departments/${department.id}/edit`"
                         class="font-semibold text-[#005eb8] hover:text-blue-700"
                       >
-                        Редактировать
+                        {{ t('common.edit') }}
                       </router-link>
                       <button
                         type="button"
                         class="font-semibold text-red-600 hover:text-red-700"
                         @click="deleteDepartment(department.id)"
                       >
-                        Удалить
+                        {{ t('common.delete') }}
                       </button>
                     </div>
                   </td>
@@ -190,12 +186,15 @@ import { computed, onMounted, ref } from 'vue';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import TableSortButton from '../components/TableSortButton.vue';
+import { useI18n } from '../i18n';
 import {
   buildDepartmentTree,
   decorateDepartments,
   flattenDepartmentTree,
 } from '../utils/departments';
 import { sortRows } from '../utils/tableSort';
+
+const { t } = useI18n();
 
 const departments = ref([]);
 const loading = ref(true);
@@ -205,7 +204,7 @@ const parentFilter = ref('');
 const sortBy = ref('name');
 const sortDirection = ref('asc');
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const decoratedDepartments = computed(() => decorateDepartments(departments.value));
 const departmentsById = computed(() => new Map(decoratedDepartments.value.map((department) => [department.id, department])));
@@ -264,7 +263,7 @@ const setSort = (column) => {
 const departmentTypeLabel = (department) => {
   const description = String(department?.description || '').trim();
   if (description) return description;
-  return department?.parent_id ? 'Подотдел' : 'Подразделение';
+  return department?.parent_id ? t('admin.departments.child') : t('admin.departments.department');
 };
 
 const departmentTypeClass = (department) => {
@@ -290,7 +289,7 @@ const fetchDepartments = async () => {
 };
 
 const deleteDepartment = async (id) => {
-  if (!confirm('Удалить департамент?')) return;
+  if (!confirm(t('confirm.departments.delete'))) return;
 
   try {
     await axios.delete(`/api/admin/departments/${id}`);

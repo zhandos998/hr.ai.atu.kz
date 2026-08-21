@@ -6,10 +6,13 @@ use App\Models\Application;
 use App\Models\ApplicationStatus;
 use App\Models\Department;
 use App\Models\Position;
+use App\Models\Resume;
 use App\Models\User;
 use App\Models\Vacancy;
 use Database\Seeders\ApplicationStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -134,5 +137,56 @@ class AdminCreateApplicationTest extends TestCase
                 ->where('users.id', $commissionMember->id)
                 ->exists()
         );
+    }
+
+    public function test_admin_can_replace_application_resume(): void
+    {
+        Storage::fake('public');
+        $this->seed(ApplicationStatusSeeder::class);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+        $candidate = User::factory()->create();
+        $vacancy = Vacancy::query()->create([
+            'title' => 'Ассистент',
+            'description' => 'Конкурс на должность ассистента.',
+            'type' => 'pps',
+        ]);
+
+        $application = Application::query()->create([
+            'user_id' => $candidate->id,
+            'vacancy_id' => $vacancy->id,
+            'status_id' => ApplicationStatus::query()->where('code', 'resume_accepted')->value('id'),
+            'resume_status' => 'accepted',
+            'documents_status' => 'awaiting_upload',
+            'compliance_status' => 'not_started',
+            'hiring_status' => 'not_started',
+        ]);
+
+        $oldPath = "resumes/{$application->id}/old.pdf";
+        Storage::disk('public')->put($oldPath, 'old resume');
+        $resume = Resume::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $candidate->id,
+            'file_path' => $oldPath,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->post("/api/admin/applications/{$application->id}/resume", [
+            'resume' => UploadedFile::fake()->create('new-resume.pdf', 120, 'application/pdf'),
+        ], [
+            'Accept' => 'application/json',
+        ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Резюме обновлено.');
+
+        $resume->refresh();
+
+        $this->assertNotSame($oldPath, $resume->file_path);
+        $this->assertStringStartsWith("resumes/{$application->id}/", $resume->file_path);
+        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('public')->assertExists($resume->file_path);
     }
 }

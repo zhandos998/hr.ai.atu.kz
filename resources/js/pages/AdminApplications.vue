@@ -1,49 +1,43 @@
 <template>
   <Layout>
-    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Управление заявками</h1>
-          <p class="text-sm text-gray-500">Откройте карточку, чтобы перейти к полной информации по кандидату и этапам.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-          <div>
-            {{ applicationArchiveMode === 'archived' ? 'В архиве' : 'Всего заявок' }}:
-            <span class="font-semibold text-gray-700">{{ applications.length }}</span>
-          </div>
-          <button
-            v-if="applicationArchiveMode === 'active'"
-            type="button"
-            class="inline-flex items-center rounded-xl bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-            @click="toggleCreateForm"
-          >
-            {{ showCreateForm ? 'Скрыть форму' : 'Добавить заявку' }}
-          </button>
-        </div>
+    <template #adminHeaderActions>
+      <div class="text-sm text-gray-500">
+        {{ applicationArchiveMode === 'archived' ? t('admin.actions.archivedApplications') : t('admin.actions.totalApplications') }}:
+        <span class="font-semibold text-gray-700">{{ applications.length }}</span>
       </div>
+      <button
+        v-if="applicationArchiveMode === 'active'"
+        type="button"
+        class="inline-flex items-center rounded-md bg-[#2f5fb8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#244f9d]"
+        @click="toggleCreateForm"
+      >
+        {{ showCreateForm ? t('admin.actions.hideForm') : t('admin.actions.addApplication') }}
+      </button>
+    </template>
 
+    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <section
         v-if="showCreateForm && applicationArchiveMode === 'active'"
         class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4"
       >
         <div>
-          <h2 class="text-xl font-semibold text-[#005eb8]">Создать заявку вручную</h2>
-          <p class="text-sm text-gray-500">Введите ФИО кандидата. Для АУП выберите департамент и должность, для ППС — факультет, кафедру и позицию.</p>
+          <h2 class="text-xl font-semibold text-[#005eb8]">{{ t('admin.applications.createTitle') }}</h2>
+          <p class="text-sm text-gray-500">{{ t('admin.applications.createDescription') }}</p>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">ФИО кандидата</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.candidateName') }}</label>
             <input
               v-model="createForm.full_name"
               type="text"
-              placeholder="Например: Иванов Иван Иванович"
+              :placeholder="t('admin.applications.candidatePlaceholder')"
               class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Тип заявки</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.applicationType') }}</label>
             <select
               v-model="createForm.vacancy_type"
               class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -59,13 +53,13 @@
           </div>
 
           <div v-if="createForm.vacancy_type === 'pps'" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Факультет</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.faculty') }}</label>
             <select
               v-model="createForm.faculty_name"
               :disabled="facultyOptions.length === 0"
               class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
             >
-              <option value="">Выберите факультет</option>
+              <option value="">{{ t('admin.applications.chooseFaculty') }}</option>
               <option
                 v-for="faculty in facultyOptions"
                 :key="faculty.id"
@@ -75,18 +69,18 @@
               </option>
             </select>
             <p v-if="facultyOptions.length === 0" class="text-xs text-amber-700">
-              В справочнике нет факультетов.
+              {{ t('admin.applications.noFaculties') }}
             </p>
           </div>
 
           <div v-if="createForm.vacancy_type === 'pps'" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Кафедра</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.department') }}</label>
             <select
               v-model="createForm.department_name"
               :disabled="!createForm.faculty_name || departmentOptions.length === 0"
               class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
             >
-              <option value="">Выберите кафедру</option>
+              <option value="">{{ t('admin.applications.chooseDepartment') }}</option>
               <option
                 v-for="department in departmentOptions"
                 :key="department.id"
@@ -96,17 +90,17 @@
               </option>
             </select>
             <p v-if="createForm.faculty_name && departmentOptions.length === 0" class="text-xs text-amber-700">
-              Для выбранного факультета в справочнике нет кафедр.
+              {{ t('admin.applications.noDepartmentsForFaculty') }}
             </p>
           </div>
 
           <div v-if="createForm.vacancy_type === 'staff'" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Департамент</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.staffDepartment') }}</label>
             <div class="relative">
               <input
                 v-model="staffDepartmentSearch"
                 type="text"
-                placeholder="Начните вводить департамент"
+                :placeholder="t('admin.applications.staffDepartmentPlaceholder')"
                 :disabled="staffDepartmentOptions.length === 0"
                 autocomplete="off"
                 class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
@@ -128,26 +122,26 @@
                 >
                   <span class="font-medium">{{ department.name }}</span>
                   <span v-if="department.positions?.length" class="ml-2 text-xs text-gray-400">
-                    {{ department.positions.length }} должн.
+                    {{ department.positions.length }} {{ t('admin.applications.positionsShort') }}
                   </span>
                 </button>
               </div>
             </div>
             <p v-if="staffDepartmentOptions.length === 0" class="text-xs text-amber-700">
-              В справочнике нет департаментов с должностями.
+              {{ t('admin.applications.noDepartmentsWithPositions') }}
             </p>
             <p v-else-if="staffDepartmentSearch && staffDepartmentSuggestions.length === 0" class="text-xs text-amber-700">
-              По запросу департаменты не найдены.
+              {{ t('admin.applications.departmentsNotFound') }}
             </p>
           </div>
 
           <div v-if="createForm.vacancy_type === 'staff'" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Должность</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.position') }}</label>
             <div class="relative">
               <input
                 v-model="staffPositionSearch"
                 type="text"
-                placeholder="Начните вводить должность"
+                :placeholder="t('admin.applications.staffPositionPlaceholder')"
                 :disabled="!createForm.department_id || staffPositionOptions.length === 0"
                 autocomplete="off"
                 class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
@@ -172,20 +166,20 @@
               </div>
             </div>
             <p v-if="createForm.department_id && staffPositionOptions.length === 0" class="text-xs text-amber-700">
-              В выбранном департаменте нет должностей.
+              {{ t('admin.applications.noPositionsInDepartment') }}
             </p>
             <p v-else-if="createForm.department_id && staffPositionSearch && staffPositionSuggestions.length === 0" class="text-xs text-amber-700">
-              По запросу должности не найдены.
+              {{ t('admin.applications.positionsNotFound') }}
             </p>
           </div>
 
           <div v-if="createForm.vacancy_type === 'pps'" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Позиция</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.ppsPosition') }}</label>
             <div class="relative">
               <input
                 v-model="ppsPositionSearch"
                 type="text"
-                placeholder="Начните вводить позицию"
+                :placeholder="t('admin.applications.ppsPositionPlaceholder')"
                 :disabled="ppsPositionOptions.length === 0"
                 autocomplete="off"
                 class="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
@@ -210,15 +204,15 @@
               </div>
             </div>
             <p v-if="ppsPositionOptions.length === 0" class="text-xs text-amber-700">
-              Для ППС пока нет доступных позиций.
+              {{ t('admin.applications.noPpsPositions') }}
             </p>
             <p v-else-if="ppsPositionSearch && ppsPositionSuggestions.length === 0" class="text-xs text-amber-700">
-              По запросу позиции не найдены.
+              {{ t('admin.applications.ppsPositionsNotFound') }}
             </p>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Резюме</label>
+            <label class="block text-sm font-medium text-gray-700">{{ t('admin.applications.resume') }}</label>
             <input
               type="file"
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
@@ -226,39 +220,39 @@
               @change="handleCreateResumeUpload"
             />
             <p class="text-xs text-gray-400">
-              {{ createForm.resume?.name || 'Необязательно. PDF, DOC, DOCX, JPG, PNG до 2 МБ' }}
+              {{ createForm.resume?.name || t('admin.applications.resumeOptional') }}
             </p>
           </div>
         </div>
 
         <div v-if="createForm.full_name || selectedVacancy || selectedStaffDepartment || selectedStaffPosition || createForm.faculty_name || createForm.department_name" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
           <div class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Кандидат</div>
-            <div class="mt-1 font-medium text-gray-800">{{ createForm.full_name || 'Не указан' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.candidate') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ createForm.full_name || t('common.notSpecified') }}</div>
           </div>
           <div class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Тип</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.type') }}</div>
             <div class="mt-1 font-medium text-gray-800">{{ vacancyTypeLabel(createForm.vacancy_type) }}</div>
           </div>
           <div v-if="createForm.vacancy_type === 'pps'" class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Факультет</div>
-            <div class="mt-1 font-medium text-gray-800">{{ createForm.faculty_name || 'Не указан' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.faculty') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ createForm.faculty_name || t('common.notSpecified') }}</div>
           </div>
           <div v-if="createForm.vacancy_type === 'pps'" class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Кафедра</div>
-            <div class="mt-1 font-medium text-gray-800">{{ createForm.department_name || 'Не указана' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.department') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ createForm.department_name || t('admin.applications.notSpecifiedFemale') }}</div>
           </div>
           <div v-if="createForm.vacancy_type === 'staff'" class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Департамент</div>
-            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffDepartment?.name || 'Не выбран' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.staffDepartment') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffDepartment?.name || t('admin.applications.notSelected') }}</div>
           </div>
           <div v-if="createForm.vacancy_type === 'staff'" class="rounded-xl bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Должность</div>
-            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffPosition?.name || 'Не выбрана' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.position') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ selectedStaffPosition?.name || t('admin.applications.notSelectedFemale') }}</div>
           </div>
           <div v-if="createForm.vacancy_type === 'pps'" class="rounded-xl bg-slate-50 px-4 py-3 md:col-span-2 xl:col-span-2">
-            <div class="text-xs uppercase tracking-wide text-gray-400">Позиция</div>
-            <div class="mt-1 font-medium text-gray-800">{{ selectedVacancy?.title || 'Не выбрана' }}</div>
+            <div class="text-xs uppercase tracking-wide text-gray-400">{{ t('admin.applications.ppsPosition') }}</div>
+            <div class="mt-1 font-medium text-gray-800">{{ selectedVacancy?.title || t('admin.applications.notSelectedFemale') }}</div>
           </div>
         </div>
 
@@ -268,7 +262,7 @@
             class="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             @click="resetCreateForm"
           >
-            Очистить
+            {{ t('common.clear') }}
           </button>
           <button
             type="button"
@@ -276,12 +270,12 @@
             class="rounded-xl bg-[#005eb8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
             @click="createApplication"
           >
-            {{ creatingApplication ? 'Создание...' : 'Создать заявку' }}
+            {{ creatingApplication ? t('admin.applications.creating') : t('admin.applications.create') }}
           </button>
         </div>
       </section>
 
-      <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
+      <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
       <div v-else class="space-y-5">
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -292,7 +286,7 @@
             class="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold transition"
             @click="setApplicationArchiveMode('active')"
           >
-            Активные
+            {{ t('admin.applications.active') }}
           </button>
           <button
             type="button"
@@ -302,7 +296,7 @@
             class="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold transition"
             @click="setApplicationArchiveMode('archived')"
           >
-            Архив
+            {{ t('admin.applications.archive') }}
           </button>
         </div>
 
@@ -328,20 +322,24 @@
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
           <div class="text-sm text-gray-500 md:self-center">
-            Показано: <span class="font-semibold text-gray-700">{{ filteredApplications.length }}</span>
+            {{ t('admin.applications.shown') }}:
+            <span class="font-semibold text-gray-700">
+              {{ paginationTotal ? `${paginationStart}-${paginationEnd}` : 0 }}
+            </span>
+            <span class="text-gray-400"> / {{ paginationTotal }}</span>
             <span class="text-gray-400"> / {{ applicationsByVacancyType[activeVacancyType]?.length || 0 }}</span>
           </div>
           <input
             v-model="applicationSearch"
             type="text"
-            placeholder="Поиск по кандидату, вакансии, факультету"
+            :placeholder="t('admin.applications.searchPlaceholder')"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 xl:col-span-2"
           />
           <select
             v-model="stageFilters.resume"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Резюме: все</option>
+            <option value="">{{ t('admin.applications.resumeAll') }}</option>
             <option
               v-for="option in stageFilterOptions.resume"
               :key="option.value"
@@ -354,7 +352,7 @@
             v-model="stageFilters.documents"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Документы: все</option>
+            <option value="">{{ t('admin.applications.documentsAll') }}</option>
             <option
               v-for="option in stageFilterOptions.documents"
               :key="option.value"
@@ -367,7 +365,7 @@
             v-model="stageFilters.hiring"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Прием: все</option>
+            <option value="">{{ t('admin.applications.hiringAll') }}</option>
             <option
               v-for="option in stageFilterOptions.hiring"
               :key="option.value"
@@ -380,7 +378,7 @@
             v-model="stageFilters.compliance"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Коррупция: все</option>
+            <option value="">{{ t('admin.applications.complianceAll') }}</option>
             <option
               v-for="option in stageFilterOptions.compliance"
               :key="option.value"
@@ -389,6 +387,49 @@
               {{ option.label }}
             </option>
           </select>
+        </div>
+
+        <div
+          v-if="filteredApplications.length > 0"
+          class="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="text-gray-500">
+            {{ t('admin.applications.page') }} <span class="font-semibold text-gray-700">{{ paginationPage }}</span>
+            {{ t('admin.applications.of') }} <span class="font-semibold text-gray-700">{{ paginationTotalPages }}</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="inline-flex items-center gap-2 text-gray-500">
+              <span>{{ t('admin.applications.perPage') }}</span>
+              <select
+                v-model.number="paginationPerPage"
+                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option
+                  v-for="option in paginationPerPageOptions"
+                  :key="option"
+                  :value="option"
+                >
+                  {{ option }}
+                </option>
+              </select>
+            </label>
+            <button
+              type="button"
+              :disabled="paginationPage <= 1"
+              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="goToPreviousPage"
+            >
+              {{ t('admin.applications.previous') }}
+            </button>
+            <button
+              type="button"
+              :disabled="paginationPage >= paginationTotalPages"
+              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="goToNextPage"
+            >
+              {{ t('admin.applications.next') }}
+            </button>
+          </div>
         </div>
 
         <div
@@ -405,7 +446,7 @@
                 <tr>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Кандидат"
+                      :label="t('admin.applications.candidate')"
                       column="candidate"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -414,7 +455,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Претендуемая должность"
+                      :label="t('admin.applications.expectedPosition')"
                       column="vacancy"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -423,7 +464,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Факультет / кафедра"
+                      :label="t('admin.applications.facultyDepartment')"
                       column="profile"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -432,7 +473,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Статусы"
+                      :label="t('admin.applications.statuses')"
                       column="statuses"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -441,7 +482,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Голоса"
+                      :label="t('admin.applications.votes')"
                       column="votes"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -450,19 +491,19 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Дата"
+                      :label="t('admin.applications.date')"
                       column="created_at"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
                       @sort="setSort"
                     />
                   </th>
-                  <th class="px-4 py-3 text-right">Действие</th>
+                  <th class="px-4 py-3 text-right">{{ t('admin.applications.action') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 bg-white">
                 <tr
-                  v-for="app in filteredApplications"
+                  v-for="app in paginatedApplications"
                   :key="app.id"
                   class="cursor-pointer transition hover:bg-blue-50/50 focus-within:bg-blue-50/50"
                   tabindex="0"
@@ -474,12 +515,12 @@
                   <td class="px-4 py-3 align-top">
                     <div class="max-w-[260px]">
                       <div class="font-semibold text-gray-900 whitespace-normal break-words">
-                        {{ app.user?.name || 'Кандидат не указан' }}
+                        {{ app.user?.name || t('admin.applications.candidateNotSpecified') }}
                       </div>
                       <div class="mt-0.5 truncate text-xs text-gray-400">
-                        {{ visibleUserEmail(app.user) || 'Email не указан' }}
+                        {{ visibleUserEmail(app.user) || t('admin.applications.emailNotSpecified') }}
                       </div>
-                      <div class="mt-1 text-xs text-gray-400">ID заявки: {{ app.id }}</div>
+                      <div class="mt-1 text-xs text-gray-400">{{ t('admin.applications.applicationId') }}: {{ app.id }}</div>
                     </div>
                   </td>
                   <td class="px-4 py-3 align-top">
@@ -495,15 +536,15 @@
                   <td class="px-4 py-3 align-top text-gray-600">
                     <template v-if="app?.vacancy?.type === 'pps'">
                       <div class="max-w-[260px] whitespace-normal break-words">
-                        {{ app.pps_profile?.faculty_name || 'Факультет не указан' }}
+                        {{ app.pps_profile?.faculty_name || t('admin.applications.facultyNotSpecified') }}
                       </div>
                       <div class="mt-1 max-w-[260px] whitespace-normal break-words text-xs text-gray-400">
-                        {{ app.pps_profile?.department_name || 'Кафедра не указана' }}
+                        {{ app.pps_profile?.department_name || t('admin.applications.departmentNotSpecified') }}
                       </div>
                     </template>
                     <template v-else>
                       <div class="max-w-[220px] whitespace-normal break-words">
-                        {{ app?.vacancy?.position?.name || 'Должность не указана' }}
+                        {{ app?.vacancy?.position?.name || t('admin.applications.positionNotSpecified') }}
                       </div>
                     </template>
                   </td>
@@ -530,7 +571,7 @@
                     <div>{{ formatDate(app.created_at) }}</div>
                     <div class="mt-2 space-y-1">
                       <div class="text-xs text-gray-400">
-                        Голосование: {{ formatDate(app.voting_started_at, 'Не назначено') }}
+                        {{ t('admin.applications.voting') }}: {{ formatDate(app.voting_started_at, t('admin.applications.notAssigned')) }}
                       </div>
                       <div
                         v-if="applicationArchiveMode === 'active'"
@@ -564,7 +605,7 @@
                           class="rounded-lg bg-[#005eb8] px-2 py-1 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                           @click.stop="updateApplicationVotingDate(app)"
                         >
-                          Сохранить
+                          {{ t('common.save') }}
                         </button>
                         <button
                           v-if="votingScheduleDraftChanged(app)"
@@ -573,18 +614,18 @@
                           class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                           @click.stop="resetVotingScheduleDraft(app)"
                         >
-                          Отмена
+                          {{ t('common.cancel') }}
                         </button>
                       </div>
                       <div
                         v-if="isVotingDateSaving(app.id)"
                         class="text-xs text-gray-400"
                       >
-                        Сохранение...
+                        {{ t('admin.applications.saving') }}
                       </div>
                     </div>
                     <div v-if="applicationArchiveMode === 'archived'" class="mt-1 text-xs text-gray-400">
-                      Архив: {{ formatDate(app.archived_at) }}
+                      {{ t('admin.applications.archive') }}: {{ formatDate(app.archived_at) }}
                     </div>
                     <div v-if="applicationArchiveMode === 'archived' && app.archived_by?.name" class="mt-1 text-xs text-gray-400">
                       {{ app.archived_by.name }}
@@ -602,7 +643,7 @@
                         @mousedown.stop
                         @change.stop="quickUpdateHiringStatus(app, $event.target.value)"
                       >
-                        <option value="" disabled>Принятие на работу</option>
+                        <option value="" disabled>{{ t('admin.applications.hiringSelect') }}</option>
                         <option
                           v-for="option in quickHiringStatusOptions"
                           :key="option.value"
@@ -616,7 +657,7 @@
                         class="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#005eb8] transition hover:bg-blue-50"
                         @click.stop="goToDetails(app.id)"
                       >
-                        Открыть
+                        {{ t('admin.applications.open') }}
                       </button>
                       <button
                         v-if="applicationArchiveMode === 'active'"
@@ -625,7 +666,7 @@
                         class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                         @click.stop="archiveApplication(app)"
                       >
-                        {{ isArchivingApplication(app.id) ? 'Архив...' : 'Архивировать' }}
+                        {{ isArchivingApplication(app.id) ? t('admin.applications.archiving') : t('admin.applications.archiveAction') }}
                       </button>
                       <button
                         v-else
@@ -634,13 +675,51 @@
                         class="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                         @click.stop="unarchiveApplication(app)"
                       >
-                        {{ isUnarchivingApplication(app.id) ? 'Возврат...' : 'Разархивировать' }}
+                        {{ isUnarchivingApplication(app.id) ? t('admin.applications.returning') : t('admin.applications.unarchive') }}
                       </button>
                     </div>
                   </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div
+            v-if="paginationTotalPages > 1"
+            class="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="text-gray-500">
+              {{ paginationStart }}-{{ paginationEnd }} {{ t('admin.applications.of') }} {{ paginationTotal }}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                :disabled="paginationPage <= 1"
+                class="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="goToPreviousPage"
+              >
+                {{ t('admin.applications.previous') }}
+              </button>
+              <button
+                v-for="page in visiblePaginationPages"
+                :key="page"
+                type="button"
+                :class="page === paginationPage
+                  ? 'border-[#005eb8] bg-[#005eb8] text-white'
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
+                class="min-w-9 rounded-lg border px-3 py-1.5 font-semibold transition"
+                @click="setPaginationPage(page)"
+              >
+                {{ page }}
+              </button>
+              <button
+                type="button"
+                :disabled="paginationPage >= paginationTotalPages"
+                class="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="goToNextPage"
+              >
+                {{ t('admin.applications.next') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -655,6 +734,7 @@ import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import TableSortButton from '../components/TableSortButton.vue';
 import { useDialogStore } from '../stores/useDialogStore';
+import { useI18n } from '../i18n';
 import {
   applicationStageOrder,
   stageLabel,
@@ -671,6 +751,7 @@ import { sortRows } from '../utils/tableSort';
 const route = useRoute();
 const router = useRouter();
 const dialogStore = useDialogStore();
+const { locale, t } = useI18n();
 
 const applications = ref([]);
 const vacancies = ref([]);
@@ -700,6 +781,9 @@ const stageFilters = ref({
 });
 const sortBy = ref('created_at');
 const sortDirection = ref('desc');
+const paginationPage = ref(1);
+const paginationPerPage = ref(25);
+const paginationPerPageOptions = [10, 25, 50, 100];
 const createForm = ref({
   full_name: '',
   vacancy_type: vacancyTypeTabValues.includes(String(route.query.type)) ? String(route.query.type) : 'pps',
@@ -738,15 +822,16 @@ const vacancyTypeOptions = computed(() => vacancyTypeTabValues.map((type) => ({
 const activeVacancyTypeLabel = computed(() => vacancyTypeLabel(activeVacancyType.value));
 const emptyApplicationsMessage = computed(() => (
   applicationArchiveMode.value === 'archived'
-    ? `В архиве ${activeVacancyTypeLabel.value} заявок пока нет.`
-    : `В разделе ${activeVacancyTypeLabel.value} заявок пока нет.`
+    ? t('admin.applications.emptyArchived', { type: activeVacancyTypeLabel.value })
+    : t('admin.applications.emptyActive', { type: activeVacancyTypeLabel.value })
 ));
-const quickHiringStatusOptions = [
-  { value: 'voting', label: 'Голосование' },
-  { value: 'hired_1_year', label: 'Взять на 1 год' },
-  { value: 'hired_3_year', label: 'Взять на 3 года' },
-];
-const quickHiringStatusValues = new Set(quickHiringStatusOptions.map((option) => option.value));
+const quickHiringStatusValueList = ['voting', 'hired_1_year', 'hired_3_year'];
+const quickHiringStatusOptions = computed(() => [
+  { value: 'voting', label: t('stage.hiring.status.voting') },
+  { value: 'hired_1_year', label: t('stage.hiring.status.hired_1_year') },
+  { value: 'hired_3_year', label: t('stage.hiring.status.hired_3_year') },
+]);
+const quickHiringStatusValues = new Set(quickHiringStatusValueList);
 
 const stageFilterOptions = computed(() => Object.fromEntries(
   applicationStageOrder.map((stage) => [stage, stageOptions(stage)]),
@@ -768,6 +853,33 @@ const filteredApplications = computed(() => {
 
   return sortRows(rows, applicationSortValue, sortDirection.value);
 });
+const paginationTotal = computed(() => filteredApplications.value.length);
+const paginationTotalPages = computed(() => Math.max(1, Math.ceil(paginationTotal.value / paginationPerPage.value)));
+const normalizedPaginationPage = computed(() => Math.min(Math.max(1, paginationPage.value), paginationTotalPages.value));
+const paginationStartIndex = computed(() => (normalizedPaginationPage.value - 1) * paginationPerPage.value);
+const paginatedApplications = computed(() => filteredApplications.value.slice(
+  paginationStartIndex.value,
+  paginationStartIndex.value + paginationPerPage.value,
+));
+const paginationStart = computed(() => (
+  paginationTotal.value === 0 ? 0 : paginationStartIndex.value + 1
+));
+const paginationEnd = computed(() => Math.min(
+  paginationStartIndex.value + paginationPerPage.value,
+  paginationTotal.value,
+));
+const visiblePaginationPages = computed(() => {
+  const total = paginationTotalPages.value;
+  const current = normalizedPaginationPage.value;
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, start + 4);
+  const normalizedStart = Math.max(1, end - 4);
+
+  return Array.from(
+    { length: end - normalizedStart + 1 },
+    (_, index) => normalizedStart + index,
+  );
+});
 const normalizeVacancyMatchText = (value) => String(value || '')
   .trim()
   .toLowerCase()
@@ -781,6 +893,7 @@ const ppsVacancyTitles = [
   'Ассоциированный профессор – исследователь',
   'Заведующий кафедрой (для выпускающих кафедр)',
   'Заведующий кафедрой (для не выпускающих кафедр)',
+  'Исполняющий обязанности (и.о.) заведующий кафедрой',
   'Сеньор-лектор',
   'Профессор',
   'Профессор-исследователь',
@@ -839,7 +952,7 @@ const filteredPpsPositionOptions = computed(() => {
 
   return filtered;
 });
-const ppsPositionSuggestions = computed(() => filteredPpsPositionOptions.value.slice(0, 12));
+const ppsPositionSuggestions = computed(() => filteredPpsPositionOptions.value);
 const staffDepartmentOptions = computed(() => (
   (departments.value || [])
     .filter((department) => (
@@ -958,7 +1071,7 @@ const departmentOptions = computed(() => {
     .slice()
     .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || ''), 'ru'));
 });
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const isArchivingApplication = (applicationId) => archivingApplicationIds.value.includes(applicationId);
 const isUnarchivingApplication = (applicationId) => unarchivingApplicationIds.value.includes(applicationId);
@@ -1019,8 +1132,8 @@ const canQuickUpdateHiring = (app) => (
 
 const quickHiringTitle = (app) => (
   canQuickUpdateHiring(app)
-    ? 'Быстро изменить статус этапа "Принятие на работу"'
-    : 'Доступно после положительной проверки комплаенса'
+    ? t('admin.applications.quickHiringTitle')
+    : t('admin.applications.quickHiringDisabledTitle')
 );
 
 const quickHiringSelectValue = (app) => {
@@ -1048,7 +1161,7 @@ const quickUpdateHiringStatus = async (app, status) => {
   }
 
   if (!canQuickUpdateHiring(app)) {
-    alert('Принятие на работу доступно только после положительной проверки комплаенса.');
+    alert(t('admin.applications.quickHiringDisabled'));
     return;
   }
 
@@ -1062,7 +1175,7 @@ const quickUpdateHiringStatus = async (app, status) => {
     });
 
     replaceApplicationInList(response.data?.application);
-    alert(response.data?.message || 'Статус принятия на работу обновлен.');
+    alert(response.data?.message || t('admin.applications.hiringStatusUpdated'));
   } catch (error) {
     alert(errorText(error));
   } finally {
@@ -1077,14 +1190,14 @@ const updateApplicationVotingDate = async (app) => {
 
   const draftDate = String(votingDateDraftValue(app) || '').trim();
   if (draftDate && !/^\d{4}-\d{2}-\d{2}$/.test(draftDate)) {
-    alert('Введите дату полностью в формате ГГГГ-ММ-ДД.');
+    alert(t('admin.applications.invalidVotingDate'));
     resetVotingScheduleDraft(app);
     return;
   }
 
   const draftOrder = String(votingOrderDraftValue(app) || '').trim();
   if (draftOrder && (!/^\d+$/.test(draftOrder) || Number(draftOrder) < 1)) {
-    alert('Введите номер в очереди положительным числом.');
+    alert(t('admin.applications.invalidVotingOrder'));
     resetVotingScheduleDraft(app);
     return;
   }
@@ -1117,13 +1230,13 @@ const updateApplicationVotingDate = async (app) => {
 const archiveApplication = async (app) => {
   if (!app?.id) return;
 
-  const candidateName = app.user?.name || `заявку #${app.id}`;
+  const candidateName = app.user?.name || t('admin.applications.applicationNumber', { id: app.id });
   const confirmed = await dialogStore.openConfirm(
-    `Архивировать ${candidateName}? Заявка исчезнет из активного списка.`,
+    t('admin.applications.archiveConfirmMessage', { name: candidateName }),
     {
-      title: 'Архивировать заявку',
-      confirmText: 'Архивировать',
-      cancelText: 'Отмена',
+      title: t('admin.applications.archiveConfirmTitle'),
+      confirmText: t('admin.applications.archiveAction'),
+      cancelText: t('common.cancel'),
     },
   );
 
@@ -1137,7 +1250,7 @@ const archiveApplication = async (app) => {
     const response = await axios.put(`/api/admin/applications/${app.id}/archive`);
     applications.value = applications.value.filter((item) => item.id !== app.id);
     syncActiveVacancyType();
-    alert(response.data?.message || 'Заявка архивирована.');
+    alert(response.data?.message || t('admin.applications.archivedMessage'));
   } catch (error) {
     alert(errorText(error));
   } finally {
@@ -1148,13 +1261,13 @@ const archiveApplication = async (app) => {
 const unarchiveApplication = async (app) => {
   if (!app?.id) return;
 
-  const candidateName = app.user?.name || `заявку #${app.id}`;
+  const candidateName = app.user?.name || t('admin.applications.applicationNumber', { id: app.id });
   const confirmed = await dialogStore.openConfirm(
-    `Разархивировать ${candidateName}? Заявка вернется в активный список.`,
+    t('admin.applications.unarchiveConfirmMessage', { name: candidateName }),
     {
-      title: 'Разархивировать заявку',
-      confirmText: 'Разархивировать',
-      cancelText: 'Отмена',
+      title: t('admin.applications.unarchiveConfirmTitle'),
+      confirmText: t('admin.applications.unarchive'),
+      cancelText: t('common.cancel'),
     },
   );
 
@@ -1168,7 +1281,7 @@ const unarchiveApplication = async (app) => {
     const response = await axios.put(`/api/admin/applications/${app.id}/unarchive`);
     applications.value = applications.value.filter((item) => item.id !== app.id);
     syncActiveVacancyType();
-    alert(response.data?.message || 'Заявка возвращена в активный список.');
+    alert(response.data?.message || t('admin.applications.unarchivedMessage'));
   } catch (error) {
     alert(errorText(error));
   } finally {
@@ -1193,10 +1306,10 @@ const applicationSearchValues = (app) => [
 ].map((value) => String(value || '').toLowerCase());
 
 const stageShortTitle = (stage) => {
-  if (stage === 'resume') return 'Резюме';
-  if (stage === 'documents') return 'Документы';
-  if (stage === 'compliance') return 'Коррупция';
-  if (stage === 'hiring') return 'Найм';
+  if (stage === 'resume') return t('stage.resume.short');
+  if (stage === 'documents') return t('stage.documents.short');
+  if (stage === 'compliance') return t('stage.compliance.short');
+  if (stage === 'hiring') return t('stage.hiring.short');
   return stage;
 };
 
@@ -1208,7 +1321,7 @@ const stageStatusValue = (stage, app) => normalizedStageStatus(
 
 const stageTooltipLabel = (stage, app) => {
   const status = stageStatusValue(stage, app);
-  if (stage === 'resume' && status === 'accepted') return 'Принята';
+  if (stage === 'resume' && status === 'accepted') return t('stage.resume.status.accepted_female');
 
   return stageLabel(stage, app?.[stageStatusField(stage)], app);
 };
@@ -1240,10 +1353,10 @@ const stageDotClass = (stage, app) => {
 
 const vacancyTitle = (app) => {
   if (app?.vacancy?.type === 'pps') {
-    return app?.pps_profile?.desired_position || app?.vacancy?.title || 'Должность не указана';
+    return app?.pps_profile?.desired_position || app?.vacancy?.title || t('admin.applications.positionNotSpecified');
   }
 
-  return app?.vacancy?.position?.name || app?.vacancy?.title || 'Должность не указана';
+  return app?.vacancy?.position?.name || app?.vacancy?.title || t('admin.applications.positionNotSpecified');
 };
 
 const applicationProfileLabel = (app) => {
@@ -1274,10 +1387,22 @@ const setSort = (column) => {
   sortDirection.value = ['created_at', 'votes'].includes(column) ? 'desc' : 'asc';
 };
 
-const formatDate = (value, fallback = 'Не указана') => {
+const setPaginationPage = (page) => {
+  paginationPage.value = Math.min(Math.max(1, Number(page) || 1), paginationTotalPages.value);
+};
+
+const goToPreviousPage = () => {
+  setPaginationPage(paginationPage.value - 1);
+};
+
+const goToNextPage = () => {
+  setPaginationPage(paginationPage.value + 1);
+};
+
+const formatDate = (value, fallback = t('admin.applications.notSpecifiedFemale')) => {
   if (!value) return fallback;
 
-  return new Date(value).toLocaleDateString('ru-RU', {
+  return new Date(value).toLocaleDateString(locale.value === 'kk' ? 'kk-KZ' : 'ru-RU', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -1310,6 +1435,7 @@ const setActiveVacancyType = (type) => {
   if (activeVacancyType.value === type) return;
 
   activeVacancyType.value = type;
+  paginationPage.value = 1;
   syncVacancyTypeQuery(type);
 };
 
@@ -1319,6 +1445,7 @@ const setApplicationArchiveMode = async (mode) => {
   applicationArchiveMode.value = mode;
   showCreateForm.value = false;
   applicationSearch.value = '';
+  paginationPage.value = 1;
   syncApplicationsQuery();
   await fetchApplications();
 };
@@ -1334,6 +1461,7 @@ const syncActiveVacancyType = () => {
 
   const fallbackType = vacancyTypeTabValues.find((type) => applicationsByVacancyType.value[type]?.length);
   activeVacancyType.value = fallbackType || 'pps';
+  paginationPage.value = 1;
   syncVacancyTypeQuery(activeVacancyType.value);
 };
 
@@ -1507,32 +1635,32 @@ const fetchDepartments = async () => {
 
 const createApplication = async () => {
   if (!createForm.value.full_name.trim()) {
-    alert('Введите ФИО кандидата.');
+    alert(t('admin.applications.validation.enterCandidate'));
     return;
   }
 
   if (createForm.value.vacancy_type === 'pps' && !createForm.value.faculty_name.trim()) {
-    alert('Выберите факультет.');
+    alert(t('admin.applications.validation.chooseFaculty'));
     return;
   }
 
   if (createForm.value.vacancy_type === 'pps' && !createForm.value.department_name.trim()) {
-    alert('Выберите кафедру.');
+    alert(t('admin.applications.validation.chooseDepartment'));
     return;
   }
 
   if (createForm.value.vacancy_type === 'staff' && !createForm.value.department_id) {
-    alert('Выберите департамент.');
+    alert(t('admin.applications.validation.chooseStaffDepartment'));
     return;
   }
 
   if (createForm.value.vacancy_type === 'staff' && !createForm.value.position_id) {
-    alert('Выберите должность.');
+    alert(t('admin.applications.validation.choosePosition'));
     return;
   }
 
   if (createForm.value.vacancy_type === 'pps' && !createForm.value.vacancy_id) {
-    alert('Выберите позицию.');
+    alert(t('admin.applications.validation.choosePpsPosition'));
     return;
   }
 
@@ -1576,7 +1704,7 @@ const createApplication = async () => {
 
     resetCreateForm();
     showCreateForm.value = false;
-    alert(response.data?.message || 'Заявка создана.');
+    alert(response.data?.message || t('admin.applications.createdMessage'));
   } catch (error) {
     alert(errorText(error));
   } finally {
@@ -1634,6 +1762,31 @@ watch(() => createForm.value.department_id, () => {
 
   if (!isSelectedPositionVisible) {
     createForm.value.position_id = '';
+  }
+});
+
+watch([
+  applicationSearch,
+  activeVacancyType,
+  applicationArchiveMode,
+  sortBy,
+  sortDirection,
+  paginationPerPage,
+  () => stageFilters.value.resume,
+  () => stageFilters.value.documents,
+  () => stageFilters.value.compliance,
+  () => stageFilters.value.hiring,
+], () => {
+  paginationPage.value = 1;
+});
+
+watch(paginationTotalPages, (totalPages) => {
+  if (paginationPage.value > totalPages) {
+    paginationPage.value = totalPages;
+  }
+
+  if (paginationPage.value < 1) {
+    paginationPage.value = 1;
   }
 });
 

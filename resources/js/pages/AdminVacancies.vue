@@ -1,36 +1,32 @@
 <template>
   <Layout>
     <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Управление вакансиями</h1>
-          <p class="text-sm text-gray-500">Список вакансий, типы, должности и быстрые действия.</p>
-        </div>
+      <div class="flex justify-end">
         <router-link
           to="/admin/vacancies/create"
           class="inline-flex items-center justify-center rounded-xl bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
         >
-          Добавить вакансию
+          {{ t('admin.vacancies.add') }}
         </router-link>
       </div>
 
       <section class="space-y-4">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div class="text-sm text-gray-500 md:self-center">
-            Показано: <span class="font-semibold text-gray-700">{{ filteredVacancies.length }}</span>
+            {{ t('admin.vacancies.shown') }}: <span class="font-semibold text-gray-700">{{ filteredVacancies.length }}</span>
             <span class="text-gray-400"> / {{ vacancies.length }}</span>
           </div>
           <input
             v-model="search"
             type="text"
-            placeholder="Поиск по вакансии, должности или описанию"
+            :placeholder="t('admin.vacancies.searchPlaceholder')"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
           <select
             v-model="typeFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все типы</option>
+            <option value="">{{ t('admin.vacancies.allTypes') }}</option>
             <option
               v-for="type in vacancyTypeOptions"
               :key="type.value"
@@ -43,7 +39,7 @@
             v-model="departmentFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все подразделения</option>
+            <option value="">{{ t('admin.vacancies.allDepartments') }}</option>
             <option
               v-for="department in departmentOptions"
               :key="department.id"
@@ -54,20 +50,20 @@
           </select>
         </div>
 
-      <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
+      <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
 
       <div
         v-else-if="vacancies.length === 0"
         class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
       >
-        Вакансий пока нет.
+        {{ t('admin.vacancies.empty') }}
       </div>
 
       <div
         v-else-if="filteredVacancies.length === 0"
         class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
       >
-        Ничего не найдено.
+        {{ t('admin.vacancies.noResults') }}
       </div>
 
       <div v-else class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -77,7 +73,7 @@
               <tr>
                 <th class="px-4 py-3">
                   <TableSortButton
-                    label="Вакансия"
+                    :label="t('admin.vacancies.vacancy')"
                     column="title"
                     :sort-by="sortBy"
                     :sort-direction="sortDirection"
@@ -86,7 +82,7 @@
                 </th>
                 <th class="px-4 py-3">
                   <TableSortButton
-                    label="Тип"
+                    :label="t('admin.vacancies.type')"
                     column="type"
                     :sort-by="sortBy"
                     :sort-direction="sortDirection"
@@ -95,7 +91,7 @@
                 </th>
                 <th class="px-4 py-3">
                   <TableSortButton
-                    label="Подразделение / должность"
+                    :label="t('admin.vacancies.departmentPosition')"
                     column="department"
                     :sort-by="sortBy"
                     :sort-direction="sortDirection"
@@ -104,7 +100,7 @@
                 </th>
                 <th class="px-4 py-3">
                   <TableSortButton
-                    label="Описание"
+                    :label="t('admin.vacancies.description')"
                     column="description"
                     :sort-by="sortBy"
                     :sort-direction="sortDirection"
@@ -113,14 +109,14 @@
                 </th>
                 <th class="px-4 py-3">
                   <TableSortButton
-                    label="Дата"
+                    :label="t('admin.vacancies.date')"
                     column="created_at"
                     :sort-by="sortBy"
                     :sort-direction="sortDirection"
                     @sort="setSort"
                   />
                 </th>
-                <th class="px-4 py-3 text-right">Действия</th>
+                <th class="px-4 py-3 text-right">{{ t('admin.vacancies.actions') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
@@ -139,15 +135,15 @@
                   </td>
                   <td class="px-4 py-3 align-top text-gray-600">
                     <div class="max-w-[280px] whitespace-normal break-words">
-                      {{ vacancyDepartmentName(vacancy) || 'Подразделение не указано' }}
+                      {{ vacancyDepartmentName(vacancy) || t('admin.vacancies.departmentNotSpecified') }}
                     </div>
                     <div class="mt-1 max-w-[280px] whitespace-normal break-words text-xs text-gray-400">
-                      {{ vacancy.position?.name || 'Должность не указана' }}
+                      {{ vacancy.position?.name || t('admin.applications.positionNotSpecified') }}
                     </div>
                   </td>
                   <td class="px-4 py-3 align-top text-gray-600">
                     <div class="max-w-[360px] line-clamp-3 whitespace-normal break-words">
-                      {{ vacancy.description || 'Описание не указано' }}
+                      {{ vacancy.description || t('admin.vacancies.descriptionNotSpecified') }}
                     </div>
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 align-top text-gray-600">
@@ -160,14 +156,14 @@
                         class="font-semibold text-[#005eb8] hover:text-blue-700"
                         @click="startEdit(vacancy)"
                       >
-                        Редактировать
+                        {{ t('common.edit') }}
                       </button>
                       <button
                         type="button"
                         class="font-semibold text-red-600 hover:text-red-700"
                         @click="deleteVacancy(vacancy.id)"
                       >
-                        Удалить
+                        {{ t('common.delete') }}
                       </button>
                     </div>
                   </td>
@@ -178,7 +174,7 @@
                     <form class="space-y-4" @submit.prevent="updateVacancy(vacancy.id)">
                       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         <label class="space-y-2">
-                          <span class="text-sm font-medium text-gray-700">Название вакансии</span>
+                          <span class="text-sm font-medium text-gray-700">{{ t('admin.vacancies.title') }}</span>
                           <input
                             v-model="editVacancy.title"
                             type="text"
@@ -187,7 +183,7 @@
                         </label>
 
                         <label class="space-y-2">
-                          <span class="text-sm font-medium text-gray-700">Тип</span>
+                          <span class="text-sm font-medium text-gray-700">{{ t('admin.vacancies.type') }}</span>
                           <input
                             :value="vacancyTypeLabel(editVacancy.type)"
                             disabled
@@ -196,13 +192,13 @@
                         </label>
 
                         <label class="space-y-2">
-                          <span class="text-sm font-medium text-gray-700">Подразделение</span>
+                          <span class="text-sm font-medium text-gray-700">{{ t('admin.positions.department') }}</span>
                           <select
                             v-model="editVacancy.department_id"
                             class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
                             @change="editVacancy.position_id = ''"
                           >
-                            <option disabled value="">Выберите подразделение</option>
+                            <option disabled value="">{{ t('admin.positions.chooseDepartment') }}</option>
                             <option
                               v-for="department in departmentOptions"
                               :key="department.id"
@@ -214,13 +210,13 @@
                         </label>
 
                         <label class="space-y-2">
-                          <span class="text-sm font-medium text-gray-700">Должность</span>
+                          <span class="text-sm font-medium text-gray-700">{{ t('admin.applications.position') }}</span>
                           <select
                             v-model="editVacancy.position_id"
                             :disabled="!editVacancy.department_id"
                             class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
                           >
-                            <option disabled value="">Выберите должность</option>
+                            <option disabled value="">{{ t('admin.positions.choosePosition') }}</option>
                             <option
                               v-for="position in filteredEditPositions"
                               :key="position.id"
@@ -232,7 +228,7 @@
                         </label>
 
                         <label class="space-y-2 xl:col-span-2">
-                          <span class="text-sm font-medium text-gray-700">Описание</span>
+                          <span class="text-sm font-medium text-gray-700">{{ t('admin.vacancies.description') }}</span>
                           <textarea
                             v-model="editVacancy.description"
                             rows="4"
@@ -247,13 +243,13 @@
                           class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
                           @click="cancelEdit"
                         >
-                          Отмена
+                          {{ t('common.cancel') }}
                         </button>
                         <button
                           type="submit"
                           class="rounded-lg bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                         >
-                          Сохранить
+                          {{ t('common.save') }}
                         </button>
                       </div>
                     </form>
@@ -280,6 +276,9 @@ import {
 } from '../utils/vacancyTypes';
 import { collectDepartmentSubtreeIds, decorateDepartments } from '../utils/departments';
 import { sortRows } from '../utils/tableSort';
+import { useI18n } from '../i18n';
+
+const { locale, t } = useI18n();
 
 const vacancies = ref([]);
 const positions = ref([]);
@@ -293,7 +292,7 @@ const sortDirection = ref('desc');
 const editId = ref(null);
 const editVacancy = ref({ title: '', description: '', type: '', department_id: '', position_id: '' });
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const departmentOptions = computed(() => decorateDepartments(departments.value));
 const vacancyTypeOptions = computed(() => vacancyTypeTabValues.map((type) => ({
@@ -360,9 +359,9 @@ const setSort = (column) => {
 };
 
 const formatDate = (value) => {
-  if (!value) return 'Не указана';
+  if (!value) return t('admin.applications.notSpecifiedFemale');
 
-  return new Date(value).toLocaleDateString('ru-RU', {
+  return new Date(value).toLocaleDateString(locale.value === 'kk' ? 'kk-KZ' : 'ru-RU', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -422,17 +421,17 @@ const cancelEdit = () => {
 
 const updateVacancy = async (id) => {
   if (!editVacancy.value.title.trim()) {
-    alert('Введите название вакансии.');
+    alert(t('admin.vacancies.validationTitle'));
     return;
   }
 
   if (!editVacancy.value.department_id) {
-    alert('Выберите подразделение.');
+    alert(t('admin.applications.validation.chooseStaffDepartment'));
     return;
   }
 
   if (!editVacancy.value.position_id) {
-    alert('Выберите должность.');
+    alert(t('admin.applications.validation.choosePosition'));
     return;
   }
 
@@ -449,7 +448,7 @@ const updateVacancy = async (id) => {
 };
 
 const deleteVacancy = async (id) => {
-  if (!confirm('Удалить вакансию?')) return;
+  if (!confirm(t('admin.vacancies.deleteConfirm'))) return;
   try {
     await axios.delete(`/api/admin/vacancies/${id}`);
     await fetchVacancies();

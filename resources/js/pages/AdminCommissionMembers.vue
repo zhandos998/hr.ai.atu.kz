@@ -1,8 +1,7 @@
 <template>
   <Layout>
     <div class="max-w-6xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Постоянные члены комиссии</h1>
+      <div class="flex justify-end">
         <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 w-full md:w-auto">
           <button
             v-for="option in typeOptions"
@@ -26,23 +25,23 @@
           <input
             v-model="memberSearch"
             type="text"
-            :placeholder="`Поиск по комиссии ${activeTypeLabel}`"
+            :placeholder="t('admin.commission.memberSearchPlaceholder', { type: activeTypeLabel })"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           />
           <input
             v-model="candidateSearch"
             type="text"
-            :placeholder="`Поиск пользователей для ${activeTypeLabel}`"
+            :placeholder="t('admin.commission.candidateSearchPlaceholder', { type: activeTypeLabel })"
             class="w-full border border-gray-300 rounded-lg px-4 py-2"
           />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="border border-gray-200 rounded-lg p-3 space-y-3">
-            <h2 class="font-semibold text-gray-800">Текущий состав: {{ activeTypeLabel }}</h2>
+            <h2 class="font-semibold text-gray-800">{{ t('admin.commission.currentMembers', { type: activeTypeLabel }) }}</h2>
 
-            <div v-if="loadingMembers" class="text-sm text-gray-500">Загрузка...</div>
-            <div v-else-if="members.length === 0" class="text-sm text-gray-500">Состав комиссии {{ activeTypeLabel }} пуст.</div>
+            <div v-if="loadingMembers" class="text-sm text-gray-500">{{ t('common.loading') }}</div>
+            <div v-else-if="members.length === 0" class="text-sm text-gray-500">{{ t('admin.commission.emptyMembers', { type: activeTypeLabel }) }}</div>
             <div v-else class="space-y-2">
               <div
                 v-for="member in members"
@@ -57,17 +56,17 @@
                   @click="removeMember(member.user_id)"
                   class="text-red-600 hover:text-red-700 text-sm font-semibold cursor-pointer"
                 >
-                  Удалить
+                  {{ t('common.delete') }}
                 </button>
               </div>
             </div>
           </div>
 
           <div class="border border-gray-200 rounded-lg p-3 space-y-3">
-            <h2 class="font-semibold text-gray-800">Добавить в комиссию: {{ activeTypeLabel }}</h2>
+            <h2 class="font-semibold text-gray-800">{{ t('admin.commission.addMembers', { type: activeTypeLabel }) }}</h2>
 
-            <div v-if="loadingCandidates" class="text-sm text-gray-500">Загрузка...</div>
-            <div v-else-if="candidates.length === 0" class="text-sm text-gray-500">Пользователи не найдены.</div>
+            <div v-if="loadingCandidates" class="text-sm text-gray-500">{{ t('common.loading') }}</div>
+            <div v-else-if="candidates.length === 0" class="text-sm text-gray-500">{{ t('admin.commission.usersNotFound') }}</div>
             <div v-else class="space-y-2 max-h-96 overflow-auto pr-1">
               <div
                 v-for="user in candidates"
@@ -82,7 +81,7 @@
                   @click="addMember(user.id)"
                   class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
                 >
-                  Добавить
+                  {{ t('common.add') }}
                 </button>
               </div>
             </div>
@@ -97,6 +96,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const typeOptions = [
   { value: 'pps', label: 'ППС' },
@@ -115,7 +117,7 @@ const activeTypeLabel = computed(() => {
   return typeOptions.find((option) => option.value === activeType.value)?.label || 'ППС';
 });
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const fetchMembers = async (q = '') => {
   loadingMembers.value = true;
@@ -158,7 +160,7 @@ const addMember = async (userId) => {
 };
 
 const removeMember = async (userId) => {
-  if (!confirm(`Удалить пользователя из комиссии ${activeTypeLabel.value}?`)) return;
+  if (!confirm(t('admin.commission.removeConfirm', { type: activeTypeLabel.value }))) return;
 
   try {
     await axios.delete(`/api/admin/commission-members/${userId}`, {

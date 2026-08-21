@@ -74,6 +74,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/admin/applications/{id}/archive', [ApplicationController::class, 'archive']);
     Route::put('/admin/applications/{id}/unarchive', [ApplicationController::class, 'unarchive']);
     Route::put('/admin/applications/{id}/voting-date', [ApplicationController::class, 'updateVotingDate']);
+    Route::post('/admin/applications/{id}/resume', [ApplicationController::class, 'adminReplaceResume']);
     Route::post('/admin/applications/{id}/upload-docs', [ApplicationController::class, 'adminUploadDocs']);
     Route::delete('/admin/applications/{id}/documents/{documentId}', [ApplicationController::class, 'adminDeleteDocument']);
     Route::put('/admin/applications/{id}/staff-details', [ApplicationController::class, 'updateStaffDetails']);
@@ -111,6 +112,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 
     Route::get('/admin/users', [AdminUserController::class, 'index']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
+    Route::post('/admin/users/{id}/impersonate', [AdminUserController::class, 'impersonate']);
     Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
 });
 

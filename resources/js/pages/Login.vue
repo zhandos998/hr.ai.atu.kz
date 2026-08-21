@@ -69,6 +69,8 @@ const login = async () => {
     });
 
     const { token, user } = response.data;
+    localStorage.removeItem('impersonator_token');
+    localStorage.removeItem('impersonator_user');
     localStorage.setItem('token', token);
     localStorage.setItem('role', normalizeRole(user.role) || 'user');
     axios.defaults.headers.common.Authorization = `Bearer ${token}`;

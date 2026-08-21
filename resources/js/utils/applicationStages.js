@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 export const applicationStageOrder = ['resume', 'documents', 'compliance', 'hiring'];
 
 export const applicationStageMeta = {
@@ -64,9 +66,14 @@ export const applicationSummaryMeta = {
 export const stageStatusField = (stage) => `${stage}_status`;
 export const stageCommentField = (stage) => `${stage}_comment`;
 
+const translated = (key, fallback) => {
+  const value = t(key);
+  return value === key ? fallback : value;
+};
+
 export const stageOptions = (stage) => Object.entries(applicationStageMeta[stage]?.statuses || {}).map(([value, meta]) => ({
   value,
-  label: meta.label,
+  label: translated(`stage.${stage}.status.${value}`, meta.label),
 }));
 
 export const normalizedStageStatus = (stage, status, context = null) => {
@@ -78,18 +85,19 @@ export const normalizedStageStatus = (stage, status, context = null) => {
 };
 export const stageLabel = (stage, status, context = null) => {
   const normalizedStatus = normalizedStageStatus(stage, status, context);
-  return applicationStageMeta[stage]?.statuses?.[normalizedStatus]?.label || normalizedStatus || '-';
+  const fallback = applicationStageMeta[stage]?.statuses?.[normalizedStatus]?.label || normalizedStatus || '-';
+  return translated(`stage.${stage}.status.${normalizedStatus}`, fallback);
 };
 export const stageClass = (stage, status, context = null) => {
   const normalizedStatus = normalizedStageStatus(stage, status, context);
   return applicationStageMeta[stage]?.statuses?.[normalizedStatus]?.className || 'bg-slate-100 text-slate-700';
 };
 
-export const summaryLabel = (code) => applicationSummaryMeta[code]?.label || code || '-';
+export const summaryLabel = (code) => translated(`summary.${code}`, applicationSummaryMeta[code]?.label || code || '-');
 export const summaryClass = (code) => applicationSummaryMeta[code]?.className || 'bg-slate-100 text-slate-700';
 
-export const stageTitle = (stage) => applicationStageMeta[stage]?.title || stage;
-export const stagePlaceholder = (stage) => applicationStageMeta[stage]?.placeholder || 'Комментарий';
+export const stageTitle = (stage) => translated(`stage.${stage}.title`, applicationStageMeta[stage]?.title || stage);
+export const stagePlaceholder = (stage) => translated(`stage.${stage}.placeholder`, applicationStageMeta[stage]?.placeholder || 'Комментарий');
 
 export const latestStageLog = (application, stage) => {
   const logs = Array.isArray(application?.stage_logs) ? application.stage_logs : [];

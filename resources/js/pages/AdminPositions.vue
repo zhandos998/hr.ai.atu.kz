@@ -1,29 +1,25 @@
 <template>
   <Layout>
-    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Управление должностями</h1>
-          <p class="text-sm text-gray-500">Список должностей по подразделениям, обязанности и квалификационные требования.</p>
-        </div>
-        <router-link
-          to="/admin/positions/create"
-          class="inline-flex items-center justify-center rounded-xl bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-        >
-          Добавить должность
-        </router-link>
-      </div>
+    <template #adminHeaderActions>
+      <router-link
+        to="/admin/positions/create"
+        class="inline-flex items-center justify-center rounded-md bg-[#2f5fb8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#244f9d]"
+      >
+        {{ t('admin.actions.addPosition') }}
+      </router-link>
+    </template>
 
+    <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <section class="space-y-4">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div class="text-sm text-gray-500 md:self-center">
-            Показано: <span class="font-semibold text-gray-700">{{ filteredPositions.length }}</span>
+            {{ t('admin.positions.shown') }}: <span class="font-semibold text-gray-700">{{ filteredPositions.length }}</span>
             <span class="text-gray-400"> / {{ positions.length }}</span>
           </div>
           <input
             v-model="search"
             type="text"
-            placeholder="Поиск по должности или подразделению"
+            :placeholder="t('admin.positions.searchPlaceholder')"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
 
@@ -31,7 +27,7 @@
             v-model="departmentFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все подразделения</option>
+            <option value="">{{ t('admin.positions.allDepartments') }}</option>
             <option
               v-for="department in departmentOptions"
               :key="department.id"
@@ -45,20 +41,20 @@
             v-model="contentFilter"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
           >
-            <option value="">Все описания</option>
-            <option value="complete">Есть обязанности и требования</option>
-            <option value="missing_duties">Нет обязанностей</option>
-            <option value="missing_qualification">Нет требований</option>
+            <option value="">{{ t('admin.positions.allDescriptions') }}</option>
+            <option value="complete">{{ t('admin.positions.complete') }}</option>
+            <option value="missing_duties">{{ t('admin.positions.missingDuties') }}</option>
+            <option value="missing_qualification">{{ t('admin.positions.missingQualification') }}</option>
           </select>
         </div>
 
-        <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
+        <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
 
         <div
           v-else-if="filteredPositions.length === 0"
           class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-gray-600"
         >
-          Ничего не найдено.
+          {{ t('admin.positions.empty') }}
         </div>
 
         <div v-else class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -68,7 +64,7 @@
                 <tr>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Должность"
+                      :label="t('admin.positions.position')"
                       column="name"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -77,7 +73,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Подразделение"
+                      :label="t('admin.positions.department')"
                       column="department"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -86,7 +82,7 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Обязанности"
+                      :label="t('admin.positions.duties')"
                       column="duties"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
@@ -95,14 +91,14 @@
                   </th>
                   <th class="px-4 py-3">
                     <TableSortButton
-                      label="Требования"
+                      :label="t('admin.positions.qualification')"
                       column="qualification"
                       :sort-by="sortBy"
                       :sort-direction="sortDirection"
                       @sort="setSort"
                     />
                   </th>
-                  <th class="px-4 py-3 text-right">Действия</th>
+                  <th class="px-4 py-3 text-right">{{ t('admin.positions.actions') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 bg-white">
@@ -129,12 +125,12 @@
                     </td>
                     <td class="px-4 py-3 align-top text-gray-600">
                       <div class="max-w-[340px] line-clamp-3 whitespace-normal break-words">
-                        {{ position.duties || 'Не указаны' }}
+                        {{ position.duties || t('admin.positions.notSpecifiedPlural') }}
                       </div>
                     </td>
                     <td class="px-4 py-3 align-top text-gray-600">
                       <div class="max-w-[340px] line-clamp-3 whitespace-normal break-words">
-                        {{ position.qualification || 'Не указаны' }}
+                        {{ position.qualification || t('admin.positions.notSpecifiedPlural') }}
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 align-top text-right">
@@ -144,14 +140,14 @@
                           class="font-semibold text-[#005eb8] hover:text-blue-700"
                           @click="startEdit(position)"
                         >
-                          Редактировать
+                          {{ t('common.edit') }}
                         </button>
                         <button
                           type="button"
                           class="font-semibold text-red-600 hover:text-red-700"
                           @click="deletePosition(position.id)"
                         >
-                          Удалить
+                          {{ t('common.delete') }}
                         </button>
                       </div>
                     </td>
@@ -162,12 +158,12 @@
                       <form class="space-y-4" @submit.prevent="updatePosition(position.id)">
                         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <label class="space-y-2">
-                            <span class="text-sm font-medium text-gray-700">Подразделение</span>
+                            <span class="text-sm font-medium text-gray-700">{{ t('admin.positions.department') }}</span>
                             <select
                               v-model="editPosition.department_id"
                               class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
                             >
-                              <option disabled value="">Выберите подразделение</option>
+                              <option disabled value="">{{ t('admin.positions.chooseDepartment') }}</option>
                               <option
                                 v-for="department in departmentOptions"
                                 :key="department.id"
@@ -179,7 +175,7 @@
                           </label>
 
                           <label class="space-y-2">
-                            <span class="text-sm font-medium text-gray-700">Название должности</span>
+                            <span class="text-sm font-medium text-gray-700">{{ t('admin.positions.name') }}</span>
                             <input
                               v-model="editPosition.name"
                               type="text"
@@ -188,7 +184,7 @@
                           </label>
 
                           <label class="space-y-2 xl:col-span-2">
-                            <span class="text-sm font-medium text-gray-700">Обязанности</span>
+                            <span class="text-sm font-medium text-gray-700">{{ t('admin.positions.duties') }}</span>
                             <textarea
                               v-model="editPosition.duties"
                               rows="4"
@@ -197,7 +193,7 @@
                           </label>
 
                           <label class="space-y-2 xl:col-span-2">
-                            <span class="text-sm font-medium text-gray-700">Требования</span>
+                            <span class="text-sm font-medium text-gray-700">{{ t('admin.positions.qualification') }}</span>
                             <textarea
                               v-model="editPosition.qualification"
                               rows="4"
@@ -212,13 +208,13 @@
                             class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
                             @click="cancelEdit"
                           >
-                            Отмена
+                            {{ t('common.cancel') }}
                           </button>
                           <button
                             type="submit"
                             class="rounded-lg bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                           >
-                            Сохранить
+                            {{ t('common.save') }}
                           </button>
                         </div>
                       </form>
@@ -239,8 +235,11 @@ import { computed, onMounted, ref } from 'vue';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import TableSortButton from '../components/TableSortButton.vue';
+import { useI18n } from '../i18n';
 import { collectDepartmentSubtreeIds, decorateDepartments } from '../utils/departments';
 import { sortRows } from '../utils/tableSort';
+
+const { t } = useI18n();
 
 const departments = ref([]);
 const positions = ref([]);
@@ -253,7 +252,7 @@ const sortDirection = ref('asc');
 const editingId = ref(null);
 const editPosition = ref({ department_id: '', name: '', duties: '', qualification: '' });
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 const departmentOptions = computed(() => decorateDepartments(departments.value));
 
 const departmentName = (departmentId) => {
@@ -342,7 +341,7 @@ const cancelEdit = () => {
 
 const updatePosition = async (id) => {
   if (!editPosition.value.department_id || !editPosition.value.name.trim()) {
-    alert('Выберите подразделение и укажите название должности.');
+    alert(t('validation.positions.required'));
     return;
   }
 
@@ -356,7 +355,7 @@ const updatePosition = async (id) => {
 };
 
 const deletePosition = async (id) => {
-  if (!confirm('Удалить должность?')) return;
+  if (!confirm(t('confirm.positions.delete'))) return;
 
   try {
     await axios.delete(`/api/admin/positions/${id}`);

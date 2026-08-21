@@ -1,27 +1,26 @@
 <template>
   <Layout>
     <div class="max-w-3xl mx-auto py-8 px-4 space-y-6">
-      <div class="flex items-center justify-between gap-3">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Редактировать департамент</h1>
+      <div class="flex justify-end">
         <router-link
           to="/admin/departments"
           class="border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold py-2 px-4 rounded-lg transition"
         >
-          Назад
+          {{ t('common.back') }}
         </router-link>
       </div>
 
-      <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
+      <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
 
       <section v-else class="bg-white rounded-xl shadow border border-gray-100 p-4 space-y-4">
         <form @submit.prevent="updateDepartment" class="space-y-3">
           <label class="space-y-2 block">
-            <span class="text-sm font-medium text-gray-700">Родительское подразделение</span>
+            <span class="text-sm font-medium text-gray-700">{{ t('admin.departmentForm.parent') }}</span>
             <select
               v-model="form.parent_id"
               class="w-full border border-gray-300 rounded-lg px-4 py-2"
             >
-              <option value="">Без родительского департамента</option>
+              <option value="">{{ t('admin.departmentForm.noParent') }}</option>
               <option
                 v-for="department in availableParentOptions"
                 :key="department.id"
@@ -33,21 +32,21 @@
           </label>
 
           <label class="space-y-2 block">
-            <span class="text-sm font-medium text-gray-700">Название</span>
+            <span class="text-sm font-medium text-gray-700">{{ t('admin.departmentForm.name') }}</span>
             <input
               v-model="form.name"
               type="text"
-              placeholder="Название департамента или подотдела"
+              :placeholder="t('admin.departmentForm.namePlaceholder')"
               class="w-full border border-gray-300 rounded-lg px-4 py-2"
             />
           </label>
 
           <label class="space-y-2 block">
-            <span class="text-sm font-medium text-gray-700">Описание</span>
+            <span class="text-sm font-medium text-gray-700">{{ t('admin.departmentForm.description') }}</span>
             <textarea
               v-model="form.description"
               rows="4"
-              placeholder="Описание (необязательно)"
+              :placeholder="t('admin.departmentForm.descriptionPlaceholder')"
               class="w-full border border-gray-300 rounded-lg px-4 py-2"
             ></textarea>
           </label>
@@ -57,7 +56,7 @@
             :disabled="submitting"
             class="bg-[#005eb8] hover:bg-blue-700 text-white font-semibold py-2 rounded-lg w-full transition cursor-pointer disabled:opacity-70"
           >
-            {{ submitting ? 'Сохранение...' : 'Сохранить изменения' }}
+            {{ submitting ? t('common.saving') : t('admin.departmentForm.saveChanges') }}
           </button>
         </form>
       </section>
@@ -71,9 +70,11 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import { collectDepartmentSubtreeIds, decorateDepartments } from '../utils/departments';
+import { useI18n } from '../i18n';
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const loading = ref(true);
 const submitting = ref(false);
 const departments = ref([]);
@@ -82,7 +83,7 @@ const form = ref({ name: '', description: '', parent_id: '' });
 const departmentId = computed(() => Number(route.params.id));
 const decoratedDepartments = computed(() => decorateDepartments(departments.value));
 const currentDepartment = computed(() => decoratedDepartments.value.find((department) => Number(department.id) === departmentId.value) || null);
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const availableParentOptions = computed(() => {
   const excludedIds = collectDepartmentSubtreeIds(departmentId.value, departments.value);
@@ -97,7 +98,7 @@ const fetchDepartments = async () => {
     departments.value = response.data;
 
     if (!currentDepartment.value) {
-      alert('Департамент не найден.');
+      alert(t('admin.departmentForm.notFound'));
       router.push('/admin/departments');
       return;
     }
@@ -116,7 +117,7 @@ const fetchDepartments = async () => {
 
 const updateDepartment = async () => {
   if (!form.value.name.trim()) {
-    alert('Введите название департамента.');
+    alert(t('admin.departmentForm.validationName'));
     return;
   }
 
@@ -124,7 +125,7 @@ const updateDepartment = async () => {
 
   try {
     await axios.put(`/api/admin/departments/${departmentId.value}`, form.value);
-    alert('Департамент обновлен.');
+    alert(t('admin.departmentForm.updated'));
     router.push('/admin/departments');
   } catch (error) {
     alert(errorText(error));

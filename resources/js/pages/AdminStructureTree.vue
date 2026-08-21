@@ -1,21 +1,17 @@
 <template>
   <Layout>
     <div class="max-w-5xl mx-auto py-8 px-4 space-y-6">
-      <h1 class="text-2xl md:text-3xl font-bold text-center text-[#005eb8]">
-        Департаменты и должности
-      </h1>
-
       <div class="bg-white rounded-xl shadow border border-gray-100 p-4">
         <input
           v-model="search"
           type="text"
-          placeholder="Поиск по департаменту, подотделу, должности, обязанностям и требованиям"
+          :placeholder="t('admin.structure.searchPlaceholder')"
           class="w-full border border-gray-300 rounded-lg px-4 py-2"
         />
       </div>
 
-      <div v-if="loading" class="text-center text-gray-500">Загрузка...</div>
-      <div v-else-if="filteredTree.length === 0" class="text-center text-gray-600">Ничего не найдено.</div>
+      <div v-if="loading" class="text-center text-gray-500">{{ t('common.loading') }}</div>
+      <div v-else-if="filteredTree.length === 0" class="text-center text-gray-600">{{ t('admin.structure.empty') }}</div>
 
       <div v-else class="space-y-3">
         <DepartmentStructureNode
@@ -38,13 +34,16 @@ import axios from 'axios';
 import Layout from '../components/Layout.vue';
 import DepartmentStructureNode from '../components/DepartmentStructureNode.vue';
 import { buildDepartmentTree, decorateDepartments } from '../utils/departments';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const departments = ref([]);
 const loading = ref(true);
 const expanded = ref({});
 const search = ref('');
 
-const errorText = (error) => error?.response?.data?.message || 'Ошибка. Попробуйте снова.';
+const errorText = (error) => error?.response?.data?.message || t('validation.genericError');
 
 const departmentTree = computed(() => buildDepartmentTree(decorateDepartments(departments.value)));
 const forceExpand = computed(() => search.value.trim() !== '');

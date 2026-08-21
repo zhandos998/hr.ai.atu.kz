@@ -2,24 +2,13 @@
     <Layout>
         <div class="max-w-7xl mx-auto py-8 px-4 space-y-6">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div class="space-y-2">
-                    <router-link
-                        :to="backRoute"
-                        class="inline-flex items-center gap-2 text-sm font-medium text-[#005eb8] hover:underline"
-                    >
-                        <span>←</span>
-                        <span>К списку заявок</span>
-                    </router-link>
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-[#005eb8]">Заявка №{{ application?.id || route.params.id }}</h1>
-                        <p
-                            v-if="application"
-                            class="text-sm text-gray-500"
-                        >
-                            {{ vacancyTypeLabel(application?.vacancy?.type) }} • {{ vacancyTitle(application) }}
-                        </p>
-                    </div>
-                </div>
+                <router-link
+                    :to="backRoute"
+                    class="inline-flex items-center gap-2 text-sm font-medium text-[#005eb8] hover:underline"
+                >
+                    <span>←</span>
+                    <span>К списку заявок</span>
+                </router-link>
 
                 <div
                     v-if="application"
@@ -191,6 +180,31 @@
                             >
                                 Резюме
                             </a>
+                            <div
+                                v-if="canReplaceResume"
+                                class="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-slate-50 px-3 py-2"
+                            >
+                                <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    class="max-w-[18rem] text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-medium file:text-[#005eb8] hover:file:bg-blue-100"
+                                    @change="handleResumeReplacementUpload"
+                                />
+                                <button
+                                    type="button"
+                                    :disabled="!resumeReplacementFile || resumeReplacing"
+                                    class="inline-flex items-center whitespace-nowrap rounded-lg bg-[#005eb8] px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                                    @click="replaceResume"
+                                >
+                                    {{ resumeReplacing ? 'Сохранение...' : application.resume_url ? 'Заменить резюме' : 'Загрузить резюме' }}
+                                </button>
+                                <span
+                                    v-if="resumeReplacementFile"
+                                    class="max-w-[18rem] truncate text-xs text-gray-500"
+                                >
+                                    {{ resumeReplacementFile.name }}
+                                </span>
+                            </div>
 
                             <template v-if="application.documents_map && Object.keys(application.documents_map).length">
                                 <span
@@ -565,7 +579,7 @@
                                                         v-model="ppsPositionSearch"
                                                         type="text"
                                                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
-                                                        placeholder="Начните вводить должность"
+                                                        placeholder="Начните вводить или выберите должность"
                                                         autocomplete="off"
                                                         :disabled="ppsPositionOptions.length === 0"
                                                         @focus="ppsPositionDropdownOpen = true"
@@ -1480,6 +1494,8 @@ const stageSavingByKey = ref({});
 const votingDateDraft = ref("");
 const votingOrderDraft = ref("");
 const votingDateSaving = ref(false);
+const resumeReplacementFile = ref(null);
+const resumeReplacing = ref(false);
 const showUploadDocsModal = ref(false);
 const uploadDocsModalMode = ref("create");
 const deletingApplicationDocumentIds = ref([]);
@@ -1611,6 +1627,12 @@ const canManageApplicationDocuments = computed(
         !["hired", "rejected"].includes(application.value?.hiring_status)
 );
 const canDeleteApplicationDocuments = computed(
+    () =>
+        Boolean(application.value) &&
+        !application.value?.archived_at &&
+        !["hired", "rejected"].includes(application.value?.hiring_status)
+);
+const canReplaceResume = computed(
     () =>
         Boolean(application.value) &&
         !application.value?.archived_at &&
@@ -1766,10 +1788,10 @@ const ppsPositionSuggestions = computed(() => {
                 normalizeSearchText(selectedPpsPosition.value?.title)
         )
     ) {
-        return [selectedPpsPosition.value, ...filtered].slice(0, 12);
+        return [selectedPpsPosition.value, ...filtered];
     }
 
-    return filtered.slice(0, 12);
+    return filtered;
 });
 const staffDepartmentOptions = computed(() =>
     (departments.value || [])
@@ -2683,6 +2705,7 @@ const fetchApplication = async () => {
         syncPpsProfileDraft(application.value);
         syncStaffDetailsDraft(application.value);
         aiResult.value = application.value.ai_result || null;
+        resumeReplacementFile.value = null;
         aiError.value = "";
         memberToAdd.value = "";
         memberSearch.value = "";
@@ -2696,10 +2719,49 @@ const fetchApplication = async () => {
         staffDepartmentSearch.value = "";
         staffPositionSearch.value = "";
         ppsProfileDraft.value = emptyPpsProfileDraft();
+        resumeReplacementFile.value = null;
         errorMessage.value =
             error?.response?.data?.message || "Ошибка при загрузке заявки.";
     } finally {
         loading.value = false;
+    }
+};
+
+const handleResumeReplacementUpload = (event) => {
+    resumeReplacementFile.value = event.target.files?.[0] || null;
+};
+
+const replaceResume = async () => {
+    if (!application.value || !resumeReplacementFile.value || !canReplaceResume.value) {
+        return;
+    }
+
+    resumeReplacing.value = true;
+
+    try {
+        const formData = new FormData();
+        formData.append("resume", resumeReplacementFile.value);
+
+        const response = await axios.post(
+            `/api/admin/applications/${application.value.id}/resume`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        application.value = response.data.application;
+        resumeReplacementFile.value = null;
+        alert(response.data?.message || "Резюме обновлено.");
+    } catch (error) {
+        alert(
+            error?.response?.data?.message ||
+                "Ошибка при обновлении резюме."
+        );
+    } finally {
+        resumeReplacing.value = false;
     }
 };
 

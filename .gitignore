@@ -13,6 +13,7 @@
 /.zed
 /auth.json
 /backups
+/database/*.sqlite
 /node_modules
 /public/build
 /public/hot

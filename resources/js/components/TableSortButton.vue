@@ -5,7 +5,7 @@
       'group inline-flex items-center gap-1 font-semibold uppercase tracking-wide transition hover:text-[#005eb8]',
       align === 'right' ? 'w-full justify-end text-right' : 'text-left',
     ]"
-    :title="`Сортировать: ${label}`"
+    :title="t('table.sortTitle', { label })"
     @click="$emit('sort', column)"
   >
     <span>{{ label }}</span>
@@ -22,6 +22,9 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from '../i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   label: {

@@ -40,6 +40,7 @@ class ApplicationController extends Controller
         'Ассоциированный профессор – исследователь',
         'Заведующий кафедрой (для выпускающих кафедр)',
         'Заведующий кафедрой (для не выпускающих кафедр)',
+        'Исполняющий обязанности (и.о.) заведующий кафедрой',
         'Сеньор-лектор',
         'Профессор',
         'Профессор-исследователь',
@@ -663,6 +664,50 @@ class ApplicationController extends Controller
             $application,
             'Администратор загрузил или обновил документы за пользователя.'
         );
+    }
+
+    public function adminReplaceResume(Request $request, int $id)
+    {
+        $application = Application::with(['user', 'vacancy', 'status', 'resume'])
+            ->notArchived()
+            ->findOrFail($id);
+
+        if (in_array($application->hiring_status, ['hired', 'rejected'], true)) {
+            return response()->json([
+                'message' => 'После финального решения комиссии резюме менять нельзя.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+        ]);
+
+        $oldPath = $application->resume?->file_path;
+        $storedPath = $validated['resume']->store("resumes/{$application->id}", 'public');
+
+        if ($application->resume) {
+            $application->resume->update([
+                'user_id' => $application->user_id,
+                'file_path' => $storedPath,
+            ]);
+        } else {
+            Resume::create([
+                'application_id' => $application->id,
+                'user_id' => $application->user_id,
+                'file_path' => $storedPath,
+            ]);
+        }
+
+        if (!empty($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json([
+            'message' => 'Резюме обновлено.',
+            'application' => $this->transformAdminApplication(
+                $this->adminApplicationsQuery()->findOrFail($application->id)
+            ),
+        ]);
     }
 
     public function adminDeleteDocument(int $id, int $documentId)
