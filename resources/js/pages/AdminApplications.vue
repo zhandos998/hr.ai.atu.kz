@@ -3,7 +3,7 @@
     <template #adminHeaderActions>
       <div class="text-sm text-gray-500">
         {{ applicationArchiveMode === 'archived' ? t('admin.actions.archivedApplications') : t('admin.actions.totalApplications') }}:
-        <span class="font-semibold text-gray-700">{{ applications.length }}</span>
+        <span class="font-semibold text-gray-700">{{ applicationArchiveTotal }}</span>
       </div>
       <button
         v-if="applicationArchiveMode === 'active'"
@@ -327,7 +327,7 @@
               {{ paginationTotal ? `${paginationStart}-${paginationEnd}` : 0 }}
             </span>
             <span class="text-gray-400"> / {{ paginationTotal }}</span>
-            <span class="text-gray-400"> / {{ applicationsByVacancyType[activeVacancyType]?.length || 0 }}</span>
+            <span class="text-gray-400"> / {{ activeVacancyTypeCount }}</span>
           </div>
           <input
             v-model="applicationSearch"
@@ -645,7 +645,7 @@
                       >
                         <option value="" disabled>{{ t('admin.applications.hiringSelect') }}</option>
                         <option
-                          v-for="option in quickHiringStatusOptions"
+                          v-for="option in quickHiringStatusOptions(app)"
                           :key="option.value"
                           :value="option.value"
                         >
@@ -784,6 +784,9 @@ const sortDirection = ref('desc');
 const paginationPage = ref(1);
 const paginationPerPage = ref(25);
 const paginationPerPageOptions = [10, 25, 50, 100];
+const serverPaginationMeta = ref(null);
+const applicationTypeCounts = ref({});
+let applicationsFetchDebounceTimer = null;
 const createForm = ref({
   full_name: '',
   vacancy_type: vacancyTypeTabValues.includes(String(route.query.type)) ? String(route.query.type) : 'pps',
@@ -800,6 +803,7 @@ const normalizeVacancyType = (value) => (
 );
 
 const activeVacancyType = ref(normalizeVacancyType(route.query.type));
+const hasServerPagination = computed(() => Boolean(serverPaginationMeta.value));
 
 const applicationsByVacancyType = computed(() => Object.fromEntries(
   vacancyTypeTabValues.map((type) => [
@@ -808,10 +812,27 @@ const applicationsByVacancyType = computed(() => Object.fromEntries(
   ]),
 ));
 
+const applicationTypeCount = (type) => {
+  const serverCount = applicationTypeCounts.value?.[type];
+
+  if (serverCount !== undefined && serverCount !== null) {
+    return Number(serverCount) || 0;
+  }
+
+  return applicationsByVacancyType.value[type]?.length || 0;
+};
+
+const activeVacancyTypeCount = computed(() => applicationTypeCount(activeVacancyType.value));
+const applicationArchiveTotal = computed(() => (
+  hasServerPagination.value
+    ? vacancyTypeTabValues.reduce((total, type) => total + applicationTypeCount(type), 0)
+    : applications.value.length
+));
+
 const applicationTypeTabs = computed(() => vacancyTypeTabValues.map((type) => ({
   value: type,
   label: vacancyTypeLabel(type),
-  count: applicationsByVacancyType.value[type]?.length || 0,
+  count: applicationTypeCount(type),
 })));
 
 const vacancyTypeOptions = computed(() => vacancyTypeTabValues.map((type) => ({
@@ -825,19 +846,35 @@ const emptyApplicationsMessage = computed(() => (
     ? t('admin.applications.emptyArchived', { type: activeVacancyTypeLabel.value })
     : t('admin.applications.emptyActive', { type: activeVacancyTypeLabel.value })
 ));
-const quickHiringStatusValueList = ['voting', 'hired_1_year', 'hired_3_year'];
-const quickHiringStatusOptions = computed(() => [
-  { value: 'voting', label: t('stage.hiring.status.voting') },
-  { value: 'hired_1_year', label: t('stage.hiring.status.hired_1_year') },
-  { value: 'hired_3_year', label: t('stage.hiring.status.hired_3_year') },
-]);
-const quickHiringStatusValues = new Set(quickHiringStatusValueList);
+const quickHiringStatusOptions = (app) => {
+  const options = [
+    { value: 'voting', label: t('stage.hiring.status.voting') },
+  ];
+
+  if (app?.vacancy?.type === 'pps') {
+    return [
+      ...options,
+      { value: 'hired_1_year', label: t('stage.hiring.status.hired_1_year') },
+      { value: 'hired_3_year', label: t('stage.hiring.status.hired_3_year') },
+    ];
+  }
+
+  return [
+    ...options,
+    { value: 'hired', label: t('stage.hiring.status.hired') },
+  ];
+};
+const quickHiringStatusValues = (app) => new Set(quickHiringStatusOptions(app).map((option) => option.value));
 
 const stageFilterOptions = computed(() => Object.fromEntries(
-  applicationStageOrder.map((stage) => [stage, stageOptions(stage)]),
+  applicationStageOrder.map((stage) => [stage, stageOptions(stage, { vacancy: { type: activeVacancyType.value } })]),
 ));
 
 const filteredApplications = computed(() => {
+  if (hasServerPagination.value) {
+    return applications.value;
+  }
+
   const q = applicationSearch.value.trim().toLowerCase();
   const rows = (applicationsByVacancyType.value[activeVacancyType.value] || []).filter((app) => {
     const matchesStages = applicationStageOrder.every((stage) => {
@@ -853,13 +890,25 @@ const filteredApplications = computed(() => {
 
   return sortRows(rows, applicationSortValue, sortDirection.value);
 });
-const paginationTotal = computed(() => filteredApplications.value.length);
-const paginationTotalPages = computed(() => Math.max(1, Math.ceil(paginationTotal.value / paginationPerPage.value)));
+const paginationTotal = computed(() => (
+  hasServerPagination.value
+    ? Number(serverPaginationMeta.value?.total || 0)
+    : filteredApplications.value.length
+));
+const paginationTotalPages = computed(() => (
+  hasServerPagination.value
+    ? Math.max(1, Number(serverPaginationMeta.value?.last_page || 1))
+    : Math.max(1, Math.ceil(paginationTotal.value / paginationPerPage.value))
+));
 const normalizedPaginationPage = computed(() => Math.min(Math.max(1, paginationPage.value), paginationTotalPages.value));
 const paginationStartIndex = computed(() => (normalizedPaginationPage.value - 1) * paginationPerPage.value);
-const paginatedApplications = computed(() => filteredApplications.value.slice(
-  paginationStartIndex.value,
-  paginationStartIndex.value + paginationPerPage.value,
+const paginatedApplications = computed(() => (
+  hasServerPagination.value
+    ? filteredApplications.value
+    : filteredApplications.value.slice(
+      paginationStartIndex.value,
+      paginationStartIndex.value + paginationPerPage.value,
+    )
 ));
 const paginationStart = computed(() => (
   paginationTotal.value === 0 ? 0 : paginationStartIndex.value + 1
@@ -1139,7 +1188,7 @@ const quickHiringTitle = (app) => (
 const quickHiringSelectValue = (app) => {
   const value = normalizedStageStatus('hiring', app?.hiring_status, app);
 
-  return quickHiringStatusValues.has(value) ? value : '';
+  return quickHiringStatusValues(app).has(value) ? value : '';
 };
 
 const replaceApplicationInList = (updatedApplication) => {
@@ -1152,7 +1201,7 @@ const replaceApplicationInList = (updatedApplication) => {
 };
 
 const quickUpdateHiringStatus = async (app, status) => {
-  if (!app?.id || !quickHiringStatusValues.has(status)) {
+  if (!app?.id || !quickHiringStatusValues(app).has(status)) {
     return;
   }
 
@@ -1248,8 +1297,7 @@ const archiveApplication = async (app) => {
 
   try {
     const response = await axios.put(`/api/admin/applications/${app.id}/archive`);
-    applications.value = applications.value.filter((item) => item.id !== app.id);
-    syncActiveVacancyType();
+    await fetchApplications();
     alert(response.data?.message || t('admin.applications.archivedMessage'));
   } catch (error) {
     alert(errorText(error));
@@ -1279,8 +1327,7 @@ const unarchiveApplication = async (app) => {
 
   try {
     const response = await axios.put(`/api/admin/applications/${app.id}/unarchive`);
-    applications.value = applications.value.filter((item) => item.id !== app.id);
-    syncActiveVacancyType();
+    await fetchApplications();
     alert(response.data?.message || t('admin.applications.unarchivedMessage'));
   } catch (error) {
     alert(errorText(error));
@@ -1332,7 +1379,7 @@ const stageDotClass = (stage, app) => {
   const status = stageStatusValue(stage, app);
   const base = 'block h-2.5 w-2.5 rounded-full ring-4 transition group-hover:scale-110';
 
-  if (['accepted', 'clear', 'hired_1_year', 'hired_3_year'].includes(status)) {
+  if (['accepted', 'clear', 'hired', 'hired_1_year', 'hired_3_year'].includes(status)) {
     return `${base} bg-emerald-500 ring-emerald-100`;
   }
 
@@ -1439,7 +1486,7 @@ const setActiveVacancyType = (type) => {
   syncVacancyTypeQuery(type);
 };
 
-const setApplicationArchiveMode = async (mode) => {
+const setApplicationArchiveMode = (mode) => {
   if (applicationArchiveMode.value === mode) return;
 
   applicationArchiveMode.value = mode;
@@ -1447,10 +1494,13 @@ const setApplicationArchiveMode = async (mode) => {
   applicationSearch.value = '';
   paginationPage.value = 1;
   syncApplicationsQuery();
-  await fetchApplications();
 };
 
 const syncActiveVacancyType = () => {
+  if (hasServerPagination.value) {
+    return;
+  }
+
   if (applications.value.length === 0) {
     return;
   }
@@ -1595,16 +1645,61 @@ const focusStaffPositionSuggestion = () => {
   staffPositionDropdownOpen.value = true;
 };
 
+const buildApplicationsRequestParams = () => ({
+  archived: applicationArchiveMode.value === 'archived' ? 1 : undefined,
+  type: activeVacancyType.value,
+  page: paginationPage.value,
+  per_page: paginationPerPage.value,
+  q: applicationSearch.value.trim() || undefined,
+  sort_by: sortBy.value,
+  sort_direction: sortDirection.value,
+  resume_status: stageFilters.value.resume || undefined,
+  documents_status: stageFilters.value.documents || undefined,
+  compliance_status: stageFilters.value.compliance || undefined,
+  hiring_status: stageFilters.value.hiring || undefined,
+});
+
+const applyApplicationsPayload = (payload) => {
+  if (Array.isArray(payload)) {
+    applications.value = payload;
+    serverPaginationMeta.value = null;
+    applicationTypeCounts.value = {};
+    return;
+  }
+
+  const counts = payload?.counts || {};
+
+  applications.value = Array.isArray(payload?.data) ? payload.data : [];
+  serverPaginationMeta.value = payload?.meta || null;
+  applicationTypeCounts.value = Object.fromEntries(
+    vacancyTypeTabValues.map((type) => [type, Number(counts[type] || 0)]),
+  );
+};
+
+const scheduleFetchApplications = (delay = 250) => {
+  if (applicationsFetchDebounceTimer) {
+    clearTimeout(applicationsFetchDebounceTimer);
+  }
+
+  applicationsFetchDebounceTimer = setTimeout(() => {
+    applicationsFetchDebounceTimer = null;
+    fetchApplications();
+  }, delay);
+};
+
 const fetchApplications = async () => {
+  if (applicationsFetchDebounceTimer) {
+    clearTimeout(applicationsFetchDebounceTimer);
+    applicationsFetchDebounceTimer = null;
+  }
+
   loading.value = true;
 
   try {
     const response = await axios.get('/api/admin/applications', {
-      params: {
-        archived: applicationArchiveMode.value === 'archived' ? 1 : undefined,
-      },
+      params: buildApplicationsRequestParams(),
     });
-    applications.value = response.data;
+    applyApplicationsPayload(response.data);
     syncVotingDateDrafts();
     syncActiveVacancyType();
   } catch (error) {
@@ -1690,16 +1785,15 @@ const createApplication = async () => {
 
     const createdApplication = response.data?.application;
     if (createdApplication) {
-      applications.value = [
-        createdApplication,
-        ...applications.value.filter((app) => app.id !== createdApplication.id),
-      ];
       resetVotingScheduleDraft(createdApplication);
 
       if (vacancyTypeTabValues.includes(String(createdApplication?.vacancy?.type))) {
         activeVacancyType.value = String(createdApplication.vacancy.type);
         syncVacancyTypeQuery(activeVacancyType.value);
       }
+
+      paginationPage.value = 1;
+      await fetchApplications();
     }
 
     resetCreateForm();
@@ -1777,7 +1871,21 @@ watch([
   () => stageFilters.value.compliance,
   () => stageFilters.value.hiring,
 ], () => {
-  paginationPage.value = 1;
+  if (paginationPage.value !== 1) {
+    paginationPage.value = 1;
+    return;
+  }
+
+  scheduleFetchApplications();
+});
+
+watch(paginationPage, () => {
+  if (applicationsFetchDebounceTimer) {
+    clearTimeout(applicationsFetchDebounceTimer);
+    applicationsFetchDebounceTimer = null;
+  }
+
+  fetchApplications();
 });
 
 watch(paginationTotalPages, (totalPages) => {

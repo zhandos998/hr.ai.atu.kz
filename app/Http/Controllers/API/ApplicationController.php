@@ -55,13 +55,176 @@ class ApplicationController extends Controller
 
     public function index(Request $request)
     {
-        $applications = $this->adminApplicationsQuery($request->boolean('archived'))
-            ->latest()
-            ->get();
+        $query = $this->adminApplicationsQuery($request->boolean('archived'));
 
-        $applications->transform(fn ($application) => $this->transformAdminApplication($application));
+        $this->applyAdminApplicationFilters($query, $request);
+        $this->applyAdminApplicationSorting($query, $request);
 
-        return response()->json($applications);
+        $applications = $query->paginate($this->adminApplicationsPerPage($request));
+
+        $applications->getCollection()->transform(fn ($application) => $this->transformAdminApplication($application));
+
+        return response()->json([
+            'data' => $applications->getCollection()->values(),
+            'meta' => [
+                'current_page' => $applications->currentPage(),
+                'from' => $applications->firstItem(),
+                'last_page' => $applications->lastPage(),
+                'per_page' => $applications->perPage(),
+                'to' => $applications->lastItem(),
+                'total' => $applications->total(),
+            ],
+            'counts' => $this->adminApplicationTypeCounts($request),
+        ]);
+    }
+
+    private function adminApplicationsPerPage(Request $request): int
+    {
+        return max(1, min((int) $request->input('per_page', 25), 100));
+    }
+
+    private function adminApplicationTypeCounts(Request $request): array
+    {
+        $query = $this->adminApplicationsBaseQuery($request->boolean('archived'));
+
+        $this->applyAdminApplicationFilters($query, $request, false);
+
+        $counts = $query
+            ->join('vacancies as count_vacancies', 'count_vacancies.id', '=', 'applications.vacancy_id')
+            ->selectRaw('count_vacancies.type as vacancy_type, COUNT(applications.id) as aggregate')
+            ->groupBy('count_vacancies.type')
+            ->pluck('aggregate', 'vacancy_type');
+
+        return [
+            'pps' => (int) ($counts['pps'] ?? 0),
+            'staff' => (int) ($counts['staff'] ?? 0),
+        ];
+    }
+
+    private function applyAdminApplicationFilters($query, Request $request, bool $includeType = true): void
+    {
+        if ($includeType) {
+            $type = trim((string) $request->input('type', ''));
+
+            if (in_array($type, ['pps', 'staff'], true)) {
+                $query->whereHas('vacancy', fn ($vacancy) => $vacancy->where('type', $type));
+            }
+        }
+
+        $search = trim((string) $request->input('q', $request->input('search', '')));
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+
+            $query->where(function ($subQuery) use ($like) {
+                $subQuery
+                    ->whereHas('user', function ($user) use ($like) {
+                        $user->where('name', 'like', $like)
+                            ->orWhere('email', 'like', $like);
+                    })
+                    ->orWhereHas('vacancy', function ($vacancy) use ($like) {
+                        $vacancy->where('title', 'like', $like)
+                            ->orWhere('type', 'like', $like)
+                            ->orWhereHas('position', fn ($position) => $position->where('name', 'like', $like));
+                    })
+                    ->orWhereHas('ppsProfile', function ($profile) use ($like) {
+                        $profile->where('desired_position', 'like', $like)
+                            ->orWhere('faculty_name', 'like', $like)
+                            ->orWhere('department_name', 'like', $like);
+                    })
+                    ->orWhereHas('status', function ($status) use ($like) {
+                        $status->where('name', 'like', $like)
+                            ->orWhere('code', 'like', $like);
+                    });
+            });
+        }
+
+        foreach (['resume', 'documents', 'compliance', 'hiring'] as $stage) {
+            $status = trim((string) $request->input("{$stage}_status", $request->input($stage, '')));
+
+            if ($status === '') {
+                continue;
+            }
+
+            if ($stage === 'documents' && $status === 'awaiting_upload') {
+                $query->whereIn('documents_status', ['awaiting_upload', 'not_requested', 'uploaded']);
+                continue;
+            }
+
+            if ($stage === 'hiring' && in_array($status, ['hired_1_year', 'hired_3_year'], true)) {
+                $query
+                    ->where('hiring_status', 'hired')
+                    ->where('hiring_term_years', $status === 'hired_1_year' ? 1 : 3);
+                continue;
+            }
+
+            if ($stage === 'hiring' && $status === 'hired') {
+                $query
+                    ->where('hiring_status', 'hired')
+                    ->whereNull('hiring_term_years');
+                continue;
+            }
+
+            $query->where("{$stage}_status", $status);
+        }
+    }
+
+    private function applyAdminApplicationSorting($query, Request $request): void
+    {
+        $sortBy = trim((string) $request->input('sort_by', 'created_at'));
+        $direction = strtolower((string) $request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $query->select('applications.*');
+
+        if ($sortBy === 'candidate') {
+            $query
+                ->leftJoin('users as sort_users', 'sort_users.id', '=', 'applications.user_id')
+                ->orderBy('sort_users.name', $direction)
+                ->orderBy('applications.id', $direction);
+            return;
+        }
+
+        if ($sortBy === 'vacancy') {
+            $query
+                ->leftJoin('vacancies as sort_vacancies', 'sort_vacancies.id', '=', 'applications.vacancy_id')
+                ->leftJoin('positions as sort_positions', 'sort_positions.id', '=', 'sort_vacancies.position_id')
+                ->leftJoin('application_pps_profiles as sort_pps_profiles', 'sort_pps_profiles.application_id', '=', 'applications.id')
+                ->orderByRaw("LOWER(COALESCE(sort_pps_profiles.desired_position, sort_positions.name, sort_vacancies.title, '')) {$direction}")
+                ->orderBy('applications.id', $direction);
+            return;
+        }
+
+        if ($sortBy === 'profile') {
+            $query
+                ->leftJoin('vacancies as sort_profile_vacancies', 'sort_profile_vacancies.id', '=', 'applications.vacancy_id')
+                ->leftJoin('positions as sort_profile_positions', 'sort_profile_positions.id', '=', 'sort_profile_vacancies.position_id')
+                ->leftJoin('application_pps_profiles as sort_profile_pps', 'sort_profile_pps.application_id', '=', 'applications.id')
+                ->orderByRaw("LOWER(COALESCE(sort_profile_pps.faculty_name, sort_profile_positions.name, '')) {$direction}")
+                ->orderByRaw("LOWER(COALESCE(sort_profile_pps.department_name, '')) {$direction}")
+                ->orderBy('applications.id', $direction);
+            return;
+        }
+
+        if ($sortBy === 'statuses') {
+            foreach (['resume_status', 'documents_status', 'compliance_status', 'hiring_status'] as $column) {
+                $query->orderBy("applications.{$column}", $direction);
+            }
+
+            $query->orderBy('applications.id', $direction);
+            return;
+        }
+
+        if ($sortBy === 'votes') {
+            $query
+                ->withCount(['commissionVotes as sort_votes_count'])
+                ->orderBy('sort_votes_count', $direction)
+                ->orderBy('applications.id', $direction);
+            return;
+        }
+
+        $query
+            ->orderBy('applications.created_at', $direction)
+            ->orderBy('applications.id', $direction);
     }
 
     public function adminShow($id)
@@ -502,6 +665,7 @@ class ApplicationController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $application = Application::query()->notArchived()->findOrFail($id);
+        $application->loadMissing('vacancy:id,type');
 
         $validated = $request->validate([
             'stage' => 'nullable|in:resume,documents,compliance,hiring',
@@ -525,6 +689,22 @@ class ApplicationController extends Controller
                     return response()->json([
                         'message' => 'Для документов доступны только статусы: ожидается загрузка, приняты, отклонены.',
                     ], 422);
+                }
+
+                if ($validated['stage'] === 'hiring') {
+                    $isPpsApplication = $application->vacancy?->type === 'pps';
+
+                    if (!$isPpsApplication && in_array($validated['stage_status'], ['hired_1_year', 'hired_3_year'], true)) {
+                        return response()->json([
+                            'message' => 'Для заявки АУП доступно только принятие на работу без срока 1/3 года.',
+                        ], 422);
+                    }
+
+                    if ($isPpsApplication && $validated['stage_status'] === 'hired') {
+                        return response()->json([
+                            'message' => 'Для заявки ППС выберите срок: 1 год или 3 года.',
+                        ], 422);
+                    }
                 }
 
                 $application = ApplicationStageManager::setStage(
@@ -1167,6 +1347,24 @@ class ApplicationController extends Controller
 
     private function adminApplicationsQuery(?bool $archived = false)
     {
+        return $this->adminApplicationsBaseQuery($archived)->with([
+            'user',
+            'archivedBy:id,name,email',
+            'status',
+            'vacancy',
+            'vacancy.position:id,department_id,name',
+            'vacancy.commissionMembers:id,name,email,phone',
+            'commissionVotes:id,application_id,user_id,decision,hire_term_years,comment,updated_at',
+            'candidateAiResult:id,application_id,score,decision,education_match,experience_match,soft_skills_match,summary_ru,updated_at',
+            'resume',
+            'documents',
+            'ppsProfile.documents',
+            'stageLogs.author:id,name',
+        ]);
+    }
+
+    private function adminApplicationsBaseQuery(?bool $archived = false)
+    {
         $query = Application::query();
 
         if ($archived === true) {
@@ -1175,19 +1373,7 @@ class ApplicationController extends Controller
             $query->notArchived();
         }
 
-        return $query->with([
-            'user',
-            'archivedBy:id,name,email',
-            'status',
-            'vacancy',
-            'vacancy.position:id,department_id,name',
-            'vacancy.commissionMembers:id,name,email,phone',
-            'commissionVotes:id,application_id,user_id,decision,hire_term_years,comment,updated_at',
-            'resume',
-            'documents',
-            'ppsProfile.documents',
-            'stageLogs.author:id,name',
-        ]);
+        return $query;
     }
 
     private function transformAdminApplication(Application $application): Application
@@ -1545,22 +1731,25 @@ class ApplicationController extends Controller
 
         if (!$workerId) {
             $application->ai_result = null;
+            $application->unsetRelation('candidateAiResult');
 
             return $application;
         }
 
-        $result = CandidateAIResult::query()
-            ->where('application_id', $application->id)
-            ->where('lang', 'ru')
-            ->orderByDesc('updated_at')
-            ->first([
-                'score',
-                'decision',
-                'education_match',
-                'experience_match',
-                'soft_skills_match',
-                'summary_ru',
-            ]);
+        $result = $application->relationLoaded('candidateAiResult')
+            ? $application->candidateAiResult
+            : CandidateAIResult::query()
+                ->where('application_id', $application->id)
+                ->where('lang', 'ru')
+                ->orderByDesc('updated_at')
+                ->first([
+                    'score',
+                    'decision',
+                    'education_match',
+                    'experience_match',
+                    'soft_skills_match',
+                    'summary_ru',
+                ]);
 
         $application->ai_result = $result ? [
             'score' => $result->score,
@@ -1570,6 +1759,7 @@ class ApplicationController extends Controller
             'soft_skills_match' => $result->soft_skills_match,
             'summary' => $result->summary_ru,
         ] : null;
+        $application->unsetRelation('candidateAiResult');
 
         return $application;
     }

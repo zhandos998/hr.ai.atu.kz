@@ -36,6 +36,7 @@ export const applicationStageMeta = {
     statuses: {
       not_started: { label: 'Не начато', className: 'bg-slate-100 text-slate-700' },
       voting: { label: 'Голосование', className: 'bg-amber-100 text-amber-800' },
+      hired: { label: 'Взять на работу', className: 'bg-emerald-100 text-emerald-800' },
       hired_1_year: { label: 'Взять на 1 год', className: 'bg-emerald-100 text-emerald-800' },
       hired_3_year: { label: 'Взять на 3 года', className: 'bg-sky-100 text-sky-800' },
       rejected: { label: 'Не брать', className: 'bg-red-100 text-red-800' },
@@ -71,14 +72,29 @@ const translated = (key, fallback) => {
   return value === key ? fallback : value;
 };
 
-export const stageOptions = (stage) => Object.entries(applicationStageMeta[stage]?.statuses || {}).map(([value, meta]) => ({
-  value,
-  label: translated(`stage.${stage}.status.${value}`, meta.label),
-}));
+export const stageOptions = (stage, context = null) => Object.entries(applicationStageMeta[stage]?.statuses || {})
+  .filter(([value]) => {
+    if (stage !== 'hiring' || !context?.vacancy?.type) return true;
+
+    const isPps = context.vacancy.type === 'pps';
+
+    if (isPps) return value !== 'hired';
+
+    return !['hired_1_year', 'hired_3_year'].includes(value);
+  })
+  .map(([value, meta]) => ({
+    value,
+    label: translated(`stage.${stage}.status.${value}`, meta.label),
+  }));
 
 export const normalizedStageStatus = (stage, status, context = null) => {
   if (stage === 'hiring' && status === 'hired') {
-    return Number(context?.hiring_term_years) === 3 ? 'hired_3_year' : 'hired_1_year';
+    const hiringTermYears = Number(context?.hiring_term_years);
+
+    if (hiringTermYears === 1) return 'hired_1_year';
+    if (hiringTermYears === 3) return 'hired_3_year';
+
+    return 'hired';
   }
 
   return applicationStageStatusAliases[stage]?.[status] || status;

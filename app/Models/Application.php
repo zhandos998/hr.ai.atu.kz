@@ -73,6 +73,12 @@ class Application extends Model
         return $this->hasMany(ApplicationCommissionVote::class);
     }
 
+    public function candidateAiResult()
+    {
+        return $this->hasOne(\App\Models\CandidateAIResult::class)
+            ->where('lang', 'ru');
+    }
+
     public function getVotingStartedAtAttribute(): ?string
     {
         if (!$this->voting_date) {
