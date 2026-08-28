@@ -320,7 +320,7 @@
           </button>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-8">
           <div class="text-sm text-gray-500 md:self-center">
             {{ t('admin.applications.shown') }}:
             <span class="font-semibold text-gray-700">
@@ -329,12 +329,30 @@
             <span class="text-gray-400"> / {{ paginationTotal }}</span>
             <span class="text-gray-400"> / {{ activeVacancyTypeCount }}</span>
           </div>
-          <input
-            v-model="applicationSearch"
-            type="text"
-            :placeholder="t('admin.applications.searchPlaceholder')"
-            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100 xl:col-span-2"
-          />
+          <div class="flex flex-col gap-2 sm:flex-row xl:col-span-3">
+            <input
+              v-model="applicationSearchDraft"
+              type="text"
+              :placeholder="t('admin.applications.searchPlaceholder')"
+              class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
+              @keydown.enter.prevent="applyApplicationSearch"
+            />
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              @click="applyApplicationSearch"
+            >
+              {{ t('common.search') }}
+            </button>
+            <button
+              v-if="applicationSearchDraft || applicationSearch"
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              @click="resetApplicationSearch"
+            >
+              {{ t('common.reset') }}
+            </button>
+          </div>
           <select
             v-model="stageFilters.resume"
             class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-[#005eb8] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -767,6 +785,7 @@ const votingOrderDrafts = ref({});
 const applicationArchiveMode = ref(String(route.query.archived) === '1' ? 'archived' : 'active');
 const showCreateForm = ref(false);
 const applicationSearch = ref('');
+const applicationSearchDraft = ref('');
 const ppsPositionSearch = ref('');
 const staffDepartmentSearch = ref('');
 const staffPositionSearch = ref('');
@@ -1446,6 +1465,39 @@ const goToNextPage = () => {
   setPaginationPage(paginationPage.value + 1);
 };
 
+const fetchApplicationsFromFirstPage = () => {
+  if (paginationPage.value !== 1) {
+    paginationPage.value = 1;
+    return;
+  }
+
+  fetchApplications();
+};
+
+const applyApplicationSearch = () => {
+  const nextSearch = applicationSearchDraft.value.trim();
+
+  if (applicationSearch.value === nextSearch) {
+    fetchApplicationsFromFirstPage();
+    return;
+  }
+
+  applicationSearch.value = nextSearch;
+  fetchApplicationsFromFirstPage();
+};
+
+const resetApplicationSearch = () => {
+  applicationSearchDraft.value = '';
+
+  if (!applicationSearch.value) {
+    fetchApplicationsFromFirstPage();
+    return;
+  }
+
+  applicationSearch.value = '';
+  fetchApplicationsFromFirstPage();
+};
+
 const formatDate = (value, fallback = t('admin.applications.notSpecifiedFemale')) => {
   if (!value) return fallback;
 
@@ -1492,6 +1544,7 @@ const setApplicationArchiveMode = (mode) => {
   applicationArchiveMode.value = mode;
   showCreateForm.value = false;
   applicationSearch.value = '';
+  applicationSearchDraft.value = '';
   paginationPage.value = 1;
   syncApplicationsQuery();
 };
@@ -1860,7 +1913,6 @@ watch(() => createForm.value.department_id, () => {
 });
 
 watch([
-  applicationSearch,
   activeVacancyType,
   applicationArchiveMode,
   sortBy,
