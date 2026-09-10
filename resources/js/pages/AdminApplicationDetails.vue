@@ -2304,7 +2304,21 @@ const voteDecisionClass = (decision) => {
     return "bg-gray-200 text-gray-700";
 };
 
-const vacancyTitle = (item) => item?.vacancy?.title || "Без названия";
+const vacancyTitle = (item) => {
+    if (item?.vacancy?.type === "pps") {
+        return (
+            item?.pps_profile?.desired_position ||
+            item?.vacancy?.title ||
+            "Без названия"
+        );
+    }
+
+    return (
+        item?.vacancy?.position?.name ||
+        item?.vacancy?.title ||
+        "Без названия"
+    );
+};
 
 const formatDate = (value, fallback = "Не указана") => {
     if (!value) return fallback;
