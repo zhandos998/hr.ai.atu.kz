@@ -4,6 +4,7 @@ set -eu
 cd /var/www/html
 
 mkdir -p \
+    storage/app/private/documents \
     storage/app/public \
     storage/framework/cache \
     storage/framework/sessions \

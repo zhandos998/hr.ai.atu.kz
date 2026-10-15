@@ -1,48 +1,50 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\ChatController;
-use App\Http\Controllers\API\ResumeController;
-use App\Http\Controllers\API\ApplicationController;
-use App\Http\Controllers\API\CandidateAIController;
-use App\Http\Controllers\API\DepartmentController;
-use App\Http\Controllers\API\AdminStructureController;
-use App\Http\Controllers\API\CommissionController;
-use App\Http\Controllers\API\AdminUserController;
-use App\Http\Controllers\API\ScienceApplicationController;
-use App\Http\Controllers\API\DigitalApplicationController;
-use App\Http\Controllers\API\StrategyApplicationController;
 use App\Http\Controllers\API\AcademicApplicationController;
-use App\Http\Controllers\API\LibraryApplicationController;
-use App\Http\Controllers\API\ProfessionalDevelopmentApplicationController;
+use App\Http\Controllers\API\AdminStructureController;
+use App\Http\Controllers\API\AdminUserController;
+use App\Http\Controllers\API\ApplicationController;
+use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\CandidateAIController;
+use App\Http\Controllers\API\ChatController;
+use App\Http\Controllers\API\CommissionController;
+use App\Http\Controllers\API\CompetitionController;
 use App\Http\Controllers\API\ComplianceApplicationController;
+use App\Http\Controllers\API\DepartmentController;
+use App\Http\Controllers\API\DigitalApplicationController;
+use App\Http\Controllers\API\LibraryApplicationController;
 use App\Http\Controllers\API\PdfParseController;
+use App\Http\Controllers\API\PersonnelRequestController;
+use App\Http\Controllers\API\ProfessionalDevelopmentApplicationController;
+use App\Http\Controllers\API\ResumeController;
+use App\Http\Controllers\API\ScienceApplicationController;
+use App\Http\Controllers\API\StrategyApplicationController;
 use App\Http\Controllers\API\TeacherAuditController;
 use App\Http\Controllers\API\VacancyController;
+use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/email/verification-notification', [AuthController::class, 'resendVerification']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])->middleware('throttle:mail');
 Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
-Route::post('/password/forgot', [AuthController::class, 'forgotPassword']);
+Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:mail');
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 Route::post('/user/email/change-confirm', [AuthController::class, 'confirmEmailChange']);
 
 Route::get('/vacancies', [VacancyController::class, 'index']);
 Route::get('/vacancies/{id}', [VacancyController::class, 'show']);
+Route::post('/personnel/status', [PersonnelRequestController::class, 'publicStatus'])
+    ->middleware('throttle:10,1');
 
-//Route::post('/chat/send', [ChatController::class, 'send'])->middleware('throttle:30,1');
-Route::middleware('auth:sanctum')->post('/chat/send', [ChatController::class, 'send']);
-
+// Route::post('/chat/send', [ChatController::class, 'send'])->middleware('throttle:30,1');
+Route::middleware(['auth:sanctum', 'throttle:20,1'])->post('/chat/send', [ChatController::class, 'send']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/user/password', [AuthController::class, 'changePassword']);
-    Route::post('/user/email/change-request', [AuthController::class, 'requestEmailChange']);
-
+    Route::post('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:10,1');
+    Route::put('/user/contact-info', [AuthController::class, 'updateContactInfo']);
+    Route::post('/user/email/change-request', [AuthController::class, 'requestEmailChange'])->middleware('throttle:mail');
 
     Route::post('/resumes', [ResumeController::class, 'store']);
 
@@ -57,9 +59,22 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::post('/applications/{id}/upload-docs', [ApplicationController::class, 'uploadDocs']);
     Route::delete('/applications/{id}/documents/{documentId}', [ApplicationController::class, 'deleteDocument']);
+
+    Route::get('/personnel/requests', [PersonnelRequestController::class, 'index']);
+    Route::get('/personnel/requests/{id}', [PersonnelRequestController::class, 'show']);
+    Route::post('/personnel/requests/{id}/decision', [PersonnelRequestController::class, 'decide'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::get('/personnel/requests/{requestId}/documents/{documentId}', [PersonnelRequestController::class, 'document']);
 });
 
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('/admin/competitions', [CompetitionController::class, 'index']);
+    Route::get('/admin/competitions/defaults', [CompetitionController::class, 'defaults']);
+    Route::post('/admin/competitions', [CompetitionController::class, 'store']);
+    Route::get('/admin/competitions/{competition}', [CompetitionController::class, 'show'])->whereNumber('competition');
+    Route::put('/admin/competitions/{competition}', [CompetitionController::class, 'update'])->whereNumber('competition');
+    Route::get('/admin/competitions/{competition}/candidates', [CompetitionController::class, 'candidates'])->whereNumber('competition');
+    Route::post('/admin/competitions/{competition}/applications', [CompetitionController::class, 'attach'])->whereNumber('competition');
+    Route::delete('/admin/competitions/{competition}/applications/{application}', [CompetitionController::class, 'detach'])->whereNumber(['competition', 'application']);
     Route::get('/admin/vacancies', [VacancyController::class, 'index']);
     Route::post('/admin/vacancies', [VacancyController::class, 'store']);
     Route::put('/admin/vacancies/{id}', [VacancyController::class, 'update']);
@@ -92,12 +107,20 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/admin/applications/{id}/reject-docs', [ApplicationController::class, 'rejectDocs']);
     Route::put('/admin/applications/{id}/complete', [ApplicationController::class, 'complete']);
 
+    Route::get('/admin/academic-units', [\App\Http\Controllers\API\AcademicStructureController::class, 'index']);
+    Route::post('/admin/academic-units', [\App\Http\Controllers\API\AcademicStructureController::class, 'store']);
+    Route::put('/admin/academic-units/{id}', [\App\Http\Controllers\API\AcademicStructureController::class, 'update']);
+    Route::delete('/admin/academic-units/{id}', [\App\Http\Controllers\API\AcademicStructureController::class, 'destroy']);
     Route::get('/admin/departments', [AdminStructureController::class, 'departments']);
+    Route::get('/admin/departments/{id}', [AdminStructureController::class, 'showDepartment']);
     Route::post('/admin/departments', [AdminStructureController::class, 'storeDepartment']);
     Route::put('/admin/departments/{id}', [AdminStructureController::class, 'updateDepartment']);
     Route::delete('/admin/departments/{id}', [AdminStructureController::class, 'destroyDepartment']);
 
     Route::get('/admin/positions', [AdminStructureController::class, 'positions']);
+    Route::get('/admin/pps-positions', [AdminStructureController::class, 'ppsPositions']);
+    Route::post('/admin/pps-positions', [AdminStructureController::class, 'storePpsPosition']);
+    Route::get('/admin/positions/{id}', [AdminStructureController::class, 'showPosition']);
     Route::post('/admin/positions', [AdminStructureController::class, 'storePosition']);
     Route::put('/admin/positions/{id}', [AdminStructureController::class, 'updatePosition']);
     Route::delete('/admin/positions/{id}', [AdminStructureController::class, 'destroyPosition']);
@@ -111,9 +134,23 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/commission-members/{userId}', [CommissionController::class, 'adminRemoveMember']);
 
     Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::get('/admin/user-position-options', [AdminUserController::class, 'positionOptions']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::post('/admin/users/{id}/impersonate', [AdminUserController::class, 'impersonate']);
     Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
+    Route::post('/admin/users/{id}/positions', [AdminUserController::class, 'assignPosition']);
+    Route::delete('/admin/users/{id}/positions/{positionId}', [AdminUserController::class, 'detachPosition']);
+
+    Route::post('/admin/personnel/requests', [PersonnelRequestController::class, 'store']);
+    Route::post('/admin/personnel/requests/{id}/update', [PersonnelRequestController::class, 'update'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::post('/admin/personnel/requests/{id}/documents', [PersonnelRequestController::class, 'uploadDocuments'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::delete('/admin/personnel/requests/{id}/documents/{documentId}', [PersonnelRequestController::class, 'destroyDocument'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::post('/admin/personnel/requests/{id}/approvers', [PersonnelRequestController::class, 'addApprover'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::delete('/admin/personnel/requests/{id}/approvers/{approvalId}', [PersonnelRequestController::class, 'removeApprover'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::get('/admin/personnel/reference-data', [PersonnelRequestController::class, 'referenceData']);
+    Route::get('/admin/personnel/approval-routes', [PersonnelRequestController::class, 'approvalRoutes']);
+    Route::post('/admin/personnel/approval-routes', [PersonnelRequestController::class, 'storeApprovalRoute']);
+    Route::delete('/admin/personnel/approval-routes/{id}', [PersonnelRequestController::class, 'destroyApprovalRoute']);
 });
 
 Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {
@@ -179,13 +216,12 @@ Route::middleware(['auth:sanctum', 'commission'])->group(function () {
     Route::post('/commission/applications/{id}/vote', [CommissionController::class, 'vote']);
 });
 
-
 Route::get('/vacancies', [VacancyController::class, 'index'])->name('api.vacancies.index');
 Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('api.vacancies.show');
 // Если есть страница деталей заявки
-Route::get('/applications/{id}', [ApplicationController::class, 'show'])->name('api.applications.show');
+Route::get('/applications/{id}', [ApplicationController::class, 'show'])->middleware('auth:sanctum')->name('api.applications.show');
 
 Route::get('/departments', [DepartmentController::class, 'index']);
 // Route::get('/positions', [DepartmentController::class, 'index']);
 
-Route::post('/pdf/parse', [PdfParseController::class, 'parse']);
+Route::post('/pdf/parse', [PdfParseController::class, 'parse'])->middleware(['auth:sanctum', 'throttle:10,1']);

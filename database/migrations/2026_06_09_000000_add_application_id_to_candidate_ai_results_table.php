@@ -24,8 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('candidate_ai_results', function (Blueprint $table) {
+            $table->dropForeign(['application_id']);
             $table->dropUnique(['application_id', 'lang']);
-            $table->dropConstrainedForeignId('application_id');
+            $table->dropColumn('application_id');
 
             $table->unique(['worker_id', 'position_id', 'lang']);
         });

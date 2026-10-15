@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Position;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,8 @@ use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
 {
-    private const ALLOWED_ROLES = ['user', 'lawyer', 'science_director', 'digital_director', 'strategy_director', 'academic_director', 'library_director', 'professional_development_director', 'admin'];
+    private const ALLOWED_ROLES = ['user', 'economist', 'lawyer', 'science_director', 'digital_director', 'strategy_director', 'academic_director', 'library_director', 'professional_development_director', 'admin'];
+
     private const LEGACY_ROLE_ALIASES = [
         'compliance_director' => 'lawyer',
     ];
@@ -25,8 +27,9 @@ class AdminUserController extends Controller
 
         $users = User::query()
             ->with([
-                'positions:id,name,department_id',
+                'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
+                'positions.academicUnit:id,name,parent_id',
                 'commissionMember:id,user_id,is_pps,is_staff',
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
@@ -50,6 +53,7 @@ class AdminUserController extends Controller
 
                 if ($normalizedRole === 'lawyer') {
                     $query->whereIn('role', User::LEGAL_ROLE_ALIASES);
+
                     return;
                 }
 
@@ -108,7 +112,7 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => 'Пользователь создан.',
             'user' => $this->transformUser(
-                $user->fresh(['positions.department', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id'])
+                $user->fresh(['positions.department', 'positions.academicUnit', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id'])
             ),
         ], 201);
     }
@@ -132,17 +136,80 @@ class AdminUserController extends Controller
 
         return response()->json([
             'message' => 'Роль пользователя обновлена.',
-            'user' => $user->fresh(['positions.department', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id']),
+            'user' => $user->fresh(['positions.department', 'positions.academicUnit', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id']),
+        ]);
+    }
+
+    public function positionOptions(): JsonResponse
+    {
+        $positions = Position::query()
+            ->with([
+                'department:id,name',
+                'academicUnit:id,name,parent_id',
+                'academicUnit.parent:id,name',
+            ])
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id', 'academic_unit_id'])
+            ->map(function (Position $position) {
+                $unit = $position->academicUnit ?: $position->department;
+
+                return [
+                    'id' => $position->id,
+                    'name' => $position->name,
+                    'unit_name' => $unit?->name,
+                    'parent_name' => $position->academicUnit?->parent?->name,
+                    'type' => $position->academic_unit_id ? 'pps' : 'staff',
+                ];
+            })
+            ->values();
+
+        return response()->json($positions);
+    }
+
+    public function assignPosition(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'position_id' => ['required', 'integer', 'exists:positions,id'],
+        ]);
+        $user = User::query()->findOrFail($id);
+
+        if ($user->isAdmin()) {
+            return response()->json([
+                'message' => 'Административной учётной записи нельзя назначить должность.',
+            ], 422);
+        }
+
+        $user->positions()->syncWithoutDetaching([(int) $validated['position_id']]);
+
+        return response()->json([
+            'message' => 'Должность назначена пользователю.',
+            'user' => $this->transformUser($this->userWithRelations($user->id)),
+        ]);
+    }
+
+    public function detachPosition(int $id, int $positionId): JsonResponse
+    {
+        $user = User::query()->findOrFail($id);
+        Position::query()->findOrFail($positionId);
+        $user->positions()->detach($positionId);
+
+        return response()->json([
+            'message' => 'Должность снята с пользователя.',
+            'user' => $this->transformUser($this->userWithRelations($user->id)),
         ]);
     }
 
     public function impersonate(Request $request, int $id): JsonResponse
     {
         $admin = $request->user();
+        if (str_starts_with((string) $admin->currentAccessToken()?->name, 'impersonated_by_')) {
+            return response()->json(['message' => 'Сначала вернитесь в свой аккаунт администратора.'], 422);
+        }
         $user = User::query()
             ->with([
-                'positions:id,name,department_id',
+                'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
+                'positions.academicUnit:id,name,parent_id',
                 'commissionMember:id,user_id,is_pps,is_staff',
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
@@ -160,7 +227,10 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => "Вход выполнен от имени пользователя {$user->name}.",
             'token' => $token,
-            'user' => $this->transformUser($user),
+            'user' => [
+                ...$this->transformUser($user),
+                'has_personnel_approvals' => $user->has_personnel_approvals,
+            ],
             'impersonator' => [
                 'id' => $admin->id,
                 'name' => $admin->name,
@@ -190,6 +260,7 @@ class AdminUserController extends Controller
                 return [
                     'id' => $position->id,
                     'name' => $position->name,
+                    'academic_unit' => $position->academicUnit ? ['id' => $position->academicUnit->id, 'name' => $position->academicUnit->name] : null,
                     'department' => $position->department ? [
                         'id' => $position->department->id,
                         'name' => $position->department->name,
@@ -197,6 +268,20 @@ class AdminUserController extends Controller
                 ];
             })->values(),
         ];
+    }
+
+    private function userWithRelations(int $id): User
+    {
+        return User::query()
+            ->with([
+                'positions:id,name,department_id,academic_unit_id',
+                'positions.department:id,name',
+                'positions.academicUnit:id,name,parent_id',
+                'commissionMember:id,user_id,is_pps,is_staff',
+                'commissionVacancies:id',
+                'ppsFacultyCommissionMemberships:id,user_id',
+            ])
+            ->findOrFail($id);
     }
 
     private function emptyToNull($value): ?string

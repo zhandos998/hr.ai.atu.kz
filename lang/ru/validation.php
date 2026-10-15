@@ -1,0 +1,51 @@
+<?php
+
+return [
+    'array' => 'Поле «:attribute» должно быть массивом.',
+    'confirmed' => 'Подтверждение поля «:attribute» не совпадает.',
+    'different' => 'Поля «:attribute» и «:other» должны отличаться.',
+    'distinct' => 'Поле «:attribute» содержит повторяющееся значение.',
+    'email' => 'Введите корректный email.',
+    'exists' => 'Выбранное значение поля «:attribute» недействительно.',
+    'file' => 'Поле «:attribute» должно содержать файл.',
+    'in' => 'Выбранное значение поля «:attribute» недействительно.',
+    'integer' => 'Поле «:attribute» должно быть целым числом.',
+    'max' => [
+        'array' => 'Поле «:attribute» не должно содержать больше :max элементов.',
+        'file' => 'Размер файла «:attribute» не должен превышать :max КБ.',
+        'numeric' => 'Значение поля «:attribute» не должно быть больше :max.',
+        'string' => 'Поле «:attribute» не должно содержать больше :max символов.',
+    ],
+    'mimes' => 'Файл «:attribute» должен иметь один из форматов: :values.',
+    'min' => [
+        'array' => 'Поле «:attribute» должно содержать не менее :min элементов.',
+        'file' => 'Размер файла «:attribute» должен быть не менее :min КБ.',
+        'numeric' => 'Значение поля «:attribute» должно быть не меньше :min.',
+        'string' => 'Поле «:attribute» должно содержать не менее :min символов.',
+    ],
+    'numeric' => 'Поле «:attribute» должно быть числом.',
+    'prohibits' => 'Поле «:attribute» запрещает наличие поля «:other».',
+    'regex' => 'Формат поля «:attribute» недействителен.',
+    'required' => 'Поле «:attribute» обязательно для заполнения.',
+    'required_if' => 'Поле «:attribute» обязательно для заполнения.',
+    'required_without' => 'Поле «:attribute» обязательно, если поле «:values» не заполнено.',
+    'string' => 'Поле «:attribute» должно быть строкой.',
+    'unique' => 'Такое значение поля «:attribute» уже используется.',
+
+    'custom' => [
+        'new_email' => [
+            'unique' => 'Этот email уже используется другим пользователем.',
+        ],
+    ],
+
+    'attributes' => [
+        'contact_info' => 'контактная информация',
+        'current_password' => 'текущий пароль',
+        'email' => 'email',
+        'employee_name' => 'ФИО сотрудника',
+        'name' => 'ФИО',
+        'new_email' => 'новый email',
+        'password' => 'пароль',
+        'phone' => 'телефон',
+    ],
+];

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 class AcademicApplicationController extends Controller
 {
     private const ACADEMIC_REVIEW_CATEGORY = 'academic_review';
+
     private const ACADEMIC_REVIEWER_EMAIL = 'n.ahmetova@atu.edu.kz';
 
     public function queue()
@@ -108,14 +109,14 @@ class AcademicApplicationController extends Controller
         $document = $application->ppsProfile?->documents
             ?->first(fn ($item) => (int) $item->id === $documentId && $item->category === self::ACADEMIC_REVIEW_CATEGORY);
 
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Документ академического развития не найден.',
             ], 404);
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -133,8 +134,9 @@ class AcademicApplicationController extends Controller
         $application = Application::with([
             'user:id,name,email,phone',
             'vacancy:id,title,type,position_id',
-            'vacancy.position:id,department_id,name',
+            'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.position.department:id,name',
+            'vacancy.position.academicUnit:id,name,parent_id',
             'ppsProfile:id,application_id,desired_position,faculty_name,department_name,academic_conclusion',
             'status:id,code,name',
         ])->notArchived()->findOrFail($id);
@@ -159,7 +161,7 @@ class AcademicApplicationController extends Controller
             'generatedAt' => now()->format('Y-m-d H:i:s'),
         ])->render();
 
-        $options = new Options();
+        $options = new Options;
         $options->set('defaultFont', 'DejaVu Sans');
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
@@ -188,8 +190,9 @@ class AcademicApplicationController extends Controller
                 'user:id,name,email,phone',
                 'status:id,code,name',
                 'vacancy:id,title,type,position_id',
-                'vacancy.position:id,department_id,name',
+                'vacancy.position:id,department_id,academic_unit_id,name',
                 'vacancy.position.department:id,name',
+                'vacancy.position.academicUnit:id,name,parent_id',
                 'resume:id,application_id,file_path',
                 'documents:id,application_id,type,file_path',
                 'ppsProfile.documents',
@@ -203,7 +206,7 @@ class AcademicApplicationController extends Controller
 
     private function attachDocumentUrls(Application $application): Application
     {
-        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+        $application->resume_url = $application->resume ? url(\App\Support\DocumentStorage::url($application->resume->file_path)) : null;
 
         $documents = [];
         foreach ($application->documents as $document) {
@@ -215,7 +218,7 @@ class AcademicApplicationController extends Controller
             $documents[$normalizedType] = [
                 'id' => $document->id,
                 'path' => $document->file_path,
-                'url' => url(Storage::url($document->file_path)),
+                'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
             ];
         }
 
@@ -226,7 +229,7 @@ class AcademicApplicationController extends Controller
 
     private function attachPpsProfileExtras(Application $application): Application
     {
-        if (!$application->relationLoaded('ppsProfile') || !$application->ppsProfile) {
+        if (! $application->relationLoaded('ppsProfile') || ! $application->ppsProfile) {
             return $application;
         }
 
@@ -235,7 +238,7 @@ class AcademicApplicationController extends Controller
             $urlField = "{$field}_document_url";
 
             $application->ppsProfile->{$urlField} = $application->ppsProfile->{$pathField}
-                ? url(Storage::url($application->ppsProfile->{$pathField}))
+                ? url(\App\Support\DocumentStorage::url($application->ppsProfile->{$pathField}))
                 : null;
         }
 
@@ -246,7 +249,7 @@ class AcademicApplicationController extends Controller
                 return [
                     'id' => $document->id,
                     'name' => $document->original_name ?: basename($document->file_path),
-                    'url' => url(Storage::url($document->file_path)),
+                    'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
                 ];
             })
             ->all();
@@ -266,11 +269,11 @@ class AcademicApplicationController extends Controller
 
     private function storeAcademicDocument(UploadedFile $file, int $applicationId, int $profileId, int $index): string
     {
-        $extension = $file->getClientOriginalExtension();
+        $extension = \App\Support\DocumentStorage::extension($file);
         $directory = "applications/{$applicationId}/pps-profile/academic-review";
-        $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
+        $filename = now()->format('YmdHisv')."-{$profileId}-{$index}.{$extension}";
 
-        return $file->storeAs($directory, $filename, 'public');
+        return $file->storeAs($directory, $filename, 'documents');
     }
 
     private function academicReviewerName(): string

@@ -22,19 +22,19 @@ class PdfParseController extends Controller
             $rawText = Pdf::getText($path);
 
             // Фикс мусора
-            $rawText = iconv("UTF-8", "UTF-8//IGNORE", $rawText);
+            $rawText = iconv('UTF-8', 'UTF-8//IGNORE', $rawText);
             $rawText = mb_convert_encoding($rawText, 'UTF-8', 'UTF-8');
 
             $clean = $this->cleanText($rawText);
         } catch (\Exception $e) {
             return response()->json([
-                "error" => "PDF parse error: " . $e->getMessage()
+                'error' => 'PDF parse error: '.$e->getMessage(),
             ], 500);
         }
 
         return response()->json([
-            "raw" => $rawText,
-            "clean" => $clean
+            'raw' => $rawText,
+            'clean' => $clean,
         ]);
     }
 
@@ -47,13 +47,13 @@ class PdfParseController extends Controller
         $pdf = $request->file('file');
 
         try {
-            $parser = new Parser();
+            $parser = new Parser;
             $pdfObj = $parser->parseFile($pdf->getPathname());
             $rawText = $pdfObj->getText();
             $rawText = mb_convert_encoding($rawText, 'UTF-8', 'auto');
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Ошибка чтения PDF: ' . $e->getMessage()
+                'error' => 'Ошибка чтения PDF: '.$e->getMessage(),
             ], 500);
         }
 

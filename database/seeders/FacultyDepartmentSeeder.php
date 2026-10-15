@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Department;
+use App\Models\AcademicUnit;
 use Illuminate\Database\Seeder;
 
 class FacultyDepartmentSeeder extends Seeder
@@ -48,19 +48,21 @@ class FacultyDepartmentSeeder extends Seeder
         ];
 
         foreach ($structure as $facultyName => $departmentNames) {
-            $faculty = Department::query()->updateOrCreate(
+            $faculty = AcademicUnit::query()->updateOrCreate(
                 ['name' => $facultyName],
                 [
                     'description' => 'Факультет',
+                    'kind' => 'faculty',
                     'parent_id' => null,
                 ],
             );
 
             foreach ($departmentNames as $departmentName) {
-                Department::query()->updateOrCreate(
+                AcademicUnit::query()->updateOrCreate(
                     ['name' => $departmentName],
                     [
                         'description' => 'Кафедра',
+                        'kind' => 'chair',
                         'parent_id' => $faculty->id,
                     ],
                 );

@@ -45,6 +45,7 @@ class VacancySeeder extends Seeder
     {
         Position::query()
             ->with('department:id,name,description')
+            ->whereNotNull('department_id')
             ->whereDoesntHave('department', function ($query) {
                 $query
                     ->where('description', 'Кафедра')
@@ -100,20 +101,9 @@ class VacancySeeder extends Seeder
     {
         $position = Position::query()
             ->where('name', $title)
-            ->whereHas('department', function ($query) {
-                $query
-                    ->where('description', 'Кафедра')
-                    ->orWhere('name', 'like', 'Кафедра%');
-            })
-            ->orderBy('department_id')
+            ->whereHas('academicUnit', fn ($query) => $query->where('kind', 'chair'))
+            ->orderBy('academic_unit_id')
             ->first(['id']);
-
-        if (!$position) {
-            $position = Position::query()
-                ->where('name', $title)
-                ->orderBy('department_id')
-                ->first(['id']);
-        }
 
         return $position?->id ? (int) $position->id : null;
     }

@@ -13,6 +13,7 @@ FROM php:8.3-fpm-bookworm AS app
 
 ARG UID=1000
 ARG GID=1000
+ARG PHP_BUILD_JOBS=2
 
 WORKDIR /var/www/html
 
@@ -35,7 +36,7 @@ RUN apt-get update \
         unzip \
         zip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" \
+    && docker-php-ext-install -j"${PHP_BUILD_JOBS}" \
         bcmath \
         exif \
         gd \

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AcademicUnit;
 use App\Models\Application;
 use App\Models\ApplicationPpsProfile;
-use App\Models\Department;
 use App\Models\Position;
 use App\Models\User;
 use App\Models\Vacancy;
@@ -18,6 +18,19 @@ use Tests\TestCase;
 class SeederPasswordPreservationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_user_and_kshit_seeders_preserve_existing_passwords_roles_and_phone(): void
+    {
+        $admin = User::factory()->create(['email' => 'admin@atu.kz', 'password' => Hash::make('changed-admin'), 'phone' => '100']);
+        $member = User::factory()->create(['email' => 'b.pazylkhaiyr@atu.edu.kz', 'password' => Hash::make('changed-member'), 'role' => 'economist', 'phone' => '200']);
+        $this->seed(\Database\Seeders\UserSeeder::class);
+        $this->seed(KshitCommissionSeeder::class);
+        $this->assertTrue(Hash::check('changed-admin', $admin->fresh()->password));
+        $this->assertSame('100', $admin->fresh()->phone);
+        $this->assertTrue(Hash::check('changed-member', $member->fresh()->password));
+        $this->assertSame('economist', $member->fresh()->role);
+        $this->assertSame('200', $member->fresh()->phone);
+    }
 
     public function test_pps_commission_seeder_does_not_reset_existing_user_password(): void
     {
@@ -75,17 +88,19 @@ class SeederPasswordPreservationTest extends TestCase
     public function test_kshit_commission_seeder_backfills_existing_kshit_vacancies(): void
     {
         $candidate = User::factory()->create();
-        $faculty = Department::query()->create([
+        $faculty = AcademicUnit::query()->create([
             'name' => 'Другое',
             'description' => 'Факультет',
+            'kind' => 'faculty',
         ]);
-        $department = Department::query()->create([
+        $department = AcademicUnit::query()->create([
             'parent_id' => $faculty->id,
             'name' => 'КШИТ',
             'description' => 'Кафедра',
+            'kind' => 'chair',
         ]);
         $position = Position::query()->create([
-            'department_id' => $department->id,
+            'academic_unit_id' => $department->id,
             'name' => 'Ассистент',
         ]);
         $vacancy = Vacancy::query()->create([

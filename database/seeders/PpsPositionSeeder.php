@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Department;
+use App\Models\AcademicUnit;
 use App\Models\Position;
 use Illuminate\Database\Seeder;
 
@@ -28,19 +28,13 @@ class PpsPositionSeeder extends Seeder
             'Исполняющий обязанности (и.о.) профессора-исследователя',
         ];
 
-        $departments = Department::query()
-            ->orderBy('name')
-            ->get()
-            ->filter(fn (Department $department) => (
-                trim((string) $department->description) === 'Кафедра'
-                || str_starts_with(trim((string) $department->name), 'Кафедра')
-            ));
+        $departments = AcademicUnit::query()->where('kind', 'chair')->orderBy('name')->get();
 
         foreach ($departments as $department) {
             foreach ($positionNames as $positionName) {
                 Position::query()->firstOrCreate(
                     [
-                        'department_id' => $department->id,
+                        'academic_unit_id' => $department->id,
                         'name' => $positionName,
                     ],
                     [

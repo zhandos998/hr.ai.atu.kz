@@ -11,8 +11,9 @@ class PublicApplicationVerificationController extends Controller
         $application->load([
             'user:id,name',
             'vacancy:id,title,type,position_id',
-            'vacancy.position:id,department_id,name',
+            'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.position.department:id,name',
+            'vacancy.position.academicUnit:id,name,parent_id',
             'ppsProfile',
         ]);
 
@@ -36,7 +37,7 @@ class PublicApplicationVerificationController extends Controller
                     ['label' => 'Тип заявки', 'value' => $vacancy?->type === 'staff' ? 'АУП' : 'ППС'],
                     ['label' => 'Кандидат', 'value' => $application->user?->name],
                     ['label' => 'Вакансия', 'value' => $vacancy?->title],
-                    ['label' => 'Департамент / кафедра', 'value' => $profile?->department_name ?: $vacancy?->position?->department?->name],
+                    ['label' => 'Департамент / кафедра', 'value' => $profile?->department_name ?: ($vacancy?->position?->academicUnit?->name ?: $vacancy?->position?->department?->name)],
                     ['label' => 'Факультет', 'value' => $profile?->faculty_name],
                     ['label' => 'Должность', 'value' => $profile?->desired_position ?: $vacancy?->position?->name ?: $vacancy?->title],
                     ['label' => 'Создана', 'value' => optional($application->created_at)->format('d.m.Y H:i')],

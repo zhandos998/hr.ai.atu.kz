@@ -47,7 +47,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $fields['email'])->first();
 
-        if (!$user || !Hash::check($fields['password'], $user->password)) {
+        if (! $user || ! Hash::check($fields['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Неверные учетные данные.'],
             ]);
@@ -64,7 +64,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->append(['has_personnel_approvals', 'is_commission_member']),
             'token' => $token,
         ]);
     }
@@ -77,13 +77,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $fields['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Если такой email зарегистрирован, письмо отправлено.',
             ]);
         }
 
-        if (!is_null($user->email_verified_at)) {
+        if (! is_null($user->email_verified_at)) {
             return response()->json([
                 'message' => 'Email уже подтвержден.',
             ]);
@@ -107,7 +107,7 @@ class AuthController extends Controller
             ->where('email', $fields['email'])
             ->first();
 
-        if (!$record || !hash_equals($record->token, hash('sha256', $fields['token']))) {
+        if (! $record || ! hash_equals($record->token, hash('sha256', $fields['token']))) {
             throw ValidationException::withMessages([
                 'token' => ['Ссылка подтверждения недействительна.'],
             ]);
@@ -122,7 +122,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $fields['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'email' => ['Пользователь не найден.'],
             ]);
@@ -192,7 +192,7 @@ class AuthController extends Controller
             ->where('email', $fields['email'])
             ->first();
 
-        if (!$record || !hash_equals($record->token, hash('sha256', $fields['token']))) {
+        if (! $record || ! hash_equals($record->token, hash('sha256', $fields['token']))) {
             throw ValidationException::withMessages([
                 'token' => ['Неверный или устаревший токен сброса пароля.'],
             ]);
@@ -207,7 +207,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $fields['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'email' => ['Пользователь не найден.'],
             ]);
@@ -219,6 +219,7 @@ class AuthController extends Controller
 
         DB::table('password_reset_tokens')->where('email', $fields['email'])->delete();
         $user->tokens()->delete();
+        DB::table('email_change_requests')->where('user_id', $user->id)->delete();
 
         return response()->json([
             'message' => 'Пароль успешно изменен. Войдите с новым паролем.',
@@ -234,7 +235,7 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (!$user || !Hash::check($fields['current_password'], $user->password)) {
+        if (! $user || ! Hash::check($fields['current_password'], $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => ['Текущий пароль указан неверно.'],
             ]);
@@ -244,8 +245,39 @@ class AuthController extends Controller
             'password' => Hash::make($fields['password']),
         ])->save();
 
+        $currentToken = $user->currentAccessToken();
+        $user->tokens()->when($currentToken instanceof \Laravel\Sanctum\PersonalAccessToken,
+            fn ($query) => $query->where('id', '!=', $currentToken->id)
+        )->delete();
+        DB::table('email_change_requests')->where('user_id', $user->id)->delete();
+
         return response()->json([
             'message' => 'Пароль успешно обновлен.',
+        ]);
+    }
+
+    public function updateContactInfo(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'phone' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'contact_info' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $contactInfo = trim((string) ($validated['contact_info'] ?? ''));
+        $user = $request->user();
+        $updates = [
+            'contact_info' => $contactInfo === '' ? null : $contactInfo,
+        ];
+
+        if (array_key_exists('phone', $validated)) {
+            $phone = trim((string) ($validated['phone'] ?? ''));
+            $updates['phone'] = $phone === '' ? null : $phone;
+        }
+
+        $user->forceFill($updates)->save();
+
+        return response()->json([
+            'message' => 'Контактная информация сохранена.',
+            'user' => $user->fresh()->append(['has_personnel_approvals', 'is_commission_member']),
         ]);
     }
 
@@ -258,9 +290,9 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (!$user || !Hash::check($fields['password'], $user->password)) {
+        if (! $user || ! Hash::check($fields['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'password' => ['Текущий пароль указан неверно.'],
+                'password' => [__('messages.current_password_incorrect')],
             ]);
         }
 
@@ -280,15 +312,28 @@ class AuthController extends Controller
             'token' => $plainToken,
         ]);
 
-        Mail::raw(
-            "Для подтверждения нового email перейдите по ссылке:\n{$url}\n\nСсылка действует 24 часа.",
-            function ($message) use ($fields) {
-                $message->to($fields['new_email'])->subject('Подтверждение смены email');
-            }
-        );
+        try {
+            Mail::raw(
+                "Для подтверждения нового email перейдите по ссылке:\n{$url}\n\nСсылка действует 24 часа.",
+                function ($message) use ($fields) {
+                    $message->to($fields['new_email'])->subject('Подтверждение смены email');
+                }
+            );
+        } catch (\Throwable $exception) {
+            DB::table('email_change_requests')
+                ->where('user_id', $user->id)
+                ->where('token', hash('sha256', $plainToken))
+                ->delete();
+
+            report($exception);
+
+            throw ValidationException::withMessages([
+                'new_email' => [__('messages.email_delivery_failed')],
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Письмо для подтверждения отправлено на новый email.',
+            'message' => __('messages.email_change_sent'),
         ]);
     }
 
@@ -304,7 +349,7 @@ class AuthController extends Controller
             ->where('token', $hashedToken)
             ->first();
 
-        if (!$record) {
+        if (! $record) {
             throw ValidationException::withMessages([
                 'token' => ['Ссылка подтверждения недействительна.'],
             ]);
@@ -330,7 +375,7 @@ class AuthController extends Controller
 
         $user = User::find($record->user_id);
 
-        if (!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'token' => ['Пользователь для смены email не найден.'],
             ]);
@@ -346,6 +391,8 @@ class AuthController extends Controller
         DB::table('email_change_requests')->where('id', $record->id)->delete();
         DB::table('email_verification_tokens')->where('email', $oldEmail)->delete();
         DB::table('email_verification_tokens')->where('email', $user->email)->delete();
+        DB::table('password_reset_tokens')->whereIn('email', [$oldEmail, $user->email])->delete();
+        $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -371,7 +418,9 @@ class AuthController extends Controller
             $request->user()->load([
                 'commissionMember',
                 'commissionVacancies:id',
-            ])
+                'personnelApprovals:id,user_id',
+                'ppsFacultyCommissionMemberships',
+            ])->append(['has_personnel_approvals', 'is_commission_member'])
         );
     }
 
@@ -405,6 +454,6 @@ class AuthController extends Controller
         $base = rtrim((string) env('FRONTEND_URL', config('app.url')), '/');
         $queryString = http_build_query($query);
 
-        return $base . $path . ($queryString !== '' ? ('?' . $queryString) : '');
+        return $base.$path.($queryString !== '' ? ('?'.$queryString) : '');
     }
 }

@@ -14,14 +14,18 @@ use Illuminate\Support\Facades\Hash;
 class KshitCommissionSeeder extends Seeder
 {
     private const FACULTY_NAME = 'Другое';
+
     private const DEPARTMENT_NAME = 'КШИТ';
+
     private const MEMBER_NAME = 'Пазылхайыр Бауыржан';
+
     private const MEMBER_EMAIL = 'b.pazylkhaiyr@atu.edu.kz';
+
     private const MEMBER_PASSWORD = '8111';
 
     public function run(): void
     {
-        $user = User::query()->updateOrCreate(
+        $user = User::query()->firstOrCreate(
             ['email' => self::MEMBER_EMAIL],
             [
                 'name' => self::MEMBER_NAME,

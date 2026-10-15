@@ -19,7 +19,7 @@ class ProfessionalDevelopmentReviewTest extends TestCase
 
     public function test_professional_development_director_can_save_professional_development(): void
     {
-        Storage::fake('public');
+        Storage::fake('documents');
         $this->seed(ApplicationStatusSeeder::class);
 
         $director = User::factory()->create([

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Application;
 use App\Models\ApplicationStatus;
 use App\Models\CommissionMember;
+use App\Models\Competition;
 use App\Models\User;
 use App\Models\Vacancy;
 use Database\Seeders\ApplicationStatusSeeder;
@@ -15,6 +16,37 @@ use Tests\TestCase;
 class CommissionVoteTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_queue_includes_competitions_only_for_accessible_applications_and_keeps_unassigned_applications(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+        $member = User::factory()->create();
+        $pps = Competition::create(['type' => 'pps', 'number' => 1, 'title' => 'Конкурс преподавателей']);
+        $staff = Competition::create(['type' => 'staff', 'number' => 1, 'title' => 'Конкурс сотрудников']);
+        $hidden = Competition::create(['type' => 'pps', 'number' => 2, 'title' => 'Недоступный конкурс']);
+        $one = $this->createPpsApplication();
+        $one->update(['competition_id' => $pps->id]);
+        $two = $this->createStaffApplication();
+        $two->update(['competition_id' => $staff->id]);
+        $legacy = $this->createPpsApplication();
+        $unavailable = $this->createPpsApplication();
+        $unavailable->update(['competition_id' => $hidden->id]);
+        foreach ([$one, $two, $legacy] as $application) {
+            $application->vacancy->commissionMembers()->attach($member);
+        }
+        Sanctum::actingAs($member);
+
+        $response = $this->getJson('/api/commission/applications')->assertOk()->assertJsonCount(3);
+        $byId = collect($response->json())->keyBy('id');
+        $this->assertSame($pps->id, $byId[$one->id]['competition']['id']);
+        $this->assertSame('Конкурс преподавателей', $byId[$one->id]['competition']['title']);
+        $this->assertSame('pps', $byId[$one->id]['competition']['type']);
+        $this->assertSame($staff->id, $byId[$two->id]['competition']['id']);
+        $this->assertNull($byId[$legacy->id]['competition']);
+        $this->assertArrayNotHasKey($unavailable->id, $byId->all());
+        $this->getJson("/api/commission/applications/{$one->id}")->assertOk()
+            ->assertJsonPath('competition.id', $pps->id)->assertJsonPath('competition.number', 1);
+    }
 
     public function test_pps_vote_requires_term_for_hire_decision(): void
     {

@@ -94,14 +94,14 @@ class LibraryApplicationController extends Controller
         $document = $application->ppsProfile?->documents
             ?->first(fn ($item) => (int) $item->id === $documentId && $item->category === self::LIBRARY_METRICS_CATEGORY);
 
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Документ Научной библиотеки не найден.',
             ], 404);
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -125,8 +125,9 @@ class LibraryApplicationController extends Controller
                 'user:id,name,email,phone',
                 'status:id,code,name',
                 'vacancy:id,title,type,position_id',
-                'vacancy.position:id,department_id,name',
+                'vacancy.position:id,department_id,academic_unit_id,name',
                 'vacancy.position.department:id,name',
+                'vacancy.position.academicUnit:id,name,parent_id',
                 'resume:id,application_id,file_path',
                 'documents:id,application_id,type,file_path',
                 'ppsProfile.documents',
@@ -140,7 +141,7 @@ class LibraryApplicationController extends Controller
 
     private function attachDocumentUrls(Application $application): Application
     {
-        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+        $application->resume_url = $application->resume ? url(\App\Support\DocumentStorage::url($application->resume->file_path)) : null;
 
         $documents = [];
         foreach ($application->documents as $document) {
@@ -152,7 +153,7 @@ class LibraryApplicationController extends Controller
             $documents[$normalizedType] = [
                 'id' => $document->id,
                 'path' => $document->file_path,
-                'url' => url(Storage::url($document->file_path)),
+                'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
             ];
         }
 
@@ -163,7 +164,7 @@ class LibraryApplicationController extends Controller
 
     private function attachPpsProfileExtras(Application $application): Application
     {
-        if (!$application->relationLoaded('ppsProfile') || !$application->ppsProfile) {
+        if (! $application->relationLoaded('ppsProfile') || ! $application->ppsProfile) {
             return $application;
         }
 
@@ -172,7 +173,7 @@ class LibraryApplicationController extends Controller
             $urlField = "{$field}_document_url";
 
             $application->ppsProfile->{$urlField} = $application->ppsProfile->{$pathField}
-                ? url(Storage::url($application->ppsProfile->{$pathField}))
+                ? url(\App\Support\DocumentStorage::url($application->ppsProfile->{$pathField}))
                 : null;
         }
 
@@ -183,7 +184,7 @@ class LibraryApplicationController extends Controller
                 return [
                     'id' => $document->id,
                     'name' => $document->original_name ?: basename($document->file_path),
-                    'url' => url(Storage::url($document->file_path)),
+                    'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
                 ];
             })
             ->all();
@@ -203,11 +204,11 @@ class LibraryApplicationController extends Controller
 
     private function storeLibraryDocument(UploadedFile $file, int $applicationId, int $profileId, int $index): string
     {
-        $extension = $file->getClientOriginalExtension();
+        $extension = \App\Support\DocumentStorage::extension($file);
         $directory = "applications/{$applicationId}/pps-profile/library-metrics";
-        $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
+        $filename = now()->format('YmdHisv')."-{$profileId}-{$index}.{$extension}";
 
-        return $file->storeAs($directory, $filename, 'public');
+        return $file->storeAs($directory, $filename, 'documents');
     }
 
     private function emptyToNull($value)

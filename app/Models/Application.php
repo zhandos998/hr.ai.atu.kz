@@ -53,6 +53,11 @@ class Application extends Model
         return $this->belongsTo(Vacancy::class)->withTrashed();
     }
 
+    public function competition()
+    {
+        return $this->belongsTo(Competition::class);
+    }
+
     public function resume() // одно резюме на заявку
     {
         return $this->hasOne(\App\Models\Resume::class);

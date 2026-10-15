@@ -9,15 +9,19 @@ use Illuminate\Http\Request;
 
 class VacancyController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $vacancies = Vacancy::query()
             ->with([
-                'position:id,department_id,name',
+                'position:id,department_id,academic_unit_id,name',
                 'commissionMembers:id,name,email,phone',
             ])
             ->latest()
             ->get();
+
+        if (! $request->user()?->isAdmin()) {
+            $vacancies->each(fn ($vacancy) => $vacancy->unsetRelation('commissionMembers'));
+        }
 
         return response()->json($vacancies);
     }
@@ -50,6 +54,10 @@ class VacancyController extends Controller
             'position_id' => 'sometimes|integer|exists:positions,id',
         ]);
 
+        if (isset($validated['type']) && $validated['type'] !== $vacancy->type && $vacancy->applications()->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['type' => ['Нельзя менять тип вакансии, к которой уже добавлены заявки.']]);
+        }
+
         $vacancy->update($validated);
 
         return response()->json([
@@ -58,12 +66,16 @@ class VacancyController extends Controller
         ]);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $vacancy = Vacancy::with([
-            'position:id,department_id,name',
+            'position:id,department_id,academic_unit_id,name',
             'commissionMembers:id,name,email,phone',
         ])->findOrFail($id);
+
+        if (! $request->user()?->isAdmin()) {
+            $vacancy->unsetRelation('commissionMembers');
+        }
 
         return response()->json($vacancy);
     }

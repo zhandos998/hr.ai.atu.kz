@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+umask 077
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/docker.env}"
@@ -46,8 +47,14 @@ cleanup() {
 trap cleanup EXIT
 
 "${COMPOSE[@]}" exec -T db sh -c \
-    'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --single-transaction --quick --routines --triggers --events --default-character-set=utf8mb4 -u "$MYSQL_USER" "$MYSQL_DATABASE"' \
+    'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --single-transaction --quick --no-tablespaces --set-gtid-purged=OFF --triggers --events --default-character-set=utf8mb4 -u "$MYSQL_USER" "$MYSQL_DATABASE"' \
     | gzip -9 > "${TMP_FILE}"
+
+gzip -t "${TMP_FILE}"
+if ! gzip -dc "${TMP_FILE}" | tail -n 5 | grep -q '^-- Dump completed'; then
+    echo 'Database dump is incomplete; backup not published.' >&2
+    exit 1
+fi
 
 mv "${TMP_FILE}" "${TARGET_FILE}"
 trap - EXIT

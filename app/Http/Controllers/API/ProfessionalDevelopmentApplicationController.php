@@ -59,7 +59,7 @@ class ProfessionalDevelopmentApplicationController extends Controller
         $validated = $request->validate([
             'professional_development' => 'nullable|string|max:8000',
             'documents' => 'nullable|array',
-            'documents.*' => 'file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'documents.*' => 'file|mimes:pdf,doc,docx,jpg,jpeg,png|extensions:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
 
         $profile = $application->ppsProfile ?: new ApplicationPpsProfile([
@@ -114,14 +114,14 @@ class ProfessionalDevelopmentApplicationController extends Controller
         $document = $application->ppsProfile?->documents
             ?->first(fn ($item) => (int) $item->id === $documentId && $item->category === self::PROFESSIONAL_DEVELOPMENT_CATEGORY);
 
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Документ повышения квалификации не найден.',
             ], 404);
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -145,8 +145,9 @@ class ProfessionalDevelopmentApplicationController extends Controller
                 'user:id,name,email,phone',
                 'status:id,code,name',
                 'vacancy:id,title,type,position_id',
-                'vacancy.position:id,department_id,name',
+                'vacancy.position:id,department_id,academic_unit_id,name',
                 'vacancy.position.department:id,name',
+                'vacancy.position.academicUnit:id,name,parent_id',
                 'resume:id,application_id,file_path',
                 'documents:id,application_id,type,file_path',
                 'ppsProfile.documents',
@@ -160,7 +161,7 @@ class ProfessionalDevelopmentApplicationController extends Controller
 
     private function attachPpsProfileExtras(Application $application): Application
     {
-        if (!$application->relationLoaded('ppsProfile') || !$application->ppsProfile) {
+        if (! $application->relationLoaded('ppsProfile') || ! $application->ppsProfile) {
             return $application;
         }
 
@@ -171,7 +172,7 @@ class ProfessionalDevelopmentApplicationController extends Controller
                 return [
                     'id' => $document->id,
                     'name' => $document->original_name ?: basename($document->file_path),
-                    'url' => url(Storage::url($document->file_path)),
+                    'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
                 ];
             })
             ->all();
@@ -181,7 +182,7 @@ class ProfessionalDevelopmentApplicationController extends Controller
 
     private function attachDocumentUrls(Application $application): Application
     {
-        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+        $application->resume_url = $application->resume ? url(\App\Support\DocumentStorage::url($application->resume->file_path)) : null;
 
         $documents = [];
         foreach ($application->documents as $document) {
@@ -193,7 +194,7 @@ class ProfessionalDevelopmentApplicationController extends Controller
             $documents[$normalizedType] = [
                 'id' => $document->id,
                 'path' => $document->file_path,
-                'url' => url(Storage::url($document->file_path)),
+                'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
             ];
         }
 
@@ -209,11 +210,11 @@ class ProfessionalDevelopmentApplicationController extends Controller
 
     private function storeProfessionalDevelopmentDocument(UploadedFile $file, int $applicationId, int $profileId, int $index): string
     {
-        $extension = $file->getClientOriginalExtension();
+        $extension = \App\Support\DocumentStorage::extension($file);
         $directory = "applications/{$applicationId}/pps-profile/professional-development";
-        $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
+        $filename = now()->format('YmdHisv')."-{$profileId}-{$index}.{$extension}";
 
-        return $file->storeAs($directory, $filename, 'public');
+        return $file->storeAs($directory, $filename, 'documents');
     }
 
     private function documentBaseType(string $type): string

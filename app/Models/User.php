@@ -11,7 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     public const LEGAL_ROLE_ALIASES = ['lawyer', 'compliance_director'];
 
@@ -24,6 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'contact_info',
         'password',
         'role',
     ];
@@ -38,9 +39,7 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    protected $appends = [
-        'is_commission_member',
-    ];
+    protected $appends = [];
 
     /**
      * Get the attributes that should be cast.
@@ -54,6 +53,7 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
     public function isAdmin()
     {
         return $this->role === 'admin';
@@ -94,6 +94,11 @@ class User extends Authenticatable
         return $this->role === 'professional_development_director';
     }
 
+    public function isEconomist(): bool
+    {
+        return $this->role === 'economist';
+    }
+
     public function isComplianceDirector()
     {
         return $this->isLawyer();
@@ -124,6 +129,24 @@ class User extends Authenticatable
         return $this->belongsToMany(Vacancy::class, 'vacancy_commission_member')->withTimestamps();
     }
 
+    public function personnelApprovals()
+    {
+        return $this->hasMany(PersonnelRequestApproval::class);
+    }
+
+    public function getHasPersonnelApprovalsAttribute(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->relationLoaded('personnelApprovals')) {
+            return $this->personnelApprovals->isNotEmpty();
+        }
+
+        return PersonnelRequestApproval::query()->where('user_id', $this->id)->exists();
+    }
+
     public function getIsCommissionMemberAttribute(): bool
     {
         if ($this->relationLoaded('commissionVacancies') && $this->commissionVacancies->isNotEmpty()) {
@@ -138,20 +161,16 @@ class User extends Authenticatable
             return true;
         }
 
-        if (Vacancy::query()
-            ->whereHas('commissionMembers', function ($query) {
-                $query->where('users.id', $this->id);
-            })
-            ->exists()) {
+        if (! $this->relationLoaded('commissionVacancies') && $this->commissionVacancies()->exists()) {
             return true;
         }
 
-        return CommissionMember::query()
+        return (! $this->relationLoaded('commissionMember') && CommissionMember::query()
             ->where('user_id', $this->id)
             ->active()
-            ->exists()
-            || PpsFacultyCommissionMember::query()
+            ->exists())
+            || (! $this->relationLoaded('ppsFacultyCommissionMemberships') && PpsFacultyCommissionMember::query()
                 ->where('user_id', $this->id)
-                ->exists();
+                ->exists());
     }
 }

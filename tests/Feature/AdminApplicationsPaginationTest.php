@@ -16,6 +16,25 @@ class AdminApplicationsPaginationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_list_query_count_is_bounded_and_does_not_include_detail_history(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        for ($i = 0; $i < 25; $i++) {
+            $application = $this->createAdminListApplication('pps', 'Candidate '.$i);
+            $application->vacancy->commissionMembers()->attach(User::factory()->create());
+        }
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        $this->getJson('/api/admin/applications?type=pps&per_page=25')->assertOk()
+            ->assertJsonCount(25, 'data')->assertJsonMissingPath('data.0.stage_logs')
+            ->assertJsonMissingPath('data.0.documents')
+            ->assertJsonPath('data.0.vote_summary.total_members', 1);
+        $count = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        \Illuminate\Support\Facades\DB::disableQueryLog();
+        $this->assertLessThan(30, $count);
+    }
+
     public function test_admin_applications_index_uses_server_pagination_and_type_counts(): void
     {
         $this->seed(ApplicationStatusSeeder::class);

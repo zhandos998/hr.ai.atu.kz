@@ -19,7 +19,7 @@ class ApplicationDocumentUploadTest extends TestCase
 
     public function test_staff_application_accepts_multiple_diploma_files(): void
     {
-        Storage::fake('public');
+        Storage::fake('documents');
         $this->seed(ApplicationStatusSeeder::class);
 
         $user = User::factory()->create();
@@ -44,13 +44,13 @@ class ApplicationDocumentUploadTest extends TestCase
             'application_id' => $application->id,
             'type' => 'diploma_2',
         ]);
-        Storage::disk('public')->assertExists("applications/{$application->id}/diploma.pdf");
-        Storage::disk('public')->assertExists("applications/{$application->id}/diploma_2.pdf");
+        Storage::disk('documents')->assertExists("applications/{$application->id}/diploma.pdf");
+        Storage::disk('documents')->assertExists("applications/{$application->id}/diploma_2.pdf");
     }
 
     public function test_pps_application_accepts_multiple_recommendation_letters(): void
     {
-        Storage::fake('public');
+        Storage::fake('documents');
         $this->seed(ApplicationStatusSeeder::class);
 
         $user = User::factory()->create();
@@ -75,8 +75,8 @@ class ApplicationDocumentUploadTest extends TestCase
             'application_id' => $application->id,
             'type' => 'recommendation_letter_2',
         ]);
-        Storage::disk('public')->assertExists("applications/{$application->id}/recommendation_letter.pdf");
-        Storage::disk('public')->assertExists("applications/{$application->id}/recommendation_letter_2.pdf");
+        Storage::disk('documents')->assertExists("applications/{$application->id}/recommendation_letter.pdf");
+        Storage::disk('documents')->assertExists("applications/{$application->id}/recommendation_letter_2.pdf");
     }
 
     private function createDocumentApplication(User $user, string $vacancyType): Application

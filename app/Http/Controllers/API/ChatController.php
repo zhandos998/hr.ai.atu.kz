@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use OpenAI\Laravel\Facades\OpenAI;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-
-use App\Models\Vacancy;
 use App\Models\Application;
 use App\Models\ApplicationStatus;
+use App\Models\Vacancy;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use OpenAI\Laravel\Facades\OpenAI;
 
 class ChatController extends Controller
 {
@@ -22,7 +21,7 @@ class ChatController extends Controller
 
         $user = $request->user();
 
-        $system = <<<SYS
+        $system = <<<'SYS'
             Ты — AI HR-ассистент отдела кадров АТУ.
             Правила:
             - Если пользователь пишет на казахском (даже если без специальных букв, например "Саламатсыз ба"), отвечай на казахском языке.
@@ -54,12 +53,12 @@ class ChatController extends Controller
                         'type' => 'object',
                         'properties' => [
                             'query' => ['type' => 'string', 'description' => 'Поиск по названию/описанию'],
-                            'type'  => ['type' => 'string', 'description' => 'Фильтр по типу вакансии: staff или pps'],
+                            'type' => ['type' => 'string', 'description' => 'Фильтр по типу вакансии: staff или pps'],
                             'limit' => ['type' => 'integer', 'description' => 'Ограничение, по умолчанию 5'],
                         ],
-                        'required' => []
-                    ]
-                ]
+                        'required' => [],
+                    ],
+                ],
             ],
             [
                 'type' => 'function',
@@ -69,12 +68,12 @@ class ChatController extends Controller
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'id'    => ['type' => 'integer', 'description' => 'ID вакансии'],
+                            'id' => ['type' => 'integer', 'description' => 'ID вакансии'],
                             'title' => ['type' => 'string',  'description' => 'Название, если не знаем id'],
                         ],
-                        'required' => []
-                    ]
-                ]
+                        'required' => [],
+                    ],
+                ],
             ],
             [
                 'type' => 'function',
@@ -86,15 +85,15 @@ class ChatController extends Controller
                         'properties' => [
                             'vacancy_id' => ['type' => 'integer', 'description' => 'Опционально — статус по конкретной вакансии'],
                         ],
-                        'required' => []
-                    ]
-                ]
+                        'required' => [],
+                    ],
+                ],
             ],
         ];
 
         $messages = [
             ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => (string)$request->string('message')],
+            ['role' => 'user', 'content' => (string) $request->string('message')],
         ];
 
         $response = OpenAI::chat()->create([
@@ -108,7 +107,7 @@ class ChatController extends Controller
         $choice = $response->choices[0];
         $messages[] = $choice->message->toArray();
 
-        if (!empty($choice->message->toolCalls)) {
+        if (! empty($choice->message->toolCalls)) {
             foreach ($choice->message->toolCalls as $toolCall) {
                 $toolName = $toolCall->function->name;
                 $args = $toolCall->function->arguments ? json_decode($toolCall->function->arguments, true) : [];
@@ -135,9 +134,11 @@ class ChatController extends Controller
             ]);
 
             $raw = $final->choices[0]->message->content;
+
             return response()->json($this->normalizeAssistantPayload($raw));
         }
         $raw = $choice->message->content;
+
         return response()->json($this->normalizeAssistantPayload($raw));
     }
 
@@ -147,7 +148,7 @@ class ChatController extends Controller
     {
         $limit = (isset($args['limit']) && is_int($args['limit'])) ? max(1, min(10, $args['limit'])) : 5;
         $query = trim($args['query'] ?? '');
-        $type  = isset($args['type']) ? trim($args['type']) : null; // 'staff' | 'pps'
+        $type = isset($args['type']) ? trim($args['type']) : null; // 'staff' | 'pps'
 
         $q = Vacancy::query();
 
@@ -169,10 +170,10 @@ class ChatController extends Controller
         return [
             'items' => $vacancies->map(function ($v) {
                 return [
-                    'id'    => $v->id,
+                    'id' => $v->id,
                     'title' => $v->title,
-                    'type'  => $v->type, // staff | pps
-                    'url'       => '/apply?vacancy_id=' . $v->id,
+                    'type' => $v->type, // staff | pps
+                    'url' => '/apply?vacancy_id='.$v->id,
                     'apply_url' => '/profile', // POST с vacancy_id
                     'apply_method' => 'POST',
                     'apply_payload_example' => ['vacancy_id' => $v->id],
@@ -185,16 +186,16 @@ class ChatController extends Controller
 
     private function toolGetVacancyDetails($user, array $args): array
     {
-        if (!$user) {
+        if (! $user) {
             return [
                 'text' => 'Для проверки статуса вашей заявки необходимо авторизоваться.',
                 'buttons' => [
                     ['label' => 'Войти', 'url' => url('/login')],
-                ]
+                ],
             ];
         }
 
-        $id    = $args['id'] ?? null;
+        $id = $args['id'] ?? null;
         $title = $args['title'] ?? null;
 
         $q = Vacancy::query();
@@ -208,7 +209,9 @@ class ChatController extends Controller
         }
 
         $v = $q->first();
-        if (!$v) return ['items' => []];
+        if (! $v) {
+            return ['items' => []];
+        }
 
         return [
             'items' => [[
@@ -216,22 +219,22 @@ class ChatController extends Controller
                 'title' => $v->title,
                 'type' => $v->type, // staff | pps
                 'description' => Str::limit(strip_tags($v->description ?? ''), 500),
-                'url'       => '/apply?vacancy_id=' . $v->id,
+                'url' => '/apply?vacancy_id='.$v->id,
                 'apply_url' => '/profile',
                 'apply_method' => 'POST',
                 'apply_payload_example' => ['vacancy_id' => $v->id],
-            ]]
+            ]],
         ];
     }
 
     private function toolGetMyApplicationStatus($user, array $args): array
     {
-        if (!$user) {
+        if (! $user) {
             return [
                 'text' => 'Для проверки статуса вашей заявки необходимо авторизоваться.',
                 'buttons' => [
                     ['label' => 'Войти', 'url' => url('/login')],
-                ]
+                ],
             ];
         }
 
@@ -251,18 +254,20 @@ class ChatController extends Controller
             ->with([
                 'status:id,code,name',
                 'vacancy:id,title',
-                'documents:id,application_id,type,file_path'
+                'documents:id,application_id,type,file_path',
             ])->first();
 
-        if (!$app) return ['items' => []];
+        if (! $app) {
+            return ['items' => []];
+        }
 
         // сделаем удобные ссылки на документы (если используешь storage:public)
         $docs = $app->documents->map(function ($d) {
             return [
                 'type' => $d->type,
                 'file' => $d->file_path,
-                'url'  => Storage::disk('public')->exists($d->file_path)
-                    ? Storage::url($d->file_path)
+                'url' => Storage::disk('documents')->exists($d->file_path)
+                    ? \App\Support\DocumentStorage::url($d->file_path)
                     : null,
             ];
         })->all();
@@ -277,7 +282,7 @@ class ChatController extends Controller
                 'updated_at' => optional($app->updated_at)->toDateTimeString(),
                 'details_url' => '/profile' ?? null,
 
-            ]]
+            ]],
         ];
     }
 
@@ -287,13 +292,13 @@ class ChatController extends Controller
         $data = json_decode($raw, true);
 
         // если модель не прислала валидный JSON — вернем как простой текст
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             return ['text' => $raw, 'buttons' => []];
         }
 
         // нормализуем к нужной схеме
         return [
-            'text' => isset($data['text']) ? (string)$data['text'] : $raw,
+            'text' => isset($data['text']) ? (string) $data['text'] : $raw,
             'buttons' => isset($data['buttons']) && is_array($data['buttons']) ? $data['buttons'] : [],
         ];
     }

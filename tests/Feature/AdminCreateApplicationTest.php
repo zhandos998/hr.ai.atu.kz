@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\ApplicationStatus;
-use App\Models\Department;
+use App\Models\AcademicUnit;
 use App\Models\Position;
 use App\Models\Resume;
 use App\Models\User;
@@ -28,19 +28,21 @@ class AdminCreateApplicationTest extends TestCase
             'role' => 'admin',
         ]);
 
-        $faculty = Department::query()->create([
+        $faculty = AcademicUnit::query()->create([
             'name' => 'Факультет информационных технологий',
             'description' => 'Факультет',
+            'kind' => 'faculty',
         ]);
 
-        $department = Department::query()->create([
+        $department = AcademicUnit::query()->create([
             'parent_id' => $faculty->id,
             'name' => 'Кафедра «Информационные системы»',
             'description' => 'Кафедра',
+            'kind' => 'chair',
         ]);
 
         $position = Position::query()->create([
-            'department_id' => $department->id,
+            'academic_unit_id' => $department->id,
             'name' => 'Ассистент',
         ]);
 
@@ -98,19 +100,21 @@ class AdminCreateApplicationTest extends TestCase
             'email' => 'b.pazylkhaiyr@atu.edu.kz',
         ]);
 
-        $faculty = Department::query()->create([
+        $faculty = AcademicUnit::query()->create([
             'name' => 'Другое',
             'description' => 'Факультет',
+            'kind' => 'faculty',
         ]);
 
-        $department = Department::query()->create([
+        $department = AcademicUnit::query()->create([
             'parent_id' => $faculty->id,
             'name' => 'КШИТ',
             'description' => 'Кафедра',
+            'kind' => 'chair',
         ]);
 
         $position = Position::query()->create([
-            'department_id' => $department->id,
+            'academic_unit_id' => $department->id,
             'name' => 'Ассистент',
         ]);
 
@@ -141,7 +145,7 @@ class AdminCreateApplicationTest extends TestCase
 
     public function test_admin_can_replace_application_resume(): void
     {
-        Storage::fake('public');
+        Storage::fake('documents');
         $this->seed(ApplicationStatusSeeder::class);
 
         $admin = User::factory()->create([
@@ -165,7 +169,7 @@ class AdminCreateApplicationTest extends TestCase
         ]);
 
         $oldPath = "resumes/{$application->id}/old.pdf";
-        Storage::disk('public')->put($oldPath, 'old resume');
+        Storage::disk('documents')->put($oldPath, 'old resume');
         $resume = Resume::query()->create([
             'application_id' => $application->id,
             'user_id' => $candidate->id,
@@ -186,7 +190,7 @@ class AdminCreateApplicationTest extends TestCase
 
         $this->assertNotSame($oldPath, $resume->file_path);
         $this->assertStringStartsWith("resumes/{$application->id}/", $resume->file_path);
-        Storage::disk('public')->assertMissing($oldPath);
-        Storage::disk('public')->assertExists($resume->file_path);
+        Storage::disk('documents')->assertMissing($oldPath);
+        Storage::disk('documents')->assertExists($resume->file_path);
     }
 }

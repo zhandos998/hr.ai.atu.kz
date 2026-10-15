@@ -11,11 +11,11 @@ use App\Models\User;
 use App\Support\ApplicationStageManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 
 class CommissionController extends Controller
 {
     private array $globalMembersCache = [];
+
     private array $facultyMembersCache = [];
 
     public function adminMembers(Request $request)
@@ -102,7 +102,7 @@ class CommissionController extends Controller
             'user_id' => $validated['user_id'],
         ]);
 
-        if (!$member->exists) {
+        if (! $member->exists) {
             $member->is_pps = false;
             $member->is_staff = false;
         }
@@ -209,7 +209,7 @@ class CommissionController extends Controller
             ], 422);
         }
 
-        if (!in_array($application->hiring_status, ['not_started', 'voting'], true)) {
+        if (! in_array($application->hiring_status, ['not_started', 'voting'], true)) {
             return response()->json([
                 'message' => 'По этой заявке голосование уже завершено.',
             ], 422);
@@ -220,7 +220,7 @@ class CommissionController extends Controller
         $isGlobalMember = $this->isGlobalCommissionMember($request->user()->id, $vacancyType);
         $isFacultyMember = $this->isPpsFacultyCommissionMember($request->user()->id, $application);
 
-        if (!$isVacancyMember && !$isGlobalMember && !$isFacultyMember) {
+        if (! $isVacancyMember && ! $isGlobalMember && ! $isFacultyMember) {
             return response()->json([
                 'message' => 'Вы не входите в комиссию для этой заявки.',
             ], 403);
@@ -265,10 +265,12 @@ class CommissionController extends Controller
     private function commissionApplicationsQuery(Request $request, bool $withPpsProfile = false, bool $onlyActive = true)
     {
         $relations = [
+            'competition:id,title,type,number',
             'user:id,name,email,phone',
             'vacancy:id,title,type,position_id',
-            'vacancy.position:id,department_id,name',
+            'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.position.department:id,name',
+            'vacancy.position.academicUnit:id,name,parent_id',
             'vacancy.commissionMembers:id,name,email,phone,role',
             'ppsProfile',
             'status:id,code,name',
@@ -300,13 +302,13 @@ class CommissionController extends Controller
                 $memberQuery->where('users.id', $userId);
             });
 
-            if (!empty($globalTypes)) {
+            if (! empty($globalTypes)) {
                 $builder->orWhereHas('vacancy', function ($vacancyQuery) use ($globalTypes) {
                     $vacancyQuery->whereIn('type', $globalTypes);
                 });
             }
 
-            if (!empty($facultyNames)) {
+            if (! empty($facultyNames)) {
                 $builder->orWhere(function ($facultyQuery) use ($facultyNames) {
                     $facultyQuery
                         ->whereHas('vacancy', function ($vacancyQuery) {
@@ -336,7 +338,7 @@ class CommissionController extends Controller
             ->where('user_id', $userId)
             ->first(['is_pps', 'is_staff']);
 
-        if (!$member) {
+        if (! $member) {
             return [];
         }
 
@@ -493,7 +495,7 @@ class CommissionController extends Controller
             return collect();
         }
 
-        if (!array_key_exists($facultyName, $this->facultyMembersCache)) {
+        if (! array_key_exists($facultyName, $this->facultyMembersCache)) {
             $this->facultyMembersCache[$facultyName] = PpsFacultyCommissionMember::query()
                 ->where('faculty_name', $facultyName)
                 ->with('user:id,name,email')
@@ -553,7 +555,7 @@ class CommissionController extends Controller
     {
         ApplicationStageManager::ensureDefaults($application);
 
-        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+        $application->resume_url = $application->resume ? url(\App\Support\DocumentStorage::url($application->resume->file_path)) : null;
 
         $documents = [];
         foreach ($application->documents as $document) {
@@ -565,7 +567,7 @@ class CommissionController extends Controller
             $documents[$normalizedType] = [
                 'id' => $document->id,
                 'path' => $document->file_path,
-                'url' => url(Storage::url($document->file_path)),
+                'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
             ];
         }
 
@@ -576,7 +578,7 @@ class CommissionController extends Controller
 
     private function attachPpsProfileDocumentUrls(Application $application): Application
     {
-        if (!$application->relationLoaded('ppsProfile') || !$application->ppsProfile) {
+        if (! $application->relationLoaded('ppsProfile') || ! $application->ppsProfile) {
             return $application;
         }
 
@@ -588,7 +590,7 @@ class CommissionController extends Controller
                     return [
                         'id' => $document->id,
                         'name' => $document->original_name ?: basename($document->file_path),
-                        'url' => url(Storage::url($document->file_path)),
+                        'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
                     ];
                 })
                 ->all();

@@ -19,4 +19,9 @@ class Position extends Model
     {
         return $this->belongsToMany(User::class)->withTimestamps();
     }
+
+    public function academicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class);
+    }
 }

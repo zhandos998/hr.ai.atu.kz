@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Department extends Model
 {
-
     protected $guarded = [];
+
+    public function academicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class);
+    }
 
     public function parent()
     {
@@ -23,5 +26,10 @@ class Department extends Model
     public function positions()
     {
         return $this->hasMany(Position::class);
+    }
+
+    public function personnelApprovalRoutes()
+    {
+        return $this->hasMany(PersonnelApprovalRoute::class);
     }
 }

@@ -15,7 +15,9 @@ use Throwable;
 class CandidateAIController extends Controller
 {
     private const MAX_DOCUMENTS = 25;
+
     private const MAX_TEXT_CHARS_PER_DOCUMENT = 12000;
+
     private const MAX_IMAGE_BYTES = 8_000_000;
 
     public function analyze(Request $request)
@@ -35,8 +37,9 @@ class CandidateAIController extends Controller
             'user:id,name,email,phone',
             'status:id,code,name',
             'vacancy:id,title,description,type,position_id',
-            'vacancy.position:id,department_id,name,duties,qualification',
+            'vacancy.position:id,department_id,academic_unit_id,name,duties,qualification',
             'vacancy.position.department:id,name,parent_id',
+            'vacancy.position.academicUnit:id,name,parent_id',
             'resume:id,application_id,file_path',
             'documents:id,application_id,type,file_path',
             'ppsProfile.documents',
@@ -49,7 +52,7 @@ class CandidateAIController extends Controller
             ->where('lang', $lang)
             ->first();
 
-        if (!$force && $existing && $this->isCompleteResult($existing)) {
+        if (! $force && $existing && $this->isCompleteResult($existing)) {
             return response()->json($this->resultResponse($existing, $lang, true));
         }
 
@@ -95,7 +98,7 @@ class CandidateAIController extends Controller
     private function buildApplicationData(Application $application): array
     {
         $position = $application->vacancy?->position;
-        $department = $position?->department;
+        $department = $position?->academicUnit ?? $position?->department;
         $ppsProfile = $application->ppsProfile;
 
         return [
@@ -226,15 +229,16 @@ class CandidateAIController extends Controller
                 'text' => null,
             ];
 
-            if (!Storage::disk('public')->exists($document['path'])) {
+            if (! Storage::disk('documents')->exists($document['path'])) {
                 $item['status'] = 'missing_in_storage';
                 $items[] = $item;
+
                 continue;
             }
 
-            $absolutePath = Storage::disk('public')->path($document['path']);
+            $absolutePath = Storage::disk('documents')->path($document['path']);
             $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
-            $mime = Storage::disk('public')->mimeType($document['path']) ?: $this->mimeFromExtension($extension);
+            $mime = Storage::disk('documents')->mimeType($document['path']) ?: $this->mimeFromExtension($extension);
 
             try {
                 if (in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
@@ -352,7 +356,7 @@ class CandidateAIController extends Controller
 
         $json = json_decode($response->choices[0]->message->content ?? '', true);
 
-        if (!is_array($json)) {
+        if (! is_array($json)) {
             throw new \RuntimeException('OpenAI returned invalid JSON for candidate analysis.');
         }
 
@@ -361,7 +365,7 @@ class CandidateAIController extends Controller
 
     private function extractPdfTextWithOpenAI(string $absolutePath, string $filename): ?string
     {
-        if (!is_readable($absolutePath)) {
+        if (! is_readable($absolutePath)) {
             return null;
         }
 
@@ -383,7 +387,7 @@ class CandidateAIController extends Controller
                         [
                             'type' => 'input_file',
                             'filename' => $filename ?: 'document.pdf',
-                            'file_data' => 'data:application/pdf;base64,' . base64_encode($raw),
+                            'file_data' => 'data:application/pdf;base64,'.base64_encode($raw),
                         ],
                     ],
                 ],
@@ -499,7 +503,7 @@ PROMPT;
 
     private function buildImageContent(string $absolutePath, string $mime, string $name): ?array
     {
-        if (!is_readable($absolutePath) || filesize($absolutePath) > self::MAX_IMAGE_BYTES) {
+        if (! is_readable($absolutePath) || filesize($absolutePath) > self::MAX_IMAGE_BYTES) {
             return null;
         }
 
@@ -510,7 +514,7 @@ PROMPT;
 
         return [
             'name' => $name,
-            'data_url' => 'data:' . ($mime ?: 'image/jpeg') . ';base64,' . base64_encode($raw),
+            'data_url' => 'data:'.($mime ?: 'image/jpeg').';base64,'.base64_encode($raw),
         ];
     }
 
@@ -522,7 +526,7 @@ PROMPT;
         foreach ($phpWord->getSections() as $section) {
             foreach ($section->getElements() as $element) {
                 if (method_exists($element, 'getText')) {
-                    $text .= $element->getText() . "\n";
+                    $text .= $element->getText()."\n";
                 }
             }
         }
@@ -532,7 +536,7 @@ PROMPT;
 
     private function readPlainTextFile(string $absolutePath): ?string
     {
-        if (!is_readable($absolutePath)) {
+        if (! is_readable($absolutePath)) {
             return null;
         }
 
@@ -541,7 +545,7 @@ PROMPT;
             return null;
         }
 
-        if (!mb_detect_encoding($raw, 'UTF-8', true)) {
+        if (! mb_detect_encoding($raw, 'UTF-8', true)) {
             $raw = mb_convert_encoding($raw, 'UTF-8', 'auto');
         }
 

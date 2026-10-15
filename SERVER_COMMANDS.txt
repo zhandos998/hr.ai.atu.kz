@@ -24,16 +24,64 @@ git pull --ff-only origin master
 
 Пересобрать и поднять контейнеры:
 
-docker compose --env-file docker.env up -d --build
+В этом обновлении документы переезжают в закрытое хранилище.
+Выполнять по порядку. При любой ошибке остановиться, не переходить дальше.
+До начала проверить свободное место: нужны копия базы и копия всех файлов.
+
+df -h
+docker compose --env-file docker.env build app nginx
+
+Включить обслуживание и остановить обработку очереди:
+
+docker compose --env-file docker.env exec -T app php artisan down
+docker compose --env-file docker.env stop queue
+umask 077
+bash scripts/backup-database.sh
+
+Сохранить копию файлов вне Docker volume (может занять время):
+
+mkdir -p backups/storage
+docker compose --env-file docker.env exec -T app tar -C /var/www/html/storage/app -czf - . > "backups/storage/storage_$(date +%Y%m%d_%H%M%S).tar.gz"
+gzip -t "$(ls -t backups/storage/storage_*.tar.gz | head -n 1)"
+
+Обновить только приложение и nginx, не удаляя volumes:
+
+docker compose --env-file docker.env up -d --no-deps --no-build app nginx
+docker compose --env-file docker.env exec -T app php artisan migrate --force
+docker compose --env-file docker.env exec -T app php artisan documents:privatize
 
 Очистить и заново собрать кэш Laravel:
 
 docker compose --env-file docker.env exec -T app php artisan optimize:clear
 docker compose --env-file docker.env exec -T app php artisan optimize
+docker compose --env-file docker.env up -d --no-deps --no-build queue
+docker compose --env-file docker.env exec -T app php artisan up
+
+documents:privatize сначала копирует файл, сравнивает SHA-256 и лишь после
+совпадения удаляет открытую копию. Команда повторяемая. Если она остановилась,
+не выключать обслуживание: сначала устранить причину и запустить её снова.
+Пути в базе менять вручную не надо. Ссылки /storage/applications/... и
+/storage/resumes/... закрыты; новые ссылки выдаёт авторизованное приложение.
+После переноса нельзя просто вернуть старый образ: он ищет файлы в public.
+Для отката нужны согласованные копии БД, storage и предыдущий образ.
+Не выполнять docker compose down -v: это удаляет данные.
+В этом релизе НЕ запускать db:seed или migrate:fresh.
+Миграция 2026_10_15_120000 объединяет дубли должностей только внутри одного
+подразделения. Связи вакансий, пользователей, кадровых заявок и AI-оценок
+переносятся на запись с меньшим ID. При разных обязанностях или требованиях
+миграция остановится без объединения: нужно отдельно разобрать эти записи.
+Откат этой миграции снимает уникальность, но не создаёт удалённые дубли заново.
+Для восстановления исходных записей нужна сделанная перед обновлением копия БД.
 
 Проверить контейнеры:
 
 docker compose --env-file docker.env ps
+docker compose --env-file docker.env logs --tail=100 app queue nginx
+
+В браузере проверить вход, список и карточку заявки, открытие старого
+резюме/PDF, загрузку нового документа, согласование кадровой заявки.
+Отдельно проверить отправку и получение письма смены email: локальные
+автотесты не подтверждают работоспособность SMTP на сервере.
 
 
 3. Миграции

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicUnit;
 use App\Models\Application;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationPpsProfile;
@@ -10,6 +11,7 @@ use App\Models\ApplicationPpsProfileDocument;
 use App\Models\ApplicationStatus;
 use App\Models\CandidateAIResult;
 use App\Models\CommissionMember;
+use App\Models\Competition;
 use App\Models\Department;
 use App\Models\Position;
 use App\Models\PpsFacultyCommissionMember;
@@ -21,15 +23,16 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 class ApplicationController extends Controller
 {
     private const KSHIT_DEPARTMENT_NAME = 'КШИТ';
+
     private const KSHIT_COMMISSION_MEMBER_EMAIL = 'b.pazylkhaiyr@atu.edu.kz';
 
     private const PPS_VACANCY_TITLES = [
@@ -51,18 +54,43 @@ class ApplicationController extends Controller
     ];
 
     private array $globalCommissionMembersCache = [];
+
     private array $facultyCommissionMembersCache = [];
 
     public function index(Request $request)
     {
-        $query = $this->adminApplicationsQuery($request->boolean('archived'));
+        $request->validate(['competition_id' => 'nullable|integer|exists:competitions,id']);
+        $query = $this->adminApplicationsBaseQuery($request->boolean('archived'))
+            ->with([
+                'competition:id,title,type',
+                'user:id,name,email',
+                'vacancy:id,title,type,position_id',
+                'vacancy.position:id,name,department_id,academic_unit_id',
+                'vacancy.position.department:id,name',
+                'vacancy.position.academicUnit:id,name',
+                'ppsProfile:id,application_id,desired_position,faculty_name,department_name',
+            ]);
 
         $this->applyAdminApplicationFilters($query, $request);
         $this->applyAdminApplicationSorting($query, $request);
 
         $applications = $query->paginate($this->adminApplicationsPerPage($request));
 
-        $applications->getCollection()->transform(fn ($application) => $this->transformAdminApplication($application));
+        $vacancyIds = $applications->getCollection()->pluck('vacancy_id')->unique();
+        $members = DB::table('vacancy_commission_member')->whereIn('vacancy_id', $vacancyIds)
+            ->selectRaw('vacancy_id, COUNT(*) as total')->groupBy('vacancy_id')->pluck('total', 'vacancy_id');
+        $votes = DB::table('application_commission_votes as votes')
+            ->join('applications', 'applications.id', '=', 'votes.application_id')
+            ->join('vacancy_commission_member as members', function ($join) {
+                $join->on('members.vacancy_id', '=', 'applications.vacancy_id')->on('members.user_id', '=', 'votes.user_id');
+            })->whereIn('votes.application_id', $applications->getCollection()->pluck('id'))
+            ->selectRaw('votes.application_id, COUNT(*) as total')->groupBy('votes.application_id')->pluck('total', 'votes.application_id');
+        $applications->getCollection()->transform(function ($application) use ($members, $votes) {
+            ApplicationStageManager::ensureDefaults($application);
+            $application->vote_summary = ['total_members' => (int) ($members[$application->vacancy_id] ?? 0), 'voted' => (int) ($votes[$application->id] ?? 0)];
+
+            return $application;
+        });
 
         return response()->json([
             'data' => $applications->getCollection()->values(),
@@ -103,6 +131,9 @@ class ApplicationController extends Controller
 
     private function applyAdminApplicationFilters($query, Request $request, bool $includeType = true): void
     {
+        if ($request->filled('competition_id')) {
+            $query->where('applications.competition_id', $request->integer('competition_id'));
+        }
         if ($includeType) {
             $type = trim((string) $request->input('type', ''));
 
@@ -114,7 +145,7 @@ class ApplicationController extends Controller
         $search = trim((string) $request->input('q', $request->input('search', '')));
 
         if ($search !== '') {
-            $like = '%' . $search . '%';
+            $like = '%'.$search.'%';
 
             $query->where(function ($subQuery) use ($like) {
                 $subQuery
@@ -148,6 +179,7 @@ class ApplicationController extends Controller
 
             if ($stage === 'documents' && $status === 'awaiting_upload') {
                 $query->whereIn('documents_status', ['awaiting_upload', 'not_requested', 'uploaded']);
+
                 continue;
             }
 
@@ -155,6 +187,7 @@ class ApplicationController extends Controller
                 $query
                     ->where('hiring_status', 'hired')
                     ->where('hiring_term_years', $status === 'hired_1_year' ? 1 : 3);
+
                 continue;
             }
 
@@ -162,6 +195,7 @@ class ApplicationController extends Controller
                 $query
                     ->where('hiring_status', 'hired')
                     ->whereNull('hiring_term_years');
+
                 continue;
             }
 
@@ -181,6 +215,7 @@ class ApplicationController extends Controller
                 ->leftJoin('users as sort_users', 'sort_users.id', '=', 'applications.user_id')
                 ->orderBy('sort_users.name', $direction)
                 ->orderBy('applications.id', $direction);
+
             return;
         }
 
@@ -191,6 +226,7 @@ class ApplicationController extends Controller
                 ->leftJoin('application_pps_profiles as sort_pps_profiles', 'sort_pps_profiles.application_id', '=', 'applications.id')
                 ->orderByRaw("LOWER(COALESCE(sort_pps_profiles.desired_position, sort_positions.name, sort_vacancies.title, '')) {$direction}")
                 ->orderBy('applications.id', $direction);
+
             return;
         }
 
@@ -202,6 +238,7 @@ class ApplicationController extends Controller
                 ->orderByRaw("LOWER(COALESCE(sort_profile_pps.faculty_name, sort_profile_positions.name, '')) {$direction}")
                 ->orderByRaw("LOWER(COALESCE(sort_profile_pps.department_name, '')) {$direction}")
                 ->orderBy('applications.id', $direction);
+
             return;
         }
 
@@ -211,6 +248,7 @@ class ApplicationController extends Controller
             }
 
             $query->orderBy('applications.id', $direction);
+
             return;
         }
 
@@ -219,6 +257,7 @@ class ApplicationController extends Controller
                 ->withCount(['commissionVotes as sort_votes_count'])
                 ->orderBy('sort_votes_count', $direction)
                 ->orderBy('applications.id', $direction);
+
             return;
         }
 
@@ -297,23 +336,30 @@ class ApplicationController extends Controller
         $validated = $request->validate([
             'full_name' => 'required|string|max:255',
             'vacancy_type' => 'nullable|in:staff,pps',
+            'competition_id' => 'nullable|integer|exists:competitions,id',
             'vacancy_id' => 'nullable|exists:vacancies,id',
             'faculty_name' => 'nullable|string|max:255',
             'department_name' => 'nullable|string|max:255',
             'department_id' => 'nullable|integer|exists:departments,id',
             'position_id' => 'nullable|integer|exists:positions,id',
-            'resume' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'resume' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|extensions:pdf,doc,docx,jpg,jpeg,png|max:2048',
         ]);
 
-        $vacancy = !empty($validated['vacancy_id'])
+        $vacancy = ! empty($validated['vacancy_id'])
             ? Vacancy::findOrFail((int) $validated['vacancy_id'])
             : null;
         $vacancyType = $validated['vacancy_type'] ?? $vacancy?->type;
-        $position = !empty($validated['position_id'])
+        if (! empty($validated['competition_id'])) {
+            $competition = Competition::findOrFail($validated['competition_id']);
+            if ($competition->type !== $vacancyType) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['competition_id' => 'Тип заявки не соответствует типу конкурса.']);
+            }
+        }
+        $position = ! empty($validated['position_id'])
             ? Position::query()->findOrFail((int) $validated['position_id'])
             : null;
 
-        if (!$vacancyType) {
+        if (! $vacancyType) {
             return response()->json([
                 'message' => 'Выберите тип заявки.',
             ], 422);
@@ -326,7 +372,7 @@ class ApplicationController extends Controller
         }
 
         if ($vacancyType === 'staff') {
-            if (!$position) {
+            if (! $position) {
                 return response()->json([
                     'message' => 'Для заявки АУП выберите должность.',
                 ], 422);
@@ -361,30 +407,31 @@ class ApplicationController extends Controller
         }
 
         if ($vacancyType === 'pps') {
-            $department = Department::query()
+            $department = AcademicUnit::query()->where('kind', 'chair')
                 ->where('name', trim((string) $validated['department_name']))
+                ->whereHas('parent', fn ($query) => $query->where('name', trim((string) $validated['faculty_name'])))
                 ->first(['id', 'name']);
 
-            if (!$department) {
+            if (! $department) {
                 return response()->json([
                     'message' => 'Выбранная кафедра не найдена в справочнике.',
                 ], 422);
             }
 
-            if ($position && (int) $position->department_id !== (int) $department->id) {
+            if ($position && (int) $position->academic_unit_id !== (int) $department->id) {
                 return response()->json([
                     'message' => 'Выбранная должность не относится к выбранной кафедре.',
                 ], 422);
             }
 
-            if (!$position) {
-                if (!$vacancy) {
+            if (! $position) {
+                if (! $vacancy) {
                     return response()->json([
                         'message' => 'Для заявки ППС выберите позицию.',
                     ], 422);
                 }
 
-                if (!$this->isAllowedPpsVacancyTitle((string) $vacancy->title)) {
+                if (! $this->isAllowedPpsVacancyTitle((string) $vacancy->title)) {
                     return response()->json([
                         'message' => 'Для заявки ППС выберите вакансию из списка должностей ППС.',
                     ], 422);
@@ -392,7 +439,7 @@ class ApplicationController extends Controller
 
                 $position = Position::query()->firstOrCreate(
                     [
-                        'department_id' => $department->id,
+                        'academic_unit_id' => $department->id,
                         'name' => $vacancy->title,
                     ],
                     [
@@ -409,6 +456,9 @@ class ApplicationController extends Controller
             $user = $this->createManualCandidate($validated['full_name']);
 
             $application = $this->createApplicationForUser($user, $vacancy, $request->file('resume'));
+            if (! empty($validated['competition_id'])) {
+                $application->update(['competition_id' => $validated['competition_id']]);
+            }
 
             if ($vacancy->type === 'pps') {
                 ApplicationPpsProfile::query()->updateOrCreate(
@@ -455,7 +505,7 @@ class ApplicationController extends Controller
             'desired_position' => 'nullable|string|max:255',
             'faculty_name' => 'nullable|string|max:255',
             'department_name' => 'nullable|string|max:255',
-            'birth_year' => 'nullable|integer|min:1900|max:' . now()->year,
+            'birth_year' => 'nullable|integer|min:1900|max:'.now()->year,
             'basic_education' => 'nullable|string|max:4000',
             'magistracy' => 'nullable|string|max:4000',
             'scientific_degree' => 'nullable|string|max:4000',
@@ -511,7 +561,7 @@ class ApplicationController extends Controller
             'anti_corruption_survey_results',
             'disciplinary_actions_info',
         ] as $field) {
-            if (!$request->exists($field)) {
+            if (! $request->exists($field)) {
                 continue;
             }
 
@@ -577,7 +627,7 @@ class ApplicationController extends Controller
         ]);
 
         $vacancy = null;
-        $position = !empty($validated['position_id'])
+        $position = ! empty($validated['position_id'])
             ? Position::query()->findOrFail((int) $validated['position_id'])
             : null;
 
@@ -596,7 +646,7 @@ class ApplicationController extends Controller
             }
 
             $vacancy = $this->resolveVacancyForPosition($application->vacancy, $position, 'staff');
-        } elseif (!empty($validated['vacancy_id'])) {
+        } elseif (! empty($validated['vacancy_id'])) {
             $vacancy = Vacancy::query()->where('type', 'staff')->findOrFail((int) $validated['vacancy_id']);
         } else {
             return response()->json([
@@ -642,14 +692,14 @@ class ApplicationController extends Controller
         $document = $application->ppsProfile?->documents
             ?->first(fn ($item) => (int) $item->id === $documentId && in_array($item->category, $allowedCategories, true));
 
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Р”РѕРєСѓРјРµРЅС‚ РїСЂРѕС„РёР»СЏ РџРџРЎ РЅРµ РЅР°Р№РґРµРЅ.',
             ], 404);
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -675,7 +725,7 @@ class ApplicationController extends Controller
         ]);
 
         try {
-            if (!empty($validated['stage'])) {
+            if (! empty($validated['stage'])) {
                 if (empty($validated['stage_status'])) {
                     return response()->json([
                         'message' => 'Для обновления этапа требуется stage_status.',
@@ -684,7 +734,7 @@ class ApplicationController extends Controller
 
                 if (
                     $validated['stage'] === 'documents'
-                    && !in_array($validated['stage_status'], ['awaiting_upload', 'accepted', 'rejected'], true)
+                    && ! in_array($validated['stage_status'], ['awaiting_upload', 'accepted', 'rejected'], true)
                 ) {
                     return response()->json([
                         'message' => 'Для документов доступны только статусы: ожидается загрузка, приняты, отклонены.',
@@ -694,7 +744,7 @@ class ApplicationController extends Controller
                 if ($validated['stage'] === 'hiring') {
                     $isPpsApplication = $application->vacancy?->type === 'pps';
 
-                    if (!$isPpsApplication && in_array($validated['stage_status'], ['hired_1_year', 'hired_3_year'], true)) {
+                    if (! $isPpsApplication && in_array($validated['stage_status'], ['hired_1_year', 'hired_3_year'], true)) {
                         return response()->json([
                             'message' => 'Для заявки АУП доступно только принятие на работу без срока 1/3 года.',
                         ], 422);
@@ -714,7 +764,7 @@ class ApplicationController extends Controller
                     $validated['comment'] ?? null,
                     $request->user()?->id
                 );
-            } elseif (!empty($validated['status_code'])) {
+            } elseif (! empty($validated['status_code'])) {
                 $application = ApplicationStageManager::setLegacyStatus(
                     $application,
                     $validated['status_code'],
@@ -744,7 +794,7 @@ class ApplicationController extends Controller
     {
         $validated = $request->validate([
             'vacancy_id' => 'required|exists:vacancies,id',
-            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|extensions:pdf,doc,docx,jpg,jpeg,png|max:2048',
         ]);
 
         $user = $request->user();
@@ -758,12 +808,12 @@ class ApplicationController extends Controller
                 'message' => 'Вы успешно откликнулись на вакансию.',
                 'application' => $application,
                 'resume' => $resume,
-                'resume_url' => Storage::url($resume->file_path),
+                'resume_url' => \App\Support\DocumentStorage::url($resume->file_path),
             ], 201);
         });
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $application = Application::with([
             'status',
@@ -772,6 +822,8 @@ class ApplicationController extends Controller
             'documents',
             'stageLogs.author:id,name',
         ])->notArchived()->findOrFail($id);
+
+        \Illuminate\Support\Facades\Gate::forUser($request->user())->authorize('view', $application);
 
         return response()->json($this->attachDocumentUrls($application));
     }
@@ -859,11 +911,11 @@ class ApplicationController extends Controller
         }
 
         $validated = $request->validate([
-            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'resume' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|extensions:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
 
         $oldPath = $application->resume?->file_path;
-        $storedPath = $validated['resume']->store("resumes/{$application->id}", 'public');
+        $storedPath = $validated['resume']->store("resumes/{$application->id}", 'documents');
 
         if ($application->resume) {
             $application->resume->update([
@@ -878,8 +930,8 @@ class ApplicationController extends Controller
             ]);
         }
 
-        if (!empty($oldPath)) {
-            Storage::disk('public')->delete($oldPath);
+        if (! empty($oldPath)) {
+            Storage::disk('documents')->delete($oldPath);
         }
 
         return response()->json([
@@ -905,7 +957,7 @@ class ApplicationController extends Controller
         }
 
         $document = $application->documents->firstWhere('id', $documentId);
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Документ не найден.',
             ], 404);
@@ -926,8 +978,8 @@ class ApplicationController extends Controller
             }
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -945,7 +997,7 @@ class ApplicationController extends Controller
 
     private function storeApplicationDocuments(Request $request, Application $application, string $stageComment)
     {
-        if (!$this->canManageDocuments($application)) {
+        if (! $this->canManageDocuments($application)) {
             return response()->json([
                 'message' => 'Сейчас нельзя изменять документы.',
             ], 403);
@@ -966,7 +1018,7 @@ class ApplicationController extends Controller
                 return in_array($existingBase, $acceptedTypes, true);
             });
             $isRequiredType = in_array($type, $requiredTypes, true);
-            $baseRule = ($isRequiredType && !$hasAnyExisting) ? 'required' : 'sometimes';
+            $baseRule = ($isRequiredType && ! $hasAnyExisting) ? 'required' : 'sometimes';
             $max = in_array($type, ['scientific_works', 'other'], true) ? 5120 : 2048;
             $mimes = match ($type) {
                 'scientific_works' => 'pdf,zip',
@@ -975,7 +1027,7 @@ class ApplicationController extends Controller
             };
 
             $rules[$type] = "{$baseRule}|array|min:1";
-            $rules["{$type}.*"] = "file|mimes:{$mimes}|max:{$max}";
+            $rules["{$type}.*"] = "file|mimes:{$mimes}|extensions:{$mimes}|max:{$max}";
         }
 
         $request->validate($rules);
@@ -993,7 +1045,7 @@ class ApplicationController extends Controller
             }
         }
 
-        if (!$hasNewFiles) {
+        if (! $hasNewFiles) {
             return response()->json([
                 'message' => 'Выберите хотя бы один документ.',
             ], 422);
@@ -1048,7 +1100,7 @@ class ApplicationController extends Controller
                     $files = [$files];
                 }
 
-                if (!is_array($files) || count($files) === 0) {
+                if (! is_array($files) || count($files) === 0) {
                     continue;
                 }
 
@@ -1065,25 +1117,26 @@ class ApplicationController extends Controller
 
                 foreach ($existingTypes as $existingType) {
                     $existingBaseType = $this->normalizeDocumentBaseType($this->documentBaseType($existingType));
-                    if (!in_array($existingBaseType, $acceptedTypes, true)) {
+                    if (! in_array($existingBaseType, $acceptedTypes, true)) {
                         continue;
                     }
 
                     if ($existingType === $type) {
                         $nextIndex = max($nextIndex, 2);
+
                         continue;
                     }
 
-                    if (preg_match('/^' . preg_quote($type, '/') . '_(\d+)$/', $existingType, $matches)) {
+                    if (preg_match('/^'.preg_quote($type, '/').'_(\d+)$/', $existingType, $matches)) {
                         $nextIndex = max($nextIndex, ((int) $matches[1]) + 1);
                     }
                 }
 
                 foreach ($files as $file) {
                     $storedType = $nextIndex === 1 ? $type : "{$type}_{$nextIndex}";
-                    $extension = $file->getClientOriginalExtension();
+                    $extension = \App\Support\DocumentStorage::extension($file);
                     $directory = "applications/{$application->id}";
-                    $path = $file->storeAs($directory, "{$storedType}.{$extension}", 'public');
+                    $path = $file->storeAs($directory, "{$storedType}.{$extension}", 'documents');
 
                     $document = ApplicationDocument::create([
                         'application_id' => $application->id,
@@ -1094,7 +1147,7 @@ class ApplicationController extends Controller
                     $savedDocs[$storedType] = [
                         'id' => $document->id,
                         'path' => $path,
-                        'url' => url(Storage::url($path)),
+                        'url' => url(\App\Support\DocumentStorage::url($path)),
                     ];
 
                     $nextIndex++;
@@ -1125,14 +1178,14 @@ class ApplicationController extends Controller
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
 
-        if (!$this->canManageDocuments($application)) {
+        if (! $this->canManageDocuments($application)) {
             return response()->json([
                 'message' => 'Сейчас нельзя удалить документ.',
             ], 403);
         }
 
         $document = $application->documents->firstWhere('id', $documentId);
-        if (!$document) {
+        if (! $document) {
             return response()->json([
                 'message' => 'Документ не найден.',
             ], 404);
@@ -1153,8 +1206,8 @@ class ApplicationController extends Controller
             }
         }
 
-        if (!empty($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if (! empty($document->file_path)) {
+            Storage::disk('documents')->delete($document->file_path);
         }
 
         $document->delete();
@@ -1239,14 +1292,15 @@ class ApplicationController extends Controller
         $application = Application::with([
             'user:id,name,email,phone',
             'vacancy:id,title,type,position_id',
-            'vacancy.position:id,department_id,name',
+            'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.position.department:id,name',
+            'vacancy.position.academicUnit:id,name,parent_id',
             'ppsProfile:id,application_id,desired_position,faculty_name,department_name',
             'status:id,code,name',
             'stageLogs.author:id,name',
         ])->notArchived()->findOrFail($id);
 
-        if (!in_array($application->compliance_status, ['clear', 'flagged'], true)) {
+        if (! in_array($application->compliance_status, ['clear', 'flagged'], true)) {
             return response()->json([
                 'message' => 'PDF ответа юриста доступен только после завершения юридической проверки.',
             ], 422);
@@ -1264,7 +1318,7 @@ class ApplicationController extends Controller
             'generatedAt' => now()->format('Y-m-d H:i:s'),
         ])->render();
 
-        $options = new Options();
+        $options = new Options;
         $options->set('defaultFont', 'DejaVu Sans');
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
@@ -1309,7 +1363,7 @@ class ApplicationController extends Controller
             ]);
 
             if ($resumeFile) {
-                $storedPath = $resumeFile->store("resumes/{$application->id}", 'public');
+                $storedPath = $resumeFile->store("resumes/{$application->id}", 'documents');
 
                 Resume::create([
                     'application_id' => $application->id,
@@ -1348,11 +1402,12 @@ class ApplicationController extends Controller
     private function adminApplicationsQuery(?bool $archived = false)
     {
         return $this->adminApplicationsBaseQuery($archived)->with([
+            'competition:id,title,type',
             'user',
             'archivedBy:id,name,email',
             'status',
             'vacancy',
-            'vacancy.position:id,department_id,name',
+            'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.commissionMembers:id,name,email,phone',
             'commissionVotes:id,application_id,user_id,decision,hire_term_years,comment,updated_at',
             'candidateAiResult:id,application_id,score,decision,education_match,experience_match,soft_skills_match,summary_ru,updated_at',
@@ -1387,7 +1442,7 @@ class ApplicationController extends Controller
 
     private function attachPpsProfileDocumentUrls(Application $application): Application
     {
-        if (!$application->relationLoaded('ppsProfile') || !$application->ppsProfile) {
+        if (! $application->relationLoaded('ppsProfile') || ! $application->ppsProfile) {
             return $application;
         }
 
@@ -1399,7 +1454,7 @@ class ApplicationController extends Controller
                     return [
                         'id' => $document->id,
                         'name' => $document->original_name ?: basename($document->file_path),
-                        'url' => url(Storage::url($document->file_path)),
+                        'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
                     ];
                 })
                 ->all();
@@ -1412,7 +1467,7 @@ class ApplicationController extends Controller
     {
         ApplicationStageManager::ensureDefaults($application);
 
-        $application->resume_url = $application->resume ? url(Storage::url($application->resume->file_path)) : null;
+        $application->resume_url = $application->resume ? url(\App\Support\DocumentStorage::url($application->resume->file_path)) : null;
 
         $documents = [];
         foreach ($application->documents as $document) {
@@ -1424,7 +1479,7 @@ class ApplicationController extends Controller
             $documents[$normalizedType] = [
                 'id' => $document->id,
                 'path' => $document->file_path,
-                'url' => url(Storage::url($document->file_path)),
+                'url' => url(\App\Support\DocumentStorage::url($document->file_path)),
             ];
         }
 
@@ -1490,8 +1545,7 @@ class ApplicationController extends Controller
         ?string $facultyName = null,
         bool $includeMain = true,
         ?string $departmentName = null,
-    ): void
-    {
+    ): void {
         $memberIds = $includeMain
             ? CommissionMember::query()
                 ->forVacancyType($vacancy->type)
@@ -1612,7 +1666,7 @@ class ApplicationController extends Controller
         return $application->resume_status === 'accepted'
             && in_array($application->documents_status, ['awaiting_upload', 'uploaded', 'rejected'], true)
             && $application->compliance_status === 'not_started'
-            && !in_array($application->hiring_status, ['hired', 'rejected'], true);
+            && ! in_array($application->hiring_status, ['hired', 'rejected'], true);
     }
 
     private function ppsProfileCategoryDocumentConfig(): array
@@ -1655,7 +1709,7 @@ class ApplicationController extends Controller
 
         foreach (array_keys($this->ppsProfileCategoryDocumentConfig()) as $field) {
             $rules[$field] = 'nullable|array';
-            $rules["{$field}.*"] = 'file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240';
+            $rules["{$field}.*"] = 'file|mimes:pdf,doc,docx,jpg,jpeg,png|extensions:pdf,doc,docx,jpg,jpeg,png|max:10240';
         }
 
         return $rules;
@@ -1669,7 +1723,7 @@ class ApplicationController extends Controller
                 $files = [$files];
             }
 
-            if (!is_array($files)) {
+            if (! is_array($files)) {
                 continue;
             }
 
@@ -1699,23 +1753,23 @@ class ApplicationController extends Controller
         string $directoryName,
         int $index
     ): string {
-        $extension = $file->getClientOriginalExtension();
+        $extension = \App\Support\DocumentStorage::extension($file);
         $directory = "applications/{$applicationId}/pps-profile/{$directoryName}";
-        $filename = now()->format('YmdHisv') . "-{$profileId}-{$index}.{$extension}";
+        $filename = now()->format('YmdHisv')."-{$profileId}-{$index}.{$extension}";
 
-        return $file->storeAs($directory, $filename, 'public');
+        return $file->storeAs($directory, $filename, 'documents');
     }
 
     private function replacePpsProfileDocument(?string $oldPath, UploadedFile $file, int $applicationId, string $field): string
     {
-        if (!empty($oldPath)) {
-            Storage::disk('public')->delete($oldPath);
+        if (! empty($oldPath)) {
+            Storage::disk('documents')->delete($oldPath);
         }
 
-        $extension = $file->getClientOriginalExtension();
+        $extension = \App\Support\DocumentStorage::extension($file);
         $directory = "applications/{$applicationId}/pps-profile";
 
-        return $file->storeAs($directory, "{$field}.{$extension}", 'public');
+        return $file->storeAs($directory, "{$field}.{$extension}", 'documents');
     }
 
     private function emptyToNull($value)
@@ -1729,7 +1783,7 @@ class ApplicationController extends Controller
         $positionId = $this->resolveApplicationPositionId($application);
         $application->ai_position_id = $positionId;
 
-        if (!$workerId) {
+        if (! $workerId) {
             $application->ai_result = null;
             $application->unsetRelation('candidateAiResult');
 
@@ -1807,9 +1861,7 @@ class ApplicationController extends Controller
 
     private function technicalVacancyDescription(Position $position): string
     {
-        $department = $position->relationLoaded('department')
-            ? $position->department
-            : $position->department()->first(['name']);
+        $department = $position->academicUnit ?? $position->department;
 
         $departmentName = $department?->name ?: 'подразделение не указано';
 
@@ -1818,11 +1870,11 @@ class ApplicationController extends Controller
 
     private function resolveApplicationPositionId(Application $application): ?int
     {
-        if (!empty($application->vacancy?->position_id)) {
+        if (! empty($application->vacancy?->position_id)) {
             return (int) $application->vacancy->position_id;
         }
 
-        if ($application->vacancy?->type !== 'pps' || !$application->ppsProfile) {
+        if ($application->vacancy?->type !== 'pps' || ! $application->ppsProfile) {
             return null;
         }
 
@@ -1833,22 +1885,22 @@ class ApplicationController extends Controller
             return null;
         }
 
-        $departmentId = Department::query()
+        $departmentId = AcademicUnit::query()->where('kind', 'chair')
             ->where('name', $departmentName)
             ->value('id');
 
-        if (!$departmentId) {
+        if (! $departmentId) {
             return null;
         }
 
-        $query = Position::query()->where('department_id', $departmentId);
+        $query = Position::query()->where('academic_unit_id', $departmentId);
         $position = (clone $query)->where('name', $positionName)->first(['id']);
 
-        if (!$position) {
+        if (! $position) {
             $position = (clone $query)->where('name', 'like', "{$positionName}%")->first(['id']);
         }
 
-        if (!$position) {
+        if (! $position) {
             $position = (clone $query)->where('name', 'like', "%{$positionName}%")->first(['id']);
         }
 
@@ -1899,7 +1951,7 @@ class ApplicationController extends Controller
             return collect();
         }
 
-        if (!array_key_exists($facultyName, $this->facultyCommissionMembersCache)) {
+        if (! array_key_exists($facultyName, $this->facultyCommissionMembersCache)) {
             $this->facultyCommissionMembersCache[$facultyName] = PpsFacultyCommissionMember::query()
                 ->where('faculty_name', $facultyName)
                 ->with('user:id,name,email')

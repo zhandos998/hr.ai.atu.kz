@@ -10,7 +10,7 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'admin@atu.kz',
         ], [
             'name' => 'Admin ATU',
@@ -20,7 +20,7 @@ class UserSeeder extends Seeder
             'role' => 'admin',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'd.dzhurinskaya@atu.edu.kz',
         ], [
             'name' => 'Джуринская Индира',
@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
             'role' => 'science_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'a.kalabina@atu.edu.kz',
         ], [
             'name' => 'Калабина Анастасия',
@@ -40,7 +40,7 @@ class UserSeeder extends Seeder
             'role' => 'digital_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'vasilina.g@atu.edu.kz',
         ], [
             'name' => 'Василина Гулзира',
@@ -50,7 +50,7 @@ class UserSeeder extends Seeder
             'role' => 'strategy_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'n.ahmetova@atu.edu.kz',
         ], [
             'name' => 'Ахметова Нурсулу',
@@ -60,7 +60,7 @@ class UserSeeder extends Seeder
             'role' => 'academic_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'b.tolekova@atu.edu.kz',
         ], [
             'name' => 'Толекова Бахыт',
@@ -70,7 +70,7 @@ class UserSeeder extends Seeder
             'role' => 'library_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'm.serikkyzy@atu.edu.kz',
         ], [
             'name' => 'Серикқызы Мира',
@@ -80,7 +80,7 @@ class UserSeeder extends Seeder
             'role' => 'professional_development_director',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'b.esembaeva@atu.edu.kz',
         ], [
             'name' => 'Есембаева Балзада',
@@ -90,7 +90,7 @@ class UserSeeder extends Seeder
             'role' => 'lawyer',
         ]);
 
-        User::updateOrCreate([
+        User::firstOrCreate([
             'email' => 'zhandos998@gmail.com',
         ], [
             'name' => 'Zhappas Zhandos Adiluly',

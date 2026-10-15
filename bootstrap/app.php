@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo('/login');
+        $middleware->append(\App\Http\Middleware\SetLocale::class);
+
         $middleware->trustProxies(
             at: env('TRUSTED_PROXIES', '*'),
             headers: Request::HEADER_X_FORWARDED_FOR
@@ -41,7 +44,13 @@ return Application::configure(basePath: dirname(__DIR__))
             // 'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
+
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, Throwable $exception) => $request->is('api/*') || $request->expectsJson()
+        );
     })->create();
