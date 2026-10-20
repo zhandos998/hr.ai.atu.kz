@@ -258,3 +258,25 @@ cd /opt/apps/vacancy
 gunzip -c backups/mysql/vacancy_YYYYMMDD_HHMMSS.sql.gz | docker compose --env-file docker.env exec -T db sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u "$MYSQL_USER" "$MYSQL_DATABASE"'
 
 Внимание: восстановление перезаписывает данные в текущей базе.
+
+
+
+cd /opt/apps/vacancy
+git pull --ff-only origin master
+
+dc() { docker compose --env-file docker.env "$@"; }
+
+dc build app nginx
+
+dc exec -T app php artisan down
+dc stop queue
+dc up -d --no-build app nginx
+
+dc exec -T app php artisan migrate --force
+dc exec -T app php artisan documents:privatize
+dc exec -T app php artisan optimize:clear
+dc exec -T app php artisan optimize
+
+dc up -d --no-build queue
+dc exec -T app php artisan up
+dc ps

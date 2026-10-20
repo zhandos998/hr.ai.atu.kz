@@ -31,13 +31,16 @@ export default function PersonnelRequestForm() {
             try {
                 const requests = [
                     axios.get('/api/admin/personnel/reference-data'),
-                    editing ? axios.get('/api/admin/personnel/approval-routes') : Promise.resolve({ data: [] }),
+                    axios.get('/api/admin/personnel/approval-routes'),
                 ];
                 if (editing) requests.push(axios.get(`/api/personnel/requests/${requestId}`));
                 const [referenceResponse, routesResponse, requestResponse] = await Promise.all(requests);
                 setDepartments(referenceResponse.data.departments);
                 setUsers(referenceResponse.data.users);
                 setDefaultRoutes(routesResponse.data);
+                if (!editing) {
+                    setCreateApprovers(routesResponse.data.filter((route) => route.action_type === 'hire').map((route) => route.approver).filter(Boolean));
+                }
                 if (requestResponse) {
                     const data = requestResponse.data;
                     setItem(data);
@@ -61,8 +64,8 @@ export default function PersonnelRequestForm() {
     const positions = (departmentId) => departments.find((department) => Number(department.id) === Number(departmentId))?.positions || [];
     const positionOptions = useMemo(() => positions(form.department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.department_id]);
     const targetPositionOptions = useMemo(() => positions(form.target_department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.target_department_id]);
-    const selectedDefaults = useMemo(() => defaultRoutes.filter((route) => Number(route.department_id) === Number(form.department_id)), [defaultRoutes, form.department_id]);
-    const departmentChanged = editing && item && Number(item.department_id) !== Number(form.department_id);
+    const selectedDefaults = useMemo(() => defaultRoutes.filter((route) => route.action_type === form.action_type), [defaultRoutes, form.action_type]);
+    const actionChanged = editing && item && item.action_type !== form.action_type;
     const approverOptions = useMemo(() => {
         const used = new Set((editing ? (item?.approvals || []).map((approval) => approval.user_id) : createApprovers.map((user) => user.id)).map(Number));
         return users
@@ -74,14 +77,20 @@ export default function PersonnelRequestForm() {
             }));
     }, [createApprovers, editing, item?.approvals, users]);
 
-    const updateField = (name, value) => setForm((current) => {
-        const next = { ...current, [name]: value };
-        if (name === 'department_id') next.position_id = null;
-        if (name === 'target_department_id') next.target_position_id = null;
-        if (name === 'action_type' && value !== 'hire') { next.salary = ''; next.work_experience = ''; }
-        if (name === 'action_type' && value !== 'transfer') { next.target_department_id = null; next.target_position_id = null; }
-        return next;
-    });
+    const updateField = (name, value) => {
+        if (name === 'action_type' && value !== form.action_type && !editing) {
+            setCreateApprovers(defaultRoutes.filter((route) => route.action_type === value).map((route) => route.approver).filter(Boolean));
+            setSelectedApprover(null);
+        }
+        setForm((current) => {
+            const next = { ...current, [name]: value };
+            if (name === 'department_id') next.position_id = null;
+            if (name === 'target_department_id') next.target_position_id = null;
+            if (name === 'action_type' && value !== 'hire') { next.salary = ''; next.work_experience = ''; }
+            if (name === 'action_type' && value !== 'transfer') { next.target_department_id = null; next.target_position_id = null; }
+            return next;
+        });
+    };
 
     const addFiles = (event) => {
         const nextFiles = Array.from(event.target.files || []);
@@ -173,7 +182,7 @@ export default function PersonnelRequestForm() {
                             <Field label={_t("Кадровое действие")}><select required className={inputClass} value={form.action_type} onChange={(event) => updateField('action_type', event.target.value)}>{actionOptions.map((option) => <option key={option.value} value={option.value}>{_t(option.label)}</option>)}</select></Field>
                             <Field label={_t("Подразделение")}><SearchSelect value={form.department_id} onChange={(value) => updateField('department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field>
                             <Field label={_t("Текущая должность")}><SearchSelect value={form.position_id} onChange={(value) => updateField('position_id', value)} options={positionOptions} disabled={!form.department_id} placeholder={_t("Найти должность")} /></Field>
-                            {form.action_type === 'hire' && <><Field label={_t("Заработная плата")}><input required type="number" min="0" step="0.01" className={inputClass} value={form.salary} onChange={(event) => updateField('salary', event.target.value)} /></Field><Field label={_t("Стаж работы")}><input required className={inputClass} value={form.work_experience} onChange={(event) => updateField('work_experience', event.target.value)} /></Field></>}
+                            {form.action_type === 'hire' && <><Field label={_t("Заработная плата")}><input required type="number" min="0" step="0.01" className={inputClass} value={form.salary} onChange={(event) => updateField('salary', event.target.value)} /></Field>{editing && <Field label={_t("Стаж работы")}><input className={inputClass} value={form.work_experience} onChange={(event) => updateField('work_experience', event.target.value)} /></Field>}</>}
                             {form.action_type === 'transfer' && <><Field label={_t("Новое подразделение")}><SearchSelect value={form.target_department_id} onChange={(value) => updateField('target_department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field><Field label={_t("Новая должность")}><SearchSelect value={form.target_position_id} onChange={(value) => updateField('target_position_id', value)} options={targetPositionOptions} disabled={!form.target_department_id} placeholder={_t("Найти должность")} /></Field></>}
                             <div className="md:col-span-2"><Field label={_t("Дополнительная информация")}><textarea rows="4" className={inputClass} value={form.details} onChange={(event) => updateField('details', event.target.value)} /></Field></div>
                         </div>
@@ -210,7 +219,7 @@ export default function PersonnelRequestForm() {
 
                 {editing && <section className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
                     <h2 className="font-bold text-[#174a9c]">{_t("Комиссия по заявке")}</h2>
-                    {departmentChanged && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{_t("После сохранения состав будет заменён комиссией по умолчанию нового подразделения:")}{_t(selectedDefaults.length ? selectedDefaults.map((route) => route.approver?.name).join(', ') : 'не настроена')}.</div>}
+                    {actionChanged && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{_t("Комиссия нового кадрового действия:")} {_t(selectedDefaults.length ? selectedDefaults.map((route) => route.approver?.name).join(', ') : 'не настроена')}.</div>}
                     <div className="mt-3 divide-y rounded-md border border-gray-200">{(item?.approvals || []).map((approval) => <div key={approval.id} className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1fr_140px_auto] md:items-center"><div><div className="font-semibold">{approval.user?.name}</div><div className="text-xs text-gray-500">{approval.user?.email}</div></div><span className="text-gray-600">{_t(decisionLabel(approval.decision))}</span><button type="button" className="text-left font-semibold text-red-600 md:text-right" onClick={() => removeApprover(approval)}>{_t("Удалить")}</button></div>)}</div>
                     <div className="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]"><SearchSelect value={selectedApprover} onChange={setSelectedApprover} options={approverOptions} placeholder={_t("Найти пользователя")} /><input type="number" min="1" max="100" className={inputClass.replace('mt-1 ', '')} value={approvalOrder} placeholder={_t("Порядок")} onChange={(event) => setApprovalOrder(event.target.value)} /><button type="button" className={primaryButtonClass} disabled={!selectedApprover} onClick={addApprover}>{_t("Добавить")}</button></div>
                 </section>}

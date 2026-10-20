@@ -149,8 +149,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/personnel/requests/{id}/approvers/{approvalId}', [PersonnelRequestController::class, 'removeApprover'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
     Route::get('/admin/personnel/reference-data', [PersonnelRequestController::class, 'referenceData']);
     Route::get('/admin/personnel/approval-routes', [PersonnelRequestController::class, 'approvalRoutes']);
-    Route::post('/admin/personnel/approval-routes', [PersonnelRequestController::class, 'storeApprovalRoute']);
-    Route::delete('/admin/personnel/approval-routes/{id}', [PersonnelRequestController::class, 'destroyApprovalRoute']);
+    Route::put('/admin/personnel/approval-routes/{actionType}', [PersonnelRequestController::class, 'saveApprovalRoutes']);
 });
 
 Route::middleware(['auth:sanctum', 'lawyer'])->group(function () {

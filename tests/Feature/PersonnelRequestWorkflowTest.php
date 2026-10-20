@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
-use App\Models\PersonnelApprovalRoute;
+use App\Models\PersonnelActionApprovalRoute;
 use App\Models\PersonnelRequest;
 use App\Models\Position;
 use App\Models\User;
@@ -127,8 +127,8 @@ class PersonnelRequestWorkflowTest extends TestCase
             'name' => 'Экономист',
         ]);
 
-        PersonnelApprovalRoute::query()->create([
-            'department_id' => $department->id,
+        PersonnelActionApprovalRoute::query()->create([
+            'action_type' => 'hire',
             'approver_user_id' => $defaultApprover->id,
             'approval_order' => 1,
         ]);
@@ -159,6 +159,35 @@ class PersonnelRequestWorkflowTest extends TestCase
         $this->assertDatabaseMissing('personnel_request_approvals', [
             'user_id' => $defaultApprover->id,
         ]);
+    }
+
+    public function test_admin_can_create_and_update_hire_request_without_work_experience(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $approver = User::factory()->create(['role' => 'user']);
+        $department = Department::query()->create(['name' => 'Отдел кадров']);
+        Sanctum::actingAs($admin);
+
+        $payload = [
+            'employee_name' => 'Новый сотрудник',
+            'action_type' => 'hire',
+            'department_id' => $department->id,
+            'salary' => 350000,
+            'approver_user_ids' => [$approver->id],
+        ];
+        $id = $this->postJson('/api/admin/personnel/requests', $payload)
+            ->assertCreated()->json('request.id');
+
+        $this->assertDatabaseHas('personnel_requests', ['id' => $id, 'work_experience' => null]);
+
+        unset($payload['approver_user_ids']);
+        $payload['salary'] = 400000;
+        $this->postJson("/api/admin/personnel/requests/{$id}/update", $payload)->assertOk();
+        $this->assertDatabaseHas('personnel_requests', ['id' => $id, 'work_experience' => null, 'salary' => 400000]);
+
+        PersonnelRequest::query()->findOrFail($id)->update(['work_experience' => '5 лет']);
+        $this->postJson("/api/admin/personnel/requests/{$id}/update", $payload)->assertOk();
+        $this->assertDatabaseHas('personnel_requests', ['id' => $id, 'work_experience' => '5 лет']);
     }
 
     public function test_creating_request_requires_manually_selected_commission(): void
@@ -229,8 +258,8 @@ class PersonnelRequestWorkflowTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $approver = User::factory()->create();
         $department = Department::query()->create(['name' => 'HR']);
-        PersonnelApprovalRoute::query()->create([
-            'department_id' => $department->id,
+        PersonnelActionApprovalRoute::query()->create([
+            'action_type' => 'dismissal',
             'approver_user_id' => $approver->id,
             'approval_order' => 1,
         ]);
@@ -258,15 +287,15 @@ class PersonnelRequestWorkflowTest extends TestCase
         $this->assertDatabaseCount('personnel_request_documents', 1);
     }
 
-    public function test_editing_department_replaces_pending_commission_with_defaults(): void
+    public function test_editing_department_preserves_pending_commission(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $oldApprover = User::factory()->create();
         $newApprover = User::factory()->create();
         $oldDepartment = Department::query()->create(['name' => 'Старое подразделение']);
         $newDepartment = Department::query()->create(['name' => 'Новое подразделение']);
-        PersonnelApprovalRoute::query()->create([
-            'department_id' => $newDepartment->id,
+        PersonnelActionApprovalRoute::query()->create([
+            'action_type' => 'dismissal',
             'approver_user_id' => $newApprover->id,
             'approval_order' => 1,
         ]);
@@ -284,9 +313,9 @@ class PersonnelRequestWorkflowTest extends TestCase
             'employee_name' => 'Сотрудник',
             'action_type' => 'dismissal',
             'department_id' => $newDepartment->id,
-        ])->assertOk()->assertJsonPath('request.approvals.0.user_id', $newApprover->id);
+        ])->assertOk()->assertJsonPath('request.approvals.0.user_id', $oldApprover->id);
 
-        $this->assertDatabaseMissing('personnel_request_approvals', [
+        $this->assertDatabaseHas('personnel_request_approvals', [
             'personnel_request_id' => $personnelRequest->id,
             'user_id' => $oldApprover->id,
         ]);

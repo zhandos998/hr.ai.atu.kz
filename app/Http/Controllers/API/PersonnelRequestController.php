@@ -4,7 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
-use App\Models\PersonnelApprovalRoute;
+use App\Models\PersonnelActionApprovalRoute;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestApproval;
 use App\Models\PersonnelRequestDocument;
@@ -169,9 +169,9 @@ class PersonnelRequestController extends Controller
             'target_department_id' => ['nullable', 'required_if:action_type,transfer', 'integer', 'exists:departments,id'],
             'target_position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
-            'work_experience' => ['nullable', 'required_if:action_type,hire', 'string', 'max:255'],
+            'work_experience' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:5000'],
-            'approver_user_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'approver_user_ids' => ['sometimes', 'required', 'array', 'min:1', 'max:100'],
             'approver_user_ids.*' => ['required', 'integer', 'distinct', 'exists:users,id'],
             'documents' => ['nullable', 'array', 'max:20'],
             'documents.*' => ['file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'extensions:pdf,doc,docx,xls,xlsx,jpg,jpeg,png'],
@@ -187,7 +187,9 @@ class PersonnelRequestController extends Controller
             );
         }
 
-        $approverIds = array_map('intval', $validated['approver_user_ids']);
+        $approverIds = array_key_exists('approver_user_ids', $validated)
+            ? array_map('intval', $validated['approver_user_ids'])
+            : $this->defaultApproverIds($validated['action_type']);
         $eligibleApproverCount = $this->personnelApproverCandidatesQuery()
             ->whereIn('id', $approverIds)
             ->count();
@@ -212,7 +214,7 @@ class PersonnelRequestController extends Controller
                     : null,
                 'salary' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE ? $validated['salary'] : null,
                 'work_experience' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE
-                    ? trim($validated['work_experience'])
+                    ? $this->emptyToNull($validated['work_experience'] ?? null)
                     : null,
                 'details' => $this->emptyToNull($validated['details'] ?? null),
                 'status' => 'pending',
@@ -250,7 +252,7 @@ class PersonnelRequestController extends Controller
             'target_department_id' => ['nullable', 'required_if:action_type,transfer', 'integer', 'exists:departments,id'],
             'target_position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
-            'work_experience' => ['nullable', 'required_if:action_type,hire', 'string', 'max:255'],
+            'work_experience' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:5000'],
             'documents' => ['nullable', 'array', 'max:20'],
             'documents.*' => ['file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'extensions:pdf,doc,docx,xls,xlsx,jpg,jpeg,png'],
@@ -267,29 +269,10 @@ class PersonnelRequestController extends Controller
             );
         }
 
-        $departmentChanged = $departmentId !== (int) $personnelRequest->department_id;
-        $routes = collect();
-        if ($departmentChanged) {
-            if ($personnelRequest->approvals()->where('decision', '!=', 'pending')->exists()) {
-                throw ValidationException::withMessages([
-                    'department_id' => ['Нельзя менять подразделение после начала согласования.'],
-                ]);
-            }
+        $actionChanged = $validated['action_type'] !== $personnelRequest->action_type;
+        $approverIds = $actionChanged ? $this->defaultApproverIds($validated['action_type']) : [];
 
-            $routes = PersonnelApprovalRoute::query()
-                ->where('department_id', $departmentId)
-                ->orderBy('approval_order')
-                ->orderBy('id')
-                ->get();
-
-            if ($routes->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'department_id' => ['Для выбранного подразделения не настроена комиссия по умолчанию.'],
-                ]);
-            }
-        }
-
-        DB::transaction(function () use ($personnelRequest, $validated, $departmentChanged, $routes, $request) {
+        DB::transaction(function () use ($personnelRequest, $validated, $actionChanged, $approverIds, $request) {
             $personnelRequest->update([
                 'employee_name' => trim($validated['employee_name']),
                 'action_type' => $validated['action_type'],
@@ -303,17 +286,17 @@ class PersonnelRequestController extends Controller
                     : null,
                 'salary' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE ? $validated['salary'] : null,
                 'work_experience' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE
-                    ? trim($validated['work_experience'])
+                    ? $this->emptyToNull($validated['work_experience'] ?? $personnelRequest->work_experience)
                     : null,
                 'details' => $this->emptyToNull($validated['details'] ?? null),
             ]);
 
-            if ($departmentChanged) {
+            if ($actionChanged) {
                 $personnelRequest->approvals()->delete();
-                foreach ($routes as $route) {
+                foreach ($approverIds as $index => $approverId) {
                     $personnelRequest->approvals()->create([
-                        'user_id' => $route->approver_user_id,
-                        'approval_order' => $route->approval_order,
+                        'user_id' => $approverId,
+                        'approval_order' => $index + 1,
                         'decision' => 'pending',
                     ]);
                 }
@@ -482,6 +465,7 @@ class PersonnelRequestController extends Controller
     public function referenceData(): JsonResponse
     {
         $users = $this->personnelApproverCandidatesQuery()
+            ->with(['positions:id,name,department_id,academic_unit_id', 'positions.department:id,name', 'positions.academicUnit:id,name'])
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'phone'])
             ->map(fn (User $user) => [
@@ -489,6 +473,7 @@ class PersonnelRequestController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'positions' => $user->positions,
             ])
             ->values();
 
@@ -503,51 +488,67 @@ class PersonnelRequestController extends Controller
 
     public function approvalRoutes(): JsonResponse
     {
-        $routes = PersonnelApprovalRoute::query()
-            ->with(['department:id,name', 'approver:id,name,email'])
-            ->orderBy('department_id')
+        $routes = PersonnelActionApprovalRoute::query()
+            ->with(['approver:id,name,email', 'approver.positions:id,name,department_id,academic_unit_id', 'approver.positions.department:id,name', 'approver.positions.academicUnit:id,name'])
+            ->orderBy('action_type')
             ->orderBy('approval_order')
+            ->orderBy('id')
             ->get();
 
-        $routes->each(fn (PersonnelApprovalRoute $route) => $route->approver?->setAppends([]));
+        $routes->each(fn (PersonnelActionApprovalRoute $route) => $route->approver?->setAppends([]));
 
         return response()->json($routes);
     }
 
-    public function storeApprovalRoute(Request $request): JsonResponse
+    public function saveApprovalRoutes(Request $request, string $actionType): JsonResponse
     {
-        $validated = $request->validate([
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-            'approver_user_id' => [
-                'required',
-                'integer',
-                'exists:users,id',
-                Rule::unique('personnel_approval_routes')->where(
-                    fn ($query) => $query->where('department_id', $request->input('department_id'))
-                ),
-            ],
-            'approval_order' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        abort_unless(in_array($actionType, self::ACTION_TYPES, true), 404);
 
-        $route = PersonnelApprovalRoute::query()->create([
-            ...$validated,
-            'approval_order' => $validated['approval_order'] ?? 1,
+        $validated = $request->validate([
+            'approver_user_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'approver_user_ids.*' => ['required', 'integer', 'distinct', 'exists:users,id'],
+        ], [
+            'approver_user_ids.*.distinct' => 'Участники комиссии не должны повторяться.',
         ]);
+        $ids = array_map('intval', $validated['approver_user_ids']);
+        if ($this->personnelApproverCandidatesQuery()->whereIn('id', $ids)->count() !== count($ids)) {
+            throw ValidationException::withMessages([
+                'approver_user_ids' => ['В составе комиссии есть недоступный пользователь.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($actionType, $ids) {
+            PersonnelActionApprovalRoute::query()->where('action_type', $actionType)->delete();
+            foreach ($ids as $index => $id) {
+                PersonnelActionApprovalRoute::query()->create([
+                    'action_type' => $actionType,
+                    'approver_user_id' => $id,
+                    'approval_order' => $index + 1,
+                ]);
+            }
+        });
 
         return response()->json([
-            'message' => 'Согласующий добавлен.',
-            'route' => tap(
-                $route->load(['department:id,name', 'approver:id,name,email']),
-                fn (PersonnelApprovalRoute $loadedRoute) => $loadedRoute->approver?->setAppends([])
-            ),
+            'message' => 'Комиссия по умолчанию сохранена.',
         ], 201);
     }
 
-    public function destroyApprovalRoute(int $id): JsonResponse
+    private function defaultApproverIds(string $actionType): array
     {
-        PersonnelApprovalRoute::query()->findOrFail($id)->delete();
+        $ids = PersonnelActionApprovalRoute::query()->where('action_type', $actionType)
+            ->orderBy('approval_order')->orderBy('id')->pluck('approver_user_id')->map(fn ($id) => (int) $id)->all();
+        if ($ids === []) {
+            throw ValidationException::withMessages([
+                'approver_user_ids' => ['Настройте комиссию по умолчанию для выбранного кадрового действия.'],
+            ]);
+        }
+        if ($this->personnelApproverCandidatesQuery()->whereIn('id', $ids)->count() !== count($ids)) {
+            throw ValidationException::withMessages([
+                'approver_user_ids' => ['Обновите комиссию по умолчанию: в её составе есть недоступный пользователь.'],
+            ]);
+        }
 
-        return response()->json(['message' => 'Согласующий удалён из маршрута.']);
+        return $ids;
     }
 
     private function findAuthorized(Request $request, int $id): PersonnelRequest
