@@ -194,15 +194,14 @@ export default function PersonnelRequests() {
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span
-                                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}
+                                                        className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}
                                                     >
                                                         {_t(statusLabel(
                                                             item.status,
                                                         ))}
                                                     </span>
-                                                    <div className="mt-1 text-xs text-gray-500">
-                                                        {_t(approved)}{_t("из")}{" "}
-                                                        {_t(item.approvals.length)}
+                                                    <div className="mt-1 whitespace-nowrap text-xs text-gray-500">
+                                                        {`${approved} ${_t("из")} ${item.approvals.length}`}
                                                     </div>
                                                 </td>
                                                 {canViewFinancialData && <td className="px-5 py-4 text-gray-600">
@@ -214,7 +213,7 @@ export default function PersonnelRequests() {
                                                     ))}
                                                 </td>
                                                 <td className="px-5 py-4">
-                                                    <div className="flex justify-end gap-3">
+                                                    <div className="flex items-center justify-end gap-3 whitespace-nowrap">
                                                         <Link
                                                             href={`${base}/${item.id}${window.location.search}`}
                                                             className="font-semibold text-[#174a9c]"
