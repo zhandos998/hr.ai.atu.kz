@@ -147,6 +147,8 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/users/{id}/positions/{positionId}', [AdminUserController::class, 'detachPosition']);
 
     Route::post('/admin/personnel/requests', [PersonnelRequestController::class, 'store']);
+    Route::post('/admin/personnel/requests/{id}/archive', [PersonnelRequestController::class, 'archive'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
+    Route::post('/admin/personnel/requests/{id}/restore', [PersonnelRequestController::class, 'restore'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
     Route::post('/admin/personnel/requests/{id}/update', [PersonnelRequestController::class, 'update'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
     Route::post('/admin/personnel/requests/{id}/documents', [PersonnelRequestController::class, 'uploadDocuments'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);
     Route::delete('/admin/personnel/requests/{id}/documents/{documentId}', [PersonnelRequestController::class, 'destroyDocument'])->middleware(\App\Http\Middleware\LockPersonnelRequest::class);

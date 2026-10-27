@@ -43,6 +43,7 @@ class PersonnelRequestController extends Controller
         );
 
         $items = PersonnelRequest::query()
+            ->whereNull('archived_at')
             ->where(function ($query) use ($searchWords) {
                 foreach ($searchWords as $word) {
                     $query->where('employee_name', 'like', "%{$word}%");
@@ -104,6 +105,7 @@ class PersonnelRequestController extends Controller
         $actionType = trim((string) $request->query('action_type', ''));
 
         $query = PersonnelRequest::query()
+            ->when($request->boolean('archived'), fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
             ->with([
                 'department:id,name',
                 'position:id,name',
@@ -240,6 +242,24 @@ class PersonnelRequestController extends Controller
         ], 201);
     }
 
+    public function archive(Request $request, int $id): JsonResponse
+    {
+        $item = PersonnelRequest::query()->findOrFail($id);
+        if ($item->archived_at === null) {
+            $item->update(['archived_at' => now(), 'archived_by' => $request->user()->id]);
+        }
+
+        return response()->json(['request' => $this->loadDetails($item)]);
+    }
+
+    public function restore(int $id): JsonResponse
+    {
+        $item = PersonnelRequest::query()->findOrFail($id);
+        $item->update(['archived_at' => null, 'archived_by' => null]);
+
+        return response()->json(['request' => $this->loadDetails($item)]);
+    }
+
     public function update(Request $request, int $id): JsonResponse
     {
         $personnelRequest = PersonnelRequest::query()->findOrFail($id);
@@ -345,7 +365,7 @@ class PersonnelRequestController extends Controller
     public function addApprover(Request $request, int $id): JsonResponse
     {
         $personnelRequest = PersonnelRequest::query()->findOrFail($id);
-        $this->ensureEditable($personnelRequest);
+        $this->ensureActive($personnelRequest);
         $validated = $request->validate([
             'user_id' => [
                 'required',
@@ -380,14 +400,19 @@ class PersonnelRequestController extends Controller
     public function removeApprover(int $id, int $approvalId): JsonResponse
     {
         $personnelRequest = PersonnelRequest::query()->findOrFail($id);
-        $this->ensureEditable($personnelRequest);
+        $this->ensureActive($personnelRequest);
+        $approval = $personnelRequest->approvals()->findOrFail($approvalId);
+        if ($approval->decision !== 'pending' || $approval->decided_at !== null) {
+            throw ValidationException::withMessages([
+                'approval' => ['Нельзя удалить участника, который уже принял решение.'],
+            ]);
+        }
         if ($personnelRequest->approvals()->count() <= 1) {
             throw ValidationException::withMessages([
                 'approval' => ['В комиссии должен остаться хотя бы один участник.'],
             ]);
         }
 
-        $approval = $personnelRequest->approvals()->findOrFail($approvalId);
         $approval->delete();
         $personnelRequest->refreshStatus();
 
@@ -405,6 +430,7 @@ class PersonnelRequestController extends Controller
         ]);
 
         $personnelRequest = $this->findAuthorized($request, $id);
+        $this->ensureActive($personnelRequest);
 
         if ($request->user()->isAdmin()) {
             throw ValidationException::withMessages([
@@ -638,8 +664,16 @@ class PersonnelRequestController extends Controller
 
     private function ensureEditable(PersonnelRequest $personnelRequest): void
     {
+        $this->ensureActive($personnelRequest);
         if ($personnelRequest->status !== 'pending' || $personnelRequest->approvals()->where('decision', '!=', 'pending')->exists()) {
-            throw ValidationException::withMessages(['request' => ['После начала согласования содержание, документы и состав комиссии менять нельзя. Создайте новую заявку.']]);
+            throw ValidationException::withMessages(['request' => ['После начала согласования содержание и документы менять нельзя. Создайте новую заявку.']]);
+        }
+    }
+
+    private function ensureActive(PersonnelRequest $personnelRequest): void
+    {
+        if ($personnelRequest->archived_at !== null) {
+            throw ValidationException::withMessages(['request' => ['Кадровый процесс в архиве. Сначала восстановите его.']]);
         }
     }
 

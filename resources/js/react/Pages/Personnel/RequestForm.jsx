@@ -5,8 +5,9 @@ import axios from 'axios';
 import { UserPlus, X } from 'lucide-react';
 import Layout from '../../Components/Layout';
 import SearchSelect from '../../Components/SearchSelect';
+import PersonnelCommission from '../../Components/PersonnelCommission';
 import { Alert, Field, inputClass, primaryButtonClass, secondaryButtonClass } from '../../Components/Form';
-import { actionOptions, decisionLabel, emptyPersonnelForm, errorText, formatFileSize } from '../../personnel';
+import { actionOptions, emptyPersonnelForm, errorText, formatFileSize } from '../../personnel';
 
 export default function PersonnelRequestForm() {
     const { t: _t } = useTextI18n();
@@ -20,7 +21,6 @@ export default function PersonnelRequestForm() {
     const [files, setFiles] = useState([]);
     const [createApprovers, setCreateApprovers] = useState([]);
     const [selectedApprover, setSelectedApprover] = useState(null);
-    const [approvalOrder, setApprovalOrder] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -64,8 +64,9 @@ export default function PersonnelRequestForm() {
     const positions = (departmentId) => departments.find((department) => Number(department.id) === Number(departmentId))?.positions || [];
     const positionOptions = useMemo(() => positions(form.department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.department_id]);
     const targetPositionOptions = useMemo(() => positions(form.target_department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.target_department_id]);
-    const selectedDefaults = useMemo(() => defaultRoutes.filter((route) => route.action_type === form.action_type), [defaultRoutes, form.action_type]);
+    const contentLocked = editing && item && (item.archived_at || item.status !== 'pending' || item.approvals.some((approval) => approval.decision !== 'pending'));
     const actionChanged = editing && item && item.action_type !== form.action_type;
+    const selectedDefaults = defaultRoutes.filter((route) => route.action_type === form.action_type);
     const approverOptions = useMemo(() => {
         const used = new Set((editing ? (item?.approvals || []).map((approval) => approval.user_id) : createApprovers.map((user) => user.id)).map(Number));
         return users
@@ -136,17 +137,6 @@ export default function PersonnelRequestForm() {
         } catch (requestError) { setError(errorText(requestError)); }
     };
 
-    const addApprover = async () => {
-        if (!selectedApprover) return;
-        try {
-            const { data } = await axios.post(`/api/admin/personnel/requests/${requestId}/approvers`, {
-                user_id: selectedApprover,
-                approval_order: approvalOrder || null,
-            });
-            setItem(data.request); setSelectedApprover(null); setApprovalOrder('');
-        } catch (requestError) { setError(errorText(requestError)); }
-    };
-
     const addCreateApprover = () => {
         const user = users.find((candidate) => Number(candidate.id) === Number(selectedApprover));
         if (!user || createApprovers.some((candidate) => Number(candidate.id) === Number(user.id))) return;
@@ -158,14 +148,6 @@ export default function PersonnelRequestForm() {
         setCreateApprovers((current) => current.filter((user) => Number(user.id) !== Number(userId)));
     };
 
-    const removeApprover = async (approval) => {
-        if (!window.confirm(`Удалить ${approval.user?.name} из комиссии?`)) return;
-        try {
-            const { data } = await axios.delete(`/api/admin/personnel/requests/${requestId}/approvers/${approval.id}`);
-            setItem(data.request);
-        } catch (requestError) { setError(errorText(requestError)); }
-    };
-
     const title = editing ? `Изменить кадровую заявку №${requestId}` : 'Новая кадровая заявка';
     const actions = <Link href={editing ? `/admin/personnel-requests/${requestId}` : '/admin/personnel-requests'} className={secondaryButtonClass}>{_t(editing ? 'К просмотру' : 'Назад к списку')}</Link>;
 
@@ -174,9 +156,11 @@ export default function PersonnelRequestForm() {
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
             <Alert>{_t(error)}</Alert>
             {loading ? <div className="py-16 text-center text-gray-500">{_t("Загрузка...")}</div> : <>
-                <form className="space-y-6" onSubmit={submit}>
+                {contentLocked && <p className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{_t(item.archived_at ? 'Кадровый процесс в архиве. Сначала восстановите его.' : 'После начала согласования содержание и документы менять нельзя. Создайте новую заявку.')}</p>}
+                {!contentLocked && <form className="space-y-6" onSubmit={submit}>
                     <section className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
                         <h2 className="font-bold text-[#174a9c]">{_t("Данные заявки")}</h2>
+                        {actionChanged && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{_t("Комиссия нового кадрового действия:")} {_t(selectedDefaults.length ? selectedDefaults.map((route) => route.approver?.name).join(', ') : 'не настроена')}.</div>}
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
                             <Field label={_t("ФИО сотрудника")}><input required className={inputClass} value={form.employee_name} onChange={(event) => updateField('employee_name', event.target.value)} /></Field>
                             <Field label={_t("Кадровое действие")}><select required className={inputClass} value={form.action_type} onChange={(event) => updateField('action_type', event.target.value)}>{actionOptions.map((option) => <option key={option.value} value={option.value}>{_t(option.label)}</option>)}</select></Field>
@@ -215,14 +199,9 @@ export default function PersonnelRequestForm() {
                     </section>}
 
                     <div className="flex justify-end gap-3"><Link href={editing ? `/admin/personnel-requests/${requestId}` : '/admin/personnel-requests'} className={secondaryButtonClass}>{_t("Отмена")}</Link><button className={primaryButtonClass} disabled={saving || !form.department_id || (!editing && createApprovers.length === 0)}>{_t(saving ? 'Сохранение...' : 'Сохранить')}</button></div>
-                </form>
+                </form>}
 
-                {editing && <section className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
-                    <h2 className="font-bold text-[#174a9c]">{_t("Комиссия по заявке")}</h2>
-                    {actionChanged && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{_t("Комиссия нового кадрового действия:")} {_t(selectedDefaults.length ? selectedDefaults.map((route) => route.approver?.name).join(', ') : 'не настроена')}.</div>}
-                    <div className="mt-3 divide-y rounded-md border border-gray-200">{(item?.approvals || []).map((approval) => <div key={approval.id} className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1fr_140px_auto] md:items-center"><div><div className="font-semibold">{approval.user?.name}</div><div className="text-xs text-gray-500">{approval.user?.email}</div></div><span className="text-gray-600">{_t(decisionLabel(approval.decision))}</span><button type="button" className="text-left font-semibold text-red-600 md:text-right" onClick={() => removeApprover(approval)}>{_t("Удалить")}</button></div>)}</div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]"><SearchSelect value={selectedApprover} onChange={setSelectedApprover} options={approverOptions} placeholder={_t("Найти пользователя")} /><input type="number" min="1" max="100" className={inputClass.replace('mt-1 ', '')} value={approvalOrder} placeholder={_t("Порядок")} onChange={(event) => setApprovalOrder(event.target.value)} /><button type="button" className={primaryButtonClass} disabled={!selectedApprover} onClick={addApprover}>{_t("Добавить")}</button></div>
-                </section>}
+                {editing && item && !item.archived_at && <PersonnelCommission item={item} onChanged={setItem} />}
             </>}
         </div>
     </Layout>;

@@ -7,8 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class PersonnelRequest extends Model
 {
     public const ACTION_HIRE = 'hire';
+
     public const ACTION_DISMISSAL = 'dismissal';
+
     public const ACTION_TRANSFER = 'transfer';
+
     public const ACTION_MATERNITY_LEAVE = 'maternity_leave';
 
     protected $guarded = [];
@@ -17,6 +20,7 @@ class PersonnelRequest extends Model
     {
         return [
             'salary' => 'decimal:2',
+            'archived_at' => 'datetime',
         ];
     }
 

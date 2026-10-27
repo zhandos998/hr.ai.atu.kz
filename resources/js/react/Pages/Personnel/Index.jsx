@@ -1,9 +1,11 @@
 import { useI18n as useTextI18n } from "../../I18nContext";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Head, Link, usePage } from "@inertiajs/react";
 import axios from "axios";
 import Layout from "../../Components/Layout";
 import { useAuth } from "../../AuthContext";
+import PersonnelArchiveButton from "../../Components/PersonnelArchiveButton";
+import { Archive, ArrowLeft } from 'lucide-react';
 import {
     actionLabel,
     actionOptions,
@@ -25,30 +27,38 @@ export default function PersonnelRequests() {
         total: 0,
     });
     const [loading, setLoading] = useState(true);
-    const [filters, setFilters] = useState({
-        q: "",
-        status: "",
-        action_type: "",
+    const [error, setError] = useState('');
+    const [filters, setFilters] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return { q: params.get('q') || '', status: params.get('status') || '', action_type: params.get('action_type') || '', archived: params.get('archived') === '1' ? '1' : '0' };
     });
     const [draft, setDraft] = useState(filters);
+    const latestLoad = useRef(0);
 
     const load = async (page = 1, activeFilters = filters) => {
+        const sequence = ++latestLoad.current;
         setLoading(true);
+        setError('');
         try {
             const { data } = await axios.get("/api/personnel/requests", {
                 params: { ...activeFilters, page },
             });
+            if (sequence !== latestLoad.current) return;
+            if (page > data.meta.last_page) return load(data.meta.last_page, activeFilters);
             setRequests(data.data);
             setMeta(data.meta);
+            const params = new URLSearchParams({ ...activeFilters, page: String(page) });
+            window.history.replaceState(window.history.state, '', `${window.location.pathname}?${params}`);
         } catch (error) {
-            window.alert(errorText(error));
+            if (sequence === latestLoad.current) setError(errorText(error));
         } finally {
-            setLoading(false);
+            if (sequence === latestLoad.current) setLoading(false);
         }
     };
 
     useEffect(() => {
-        load();
+        load(Math.max(1, Number(new URLSearchParams(window.location.search).get('page')) || 1));
+        return () => { latestLoad.current += 1; };
     }, []);
 
     const actions = admin ? (
@@ -75,6 +85,14 @@ export default function PersonnelRequests() {
                 title={_t(admin ? "Кадровые процессы" : "Кадровое согласование")}
             />
             <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+                <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-gray-700">{_t(filters.archived === '1' ? 'Архивные кадровые процессы' : 'Кадровые процессы')} <span className="text-gray-400">({meta.total})</span></h2>
+                    <button type="button" disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 disabled:opacity-50" onClick={() => {
+                        const next = { ...filters, archived: filters.archived === '1' ? '0' : '1' };
+                        setFilters(next); setDraft((current) => ({ ...current, archived: next.archived })); load(1, next);
+                    }}>{filters.archived === '1' ? <ArrowLeft size={16} /> : <Archive size={16} />}{_t(filters.archived === '1' ? 'К активным' : 'Архивные')}</button>
+                </div>
+                {error && <p role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">{_t(error)}</p>}
                 <form
                     className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 md:grid-cols-[1fr_220px_200px_auto]"
                     onSubmit={(event) => {
@@ -198,15 +216,16 @@ export default function PersonnelRequests() {
                                                 <td className="px-5 py-4">
                                                     <div className="flex justify-end gap-3">
                                                         <Link
-                                                            href={`${base}/${item.id}`}
+                                                            href={`${base}/${item.id}${window.location.search}`}
                                                             className="font-semibold text-[#174a9c]"
                                                         >{_t("Открыть")}</Link>
-                                                        {admin && (
+                                                        {admin && !item.archived_at && (
                                                             <Link
                                                                 href={`${base}/${item.id}/edit`}
                                                                 className="font-semibold text-gray-600"
                                                             >{_t("Изменить")}</Link>
                                                         )}
+                                                        {admin && <PersonnelArchiveButton item={item} onChanged={() => load(meta.current_page)} onError={setError} />}
                                                     </div>
                                                 </td>
                                             </tr>
