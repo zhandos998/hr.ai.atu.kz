@@ -90,7 +90,7 @@ const decisionLabel = (vote, type) =>
 export default function CommissionShow() {
     const { t: _t } = useTextI18n();
     const { props: { applicationId }, url } = usePage();
-    const competitionFilter = new URLSearchParams(url.split("?")[1] || "").get("competition_id");
+    const listFilters = new URLSearchParams(url.split("?")[1] || "");
     const [item, setItem] = useState(null);
     const [comment, setComment] = useState("");
     const [loading, setLoading] = useState(true);
@@ -146,7 +146,7 @@ export default function CommissionShow() {
             <Head title={_t(`Заявка комиссии №${applicationId}`)} />
             <div className="mx-auto max-w-6xl space-y-5 px-4 py-8">
                 <Link
-                    href={`/commission/applications?type=${type || "pps"}${competitionFilter ? `&competition_id=${encodeURIComponent(competitionFilter)}` : ""}`}
+                    href={`/commission/applications?${new URLSearchParams({ ...Object.fromEntries([...listFilters].filter(([key]) => ['competition_id', 'page', 'per_page', 'q'].includes(key))), type: type || listFilters.get('type') || 'pps' }).toString()}`}
                     className="text-sm font-semibold text-[#174a9c]"
                 >{_t("← Вернуться к списку")}</Link>
                 <Alert>{_t(error)}</Alert>

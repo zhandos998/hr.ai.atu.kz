@@ -4,13 +4,7 @@ import { Head, Link } from "@inertiajs/react";
 import axios from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Layout from "../../Components/Layout";
-import { errorText, inputClass } from "../../Components/Form";
-
-const competitionKey = (item) => String(item.competition_id || "none");
-const order = (item) =>
-    Number(item.voting_order) > 0
-        ? Number(item.voting_order)
-        : Number.MAX_SAFE_INTEGER;
+import { Alert, errorText, inputClass } from "../../Components/Form";
 const decisionLabel = (vote, type) =>
     !vote
         ? "Не голосовал"
@@ -27,69 +21,54 @@ export default function CommissionApplications() {
     const query = new URLSearchParams(window.location.search);
     const queryType = query.get("type");
     const [items, setItems] = useState([]);
-    const [type, setType] = useState(
-        ["pps", "staff"].includes(queryType) ? queryType : "pps",
-    );
-    const [activeCompetition, setActiveCompetition] = useState(
-        query.get("competition_id") || "",
-    );
-    const [search, setSearch] = useState("");
+    const [filters, setFilters] = useState(() => ({
+        type: ["pps", "staff"].includes(queryType) ? queryType : "pps",
+        competition_id: query.get("competition_id") || "",
+        q: query.get("q") || "",
+        page: Math.max(1, Number(query.get("page")) || 1),
+        per_page: [10, 25, 50, 100].includes(Number(query.get("per_page"))) ? Number(query.get("per_page")) : 25,
+    }));
+    const { type, competition_id: activeCompetition } = filters;
+    const [search, setSearch] = useState(filters.q);
+    const [counts, setCounts] = useState({ pps: 0, staff: 0 });
+    const [groups, setGroups] = useState([]);
+    const [meta, setMeta] = useState({ current_page: 1, last_page: 1, from: null, to: null, total: 0 });
+    const [error, setError] = useState("");
     const [comments, setComments] = useState({});
     const [loading, setLoading] = useState(true);
     const [savingId, setSavingId] = useState(null);
     const scroller = useRef(null);
-    const load = async () => {
+    useEffect(() => {
+        const controller = new AbortController();
         setLoading(true);
-        try {
-            const { data } = await axios.get("/api/commission/applications");
-            setItems(data);
-            setComments(
-                Object.fromEntries(
-                    data.map((item) => [
-                        item.id,
-                        item.vote_summary?.my_vote?.comment || "",
-                    ]),
-                ),
-            );
-        } catch (error) {
-            window.alert(errorText(error));
-        } finally {
-            setLoading(false);
-        }
-    };
-    useEffect(() => {
-        load();
-    }, []);
-    const typed = useMemo(
-        () => items.filter((item) => item.vacancy?.type === type),
-        [items, type],
-    );
-    const competitions = useMemo(() => {
-        const groups = new Map();
-        typed.forEach((item) => {
-            const value = competitionKey(item);
-            if (!groups.has(value)) {
-                groups.set(value, {
-                    value,
-                    count: 0,
-                    label: item.competition?.title || "Без конкурса",
+        setError("");
+        axios.get("/api/commission/applications", { params: filters, signal: controller.signal })
+            .then(({ data }) => {
+                if (controller.signal.aborted) return;
+                const page = Math.min(data.meta.current_page, data.meta.last_page);
+                const competition_id = data.filters.competition_id;
+                setItems(data.data); setMeta(data.meta); setCounts(data.counts); setGroups(data.competitions);
+                setComments((previous) => {
+                    const next = { ...previous };
+                    data.data.forEach((item) => { if (!(item.id in next)) next[item.id] = item.vote_summary?.my_vote?.comment || ""; });
+                    return next;
                 });
-            }
-            groups.get(value).count++;
-        });
-        return Array.from(groups.values()).sort((a, b) =>
-            a.value === "none"
-                ? 1
-                : b.value === "none"
-                  ? -1
-                  : Number(b.value) - Number(a.value),
-        );
-    }, [typed]);
+                const nextFilters = { ...filters, page, competition_id };
+                const url = new URL(window.location.href);
+                Object.entries(nextFilters).forEach(([key, value]) => value === "" ? url.searchParams.delete(key) : url.searchParams.set(key, String(value)));
+                window.history.replaceState(window.history.state, "", url);
+                if (page !== filters.page || competition_id !== filters.competition_id) setFilters(nextFilters);
+            })
+            .catch((requestError) => { if (!controller.signal.aborted) { setError(errorText(requestError)); setItems([]); } })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [filters]);
     useEffect(() => {
-        if (loading || activeCompetition === "all") return;
-        if (!competitions.some((competition) => competition.value === activeCompetition))
-            setActiveCompetition(competitions[0]?.value || "all");
-    }, [competitions, activeCompetition, loading]);
+        if (search === filters.q) return;
+        const timeout = window.setTimeout(() => setFilters((previous) => ({ ...previous, q: search, page: 1 })), 300);
+        return () => window.clearTimeout(timeout);
+    }, [search, filters.q]);
+    const competitions = useMemo(() => groups.filter((group) => group.type === type), [groups, type]);
     useEffect(() => {
         const container = scroller.current;
         const selected = container?.querySelector('[aria-pressed="true"]');
@@ -102,44 +81,26 @@ export default function CommissionApplications() {
         observer.observe(container);
         return () => observer.disconnect();
     }, [activeCompetition, type, competitions.length]);
-    const filtered = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return typed
-            .filter(
-                (item) =>
-                    (activeCompetition === "all" ||
-                        competitionKey(item) === activeCompetition) &&
-                    (!query ||
-                        [
-                            item.id,
-                            item.user?.name,
-                            item.user?.email,
-                            item.vacancy?.title,
-                            item.pps_profile?.desired_position,
-                            item.pps_profile?.faculty_name,
-                            item.pps_profile?.department_name,
-                        ].some((value) =>
-                            String(value || "")
-                                .toLowerCase()
-                                .includes(query),
-                        )),
-            )
-            .sort((a, b) => order(a) - order(b) || Number(a.id) - Number(b.id));
-    }, [activeCompetition, search, typed]);
     const vote = async (item, decision, years = null) => {
         setSavingId(item.id);
         try {
-            await axios.post(`/api/commission/applications/${item.id}/vote`, {
+            const { data } = await axios.post(`/api/commission/applications/${item.id}/vote`, {
                 decision,
                 hire_term_years: years,
                 comment: comments[item.id]?.trim() || null,
             });
-            await load();
+            setItems((previous) => previous.map((row) => row.id === item.id ? data.application : row));
+            setComments((previous) => ({ ...previous, [item.id]: data.application.vote_summary?.my_vote?.comment || "" }));
         } catch (error) {
             window.alert(errorText(error));
         } finally {
             setSavingId(null);
         }
+    };
+    const pagination = {
+        meta, loading, perPage: filters.per_page,
+        onPage: (page) => setFilters((previous) => ({ ...previous, page })),
+        onPerPage: (per_page) => setFilters((previous) => ({ ...previous, per_page, page: 1 })),
     };
     return (
         <Layout
@@ -149,6 +110,7 @@ export default function CommissionApplications() {
         >
             <Head title={_t("Голосование комиссии")} />
             <div className="mx-auto max-w-6xl space-y-5 px-4 py-8">
+                <Alert>{_t(error)}</Alert>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex gap-2">
                         {[
@@ -158,13 +120,12 @@ export default function CommissionApplications() {
                             <button
                                 key={value}
                                 className={`rounded-md border px-4 py-2 text-sm font-semibold ${type === value ? "border-[#005eb8] bg-[#005eb8] text-white" : "border-gray-300 bg-white text-gray-700"}`}
-                                onClick={() => setType(value)}
+                                disabled={loading}
+                                onClick={() => setFilters((previous) => ({ ...previous, type: value, competition_id: "", page: 1 }))}
                             >
                                 {_t(label)} (
                                 {
-                                    _t(items.filter(
-                                        (item) => item.vacancy?.type === value,
-                                    ).length)
+                                    _t(counts[value])
                                 }
                                 )
                             </button>
@@ -173,12 +134,13 @@ export default function CommissionApplications() {
                     <input
                         className={`${inputClass.replace("mt-1 ", "")} lg:max-w-md`}
                         type="search"
+                        maxLength={255}
                         value={search}
                         placeholder={_t("Кандидат, должность или кафедра")}
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </div>
-                {typed.length > 0 && (
+                {counts[type] > 0 && (
                     <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-3">
                         <button
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -201,17 +163,19 @@ export default function CommissionApplications() {
                             <div className="flex min-w-max gap-2">
                                 <button
                                     aria-pressed={activeCompetition === "all"}
+                                    disabled={loading}
                                     className={`rounded-md border px-3 py-2 text-sm font-semibold ${activeCompetition === "all" ? "border-[#005eb8] bg-[#005eb8] text-white" : "border-gray-300 bg-white text-gray-700"}`}
-                                    onClick={() => setActiveCompetition("all")}
-                                >{_t("Все")} ({typed.length})
+                                    onClick={() => setFilters((previous) => ({ ...previous, competition_id: "all", page: 1 }))}
+                                >{_t("Все")} ({counts[type]})
                                 </button>
                                 {competitions.map((competition) => (
                                     <button
                                         key={competition.value}
                                         aria-pressed={activeCompetition === competition.value}
+                                        disabled={loading}
                                         className={`max-w-[min(18rem,100cqi)] whitespace-normal break-words rounded-md border px-3 py-2 text-left text-sm font-semibold ${activeCompetition === competition.value ? "border-[#005eb8] bg-[#005eb8] text-white" : "border-gray-300 bg-white text-gray-700"}`}
                                         onClick={() =>
-                                            setActiveCompetition(competition.value)
+                                            setFilters((previous) => ({ ...previous, competition_id: competition.value, page: 1 }))
                                         }
                                     >
                                         {_t(competition.label)} ({competition.count})
@@ -235,19 +199,20 @@ export default function CommissionApplications() {
                         </button>
                     </div>
                 )}
+                <CommissionPagination {...pagination} />
                 {loading ? (
                     <div className="py-12 text-center text-gray-500">{_t("Загрузка...")}</div>
-                ) : filtered.length === 0 ? (
+                ) : items.length === 0 ? (
                     <div className="rounded-md border border-gray-200 bg-white py-12 text-center text-gray-500">{_t("Нет заявок для голосования.")}</div>
                 ) : (
                     <div className="space-y-4">
-                        {filtered.map((item, index) => (
+                        {items.map((item, index) => (
                             <article
                                 key={item.id}
                                 className="rounded-md border border-gray-200 bg-white p-5 shadow-sm"
                             >
                                 <div className="flex items-start justify-between gap-3">
-                                    <div>
+                                    <div className="min-w-0 flex-1">
                                         <h2 className="font-bold text-[#174a9c]">
                                             {_t(item.pps_profile
                                                 ?.desired_position ||
@@ -256,7 +221,7 @@ export default function CommissionApplications() {
                                         </h2>
                                         <p className="mt-1 text-sm text-gray-600">
                                             {item.user?.name} ·{" "}
-                                            {item.user?.email}
+                                            <span className="break-all">{item.user?.email}</span>
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             {_t(item.competition?.title || "Без конкурса")}
@@ -266,12 +231,12 @@ export default function CommissionApplications() {
                                         №{" "}
                                         {_t(Number(item.voting_order) > 0
                                             ? item.voting_order
-                                            : index + 1)}
+                                            : (meta.from || 1) + index)}
                                     </span>
                                 </div>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     <Link
-                                        href={`/commission/applications/${item.id}?type=${type}&competition_id=${encodeURIComponent(activeCompetition)}`}
+                                        href={`/commission/applications/${item.id}?${new URLSearchParams({ ...filters, competition_id: activeCompetition }).toString()}`}
                                         className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
                                     >{_t("Подробнее")}</Link>
                                     {item.resume_url && (
@@ -353,7 +318,25 @@ export default function CommissionApplications() {
                         ))}
                     </div>
                 )}
+                {meta.last_page > 1 && <CommissionPagination {...pagination} />}
             </div>
         </Layout>
     );
+}
+
+function CommissionPagination({ meta, loading, perPage, onPage, onPerPage }) {
+    const { t: _t } = useTextI18n();
+    return <nav aria-label={_t('Страницы заявок')} className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-200 py-3 text-sm">
+        <span className="text-gray-500">{_t('Показано:')} <strong className="font-medium text-gray-700">{meta.from || 0}-{meta.to || 0}</strong> / {meta.total}</span>
+        <div className="flex flex-wrap items-center gap-2">
+            <label className="mr-2 flex items-center gap-2 text-xs text-gray-500">{_t('На странице')}
+                <select className="rounded-md border border-gray-300 bg-white px-2 py-2 text-gray-700" value={perPage} disabled={loading} onChange={(event) => onPerPage(Number(event.target.value))}>
+                    {[10, 25, 50, 100].map((count) => <option key={count} value={count}>{count}</option>)}
+                </select>
+            </label>
+            <button type="button" title={_t('Назад')} aria-label={_t('Назад')} disabled={loading || meta.current_page <= 1} onClick={() => onPage(meta.current_page - 1)} className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 disabled:opacity-40"><ChevronLeft size={18} /></button>
+            <span className="min-w-12 px-1 text-center text-xs tabular-nums text-gray-500">{meta.current_page} / {meta.last_page}</span>
+            <button type="button" title={_t('Вперёд')} aria-label={_t('Вперёд')} disabled={loading || meta.current_page >= meta.last_page} onClick={() => onPage(meta.current_page + 1)} className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 disabled:opacity-40"><ChevronRight size={18} /></button>
+        </div>
+    </nav>;
 }

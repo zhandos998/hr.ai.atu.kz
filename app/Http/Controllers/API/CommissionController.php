@@ -153,17 +153,85 @@ class CommissionController extends Controller
 
     public function queue(Request $request)
     {
-        $applications = $this->commissionApplicationsQuery($request)
-            ->latest()
-            ->get();
+        $validated = $request->validate([
+            'type' => 'nullable|in:pps,staff',
+            'competition_id' => ['nullable', 'regex:/^(all|none|[1-9][0-9]*)$/'],
+            'q' => 'nullable|string|max:255',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+        $query = $this->commissionApplicationsQuery($request);
+        // Aggregate the authorized set, not just the current page or search results.
+        $groups = (clone $query)->withoutEagerLoads()
+            ->join('vacancies', 'vacancies.id', '=', 'applications.vacancy_id')
+            ->leftJoin('competitions', 'competitions.id', '=', 'applications.competition_id')
+            ->selectRaw('vacancies.type, applications.competition_id, competitions.title, COUNT(*) as aggregate')
+            ->groupBy('vacancies.type', 'applications.competition_id', 'competitions.title')
+            ->orderByDesc('applications.competition_id')->get();
+        $type = $validated['type'] ?? null;
+        $competition = $validated['competition_id'] ?? null;
+        if ($type !== null) {
+            $query->whereHas('vacancy', fn ($vacancy) => $vacancy->where('type', $type));
+            if ($competition === null) {
+                $first = $groups->firstWhere('type', $type);
+                $competition = $first ? (string) ($first->competition_id ?? 'none') : 'all';
+            }
+        }
+        $competition ??= 'all';
+        if ($competition === 'none') {
+            $query->whereNull('applications.competition_id');
+        } elseif ($competition !== 'all') {
+            $query->where('applications.competition_id', (int) $competition);
+        }
+        $search = trim($validated['q'] ?? '');
+        if ($search !== '') {
+            $lower = 'LOWER';
+            if ($query->getConnection()->getDriverName() === 'sqlite') {
+                // SQLite's built-in LOWER handles ASCII only; keep the previous Unicode search behavior.
+                $query->getConnection()->getPdo()->sqliteCreateFunction('commission_lower', fn ($value) => mb_strtolower((string) $value, 'UTF-8'), 1);
+                $lower = 'commission_lower';
+            }
+            $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search, 'UTF-8')).'%';
+            $contains = function ($builder, array $columns) use ($lower, $like) {
+                return $builder->where(function ($nested) use ($columns, $lower, $like) {
+                    foreach ($columns as $column) {
+                        $wrapped = $nested->getQuery()->getGrammar()->wrap($column);
+                        $nested->orWhereRaw("{$lower}({$wrapped}) LIKE ? ESCAPE '!'", [$like]);
+                    }
+                });
+            };
+            $query->where(function ($builder) use ($contains) {
+                $contains($builder, ['applications.id'])
+                    ->orWhereHas('user', fn ($user) => $contains($user, ['name', 'email']))
+                    ->orWhereHas('vacancy', fn ($vacancy) => $contains($vacancy, ['title']))
+                    ->orWhereHas('ppsProfile', fn ($profile) => $contains($profile, ['desired_position', 'faculty_name', 'department_name']));
+            });
+        }
+        $applications = $query
+            ->orderByRaw('CASE WHEN applications.voting_order > 0 THEN applications.voting_order ELSE 2147483647 END')
+            ->orderBy('applications.id')
+            ->paginate($validated['per_page'] ?? 25);
 
-        $applications->transform(fn (Application $application) => $this->transformApplication(
+        $applications->getCollection()->transform(fn (Application $application) => $this->transformApplication(
             $application,
             $request->user()->id,
             $this->globalMembers($application->vacancy?->type)
         ));
 
-        return response()->json($applications);
+        return response()->json([
+            'data' => $applications->getCollection()->values(),
+            'meta' => [
+                'current_page' => $applications->currentPage(), 'last_page' => $applications->lastPage(),
+                'from' => $applications->firstItem(), 'to' => $applications->lastItem(),
+                'per_page' => $applications->perPage(), 'total' => $applications->total(),
+            ],
+            'filters' => ['type' => $type, 'competition_id' => $competition],
+            'counts' => ['pps' => (int) $groups->where('type', 'pps')->sum('aggregate'), 'staff' => (int) $groups->where('type', 'staff')->sum('aggregate')],
+            'competitions' => $groups->map(fn ($group) => [
+                'type' => $group->type, 'value' => (string) ($group->competition_id ?? 'none'),
+                'label' => $group->title ?? 'Без конкурса', 'count' => (int) $group->aggregate,
+            ])->values(),
+        ]);
     }
 
     public function show(Request $request, int $id)

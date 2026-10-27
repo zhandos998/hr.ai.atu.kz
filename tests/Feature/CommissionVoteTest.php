@@ -36,14 +36,15 @@ class CommissionVoteTest extends TestCase
         }
         Sanctum::actingAs($member);
 
-        $response = $this->getJson('/api/commission/applications')->assertOk()->assertJsonCount(3);
-        $byId = collect($response->json())->keyBy('id');
+        $response = $this->getJson('/api/commission/applications')->assertOk()->assertJsonCount(3, 'data');
+        $byId = collect($response->json('data'))->keyBy('id');
         $this->assertSame($pps->id, $byId[$one->id]['competition']['id']);
         $this->assertSame('Конкурс преподавателей', $byId[$one->id]['competition']['title']);
         $this->assertSame('pps', $byId[$one->id]['competition']['type']);
         $this->assertSame($staff->id, $byId[$two->id]['competition']['id']);
         $this->assertNull($byId[$legacy->id]['competition']);
         $this->assertArrayNotHasKey($unavailable->id, $byId->all());
+        $this->assertNotContains((string) $hidden->id, collect($response->json('competitions'))->pluck('value')->all());
         $this->getJson("/api/commission/applications/{$one->id}")->assertOk()
             ->assertJsonPath('competition.id', $pps->id)->assertJsonPath('competition.number', 1);
     }

@@ -12,6 +12,7 @@ use App\Http\Controllers\API\CompetitionController;
 use App\Http\Controllers\API\ComplianceApplicationController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\DigitalApplicationController;
+use App\Http\Controllers\API\FacultyController;
 use App\Http\Controllers\API\LibraryApplicationController;
 use App\Http\Controllers\API\PdfParseController;
 use App\Http\Controllers\API\PersonnelRequestController;
@@ -33,6 +34,10 @@ Route::post('/user/email/change-confirm', [AuthController::class, 'confirmEmailC
 
 Route::get('/vacancies', [VacancyController::class, 'index']);
 Route::get('/vacancies/{id}', [VacancyController::class, 'show']);
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/faculties', [FacultyController::class, 'index']);
+    Route::get('/faculties/{faculty}/departments', [FacultyController::class, 'departments'])->whereNumber('faculty');
+});
 Route::post('/personnel/status', [PersonnelRequestController::class, 'publicStatus'])
     ->middleware('throttle:10,1');
 
