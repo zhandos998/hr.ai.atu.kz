@@ -9,7 +9,7 @@ COPY public ./public
 COPY vite.config.js ./
 RUN npm run build
 
-FROM php:8.3-fpm-bookworm AS app
+FROM php:8.3.36-fpm-bookworm AS app
 
 ARG UID=1000
 ARG GID=1000
@@ -50,6 +50,11 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-hr-ai.ini
+COPY docker/php/security-fpm.conf /usr/local/etc/php-fpm.d/zz-security.conf
+COPY docker/php/check-security.php /usr/local/bin/check-php-security.php
+
+RUN php /usr/local/bin/check-php-security.php \
+    && php-fpm --test
 
 COPY composer.json composer.lock ./
 RUN composer install \

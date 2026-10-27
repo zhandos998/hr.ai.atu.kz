@@ -3,6 +3,8 @@ set -eu
 
 cd /var/www/html
 
+php /usr/local/bin/check-php-security.php
+
 mkdir -p \
     storage/app/private/documents \
     storage/app/public \
