@@ -23,6 +23,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'username',
         'phone',
         'contact_info',
         'password',
@@ -57,6 +58,19 @@ class User extends Authenticatable
     public function isAdmin()
     {
         return $this->role === 'admin';
+    }
+
+    public static function findForLogin(string $identifier): ?self
+    {
+        $identifier = mb_strtolower(trim($identifier));
+
+        if ($identifier === '') {
+            return null;
+        }
+
+        return str_contains($identifier, '@')
+            ? static::query()->whereRaw('LOWER(email) = ?', [$identifier])->first()
+            : static::query()->where('username', $identifier)->first();
     }
 
     public function isLawyer()

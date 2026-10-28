@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'invalid_credentials' => 'Логин, email немесе құпиясөз қате.',
+    'email_not_verified' => 'Email расталмаған. Растау үшін жаңа хат жібердік.',
     'too_many_attempts' => 'Тым көп әрекет жасалды. Бір минуттан кейін қайталаңыз.',
     'document_extension_invalid' => 'Құжат кеңейтімі жарамсыз. PDF, сурет немесе қолдау көрсетілетін кеңсе файлын таңдаңыз.',
     'current_password_incorrect' => 'Ағымдағы құпиясөз қате көрсетілген.',

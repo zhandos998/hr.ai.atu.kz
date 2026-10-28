@@ -34,7 +34,7 @@ class AdminUserController extends Controller
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
             ])
-            ->select('id', 'name', 'email', 'phone', 'role', 'email_verified_at', 'created_at')
+            ->select('id', 'name', 'email', 'username', 'phone', 'role', 'email_verified_at', 'created_at')
             ->where(function ($query) {
                 $query
                     ->whereNull('email')
@@ -45,6 +45,7 @@ class AdminUserController extends Controller
                     $inner
                         ->where('name', 'like', "%{$q}%")
                         ->orWhere('email', 'like', "%{$q}%")
+                        ->orWhere('username', 'like', "%{$q}%")
                         ->orWhere('phone', 'like', "%{$q}%");
                 });
             })
@@ -89,9 +90,11 @@ class AdminUserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->normalizeUsername($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
+            'username' => $this->usernameRules(),
             'phone' => ['nullable', 'string', 'max:255'],
             'role' => ['required', 'string', Rule::in(array_merge(self::ALLOWED_ROLES, array_keys(self::LEGACY_ROLE_ALIASES)))],
             'password' => ['required', 'string', 'min:4', 'max:64'],
@@ -100,6 +103,7 @@ class AdminUserController extends Controller
         $user = User::query()->create([
             'name' => trim($validated['name']),
             'email' => mb_strtolower(trim($validated['email'])),
+            'username' => $validated['username'] ?? null,
             'phone' => $this->emptyToNull($validated['phone'] ?? null),
             'role' => self::normalizeRole($validated['role']),
             'password' => Hash::make($validated['password']),
@@ -137,6 +141,21 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => 'Роль пользователя обновлена.',
             'user' => $user->fresh(['positions.department', 'positions.academicUnit', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id']),
+        ]);
+    }
+
+    public function updateUsername(Request $request, int $id): JsonResponse
+    {
+        $user = User::query()->findOrFail($id);
+        $this->normalizeUsername($request);
+        $validated = $request->validate([
+            'username' => ['present', ...$this->usernameRules($user)],
+        ]);
+        $user->update(['username' => $validated['username']]);
+
+        return response()->json([
+            'message' => 'Логин пользователя обновлён.',
+            'user' => $this->transformUser($this->userWithRelations($user->id)),
         ]);
     }
 
@@ -251,6 +270,7 @@ class AdminUserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'username' => $user->username,
             'phone' => $user->phone,
             'role' => self::normalizeRole($user->role),
             'email_verified_at' => $user->email_verified_at,
@@ -289,5 +309,21 @@ class AdminUserController extends Controller
         $trimmed = trim((string) ($value ?? ''));
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function normalizeUsername(Request $request): void
+    {
+        if (is_string($request->input('username'))) {
+            $username = mb_strtolower(trim($request->input('username')));
+            $request->merge(['username' => $username === '' ? null : $username]);
+        }
+    }
+
+    private function usernameRules(?User $user = null): array
+    {
+        return [
+            'nullable', 'string', 'min:3', 'max:64', 'regex:/^[a-z0-9][a-z0-9._-]*$/D',
+            Rule::unique('users', 'username')->ignore($user?->id),
+        ];
     }
 }

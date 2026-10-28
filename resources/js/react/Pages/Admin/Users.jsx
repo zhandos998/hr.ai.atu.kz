@@ -1,8 +1,8 @@
 import { useI18n as useTextI18n } from "../../I18nContext";
-import React, { Fragment, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Head } from "@inertiajs/react";
 import axios from "axios";
-import { BriefcaseBusiness, UserMinus, UserPlus, X } from "lucide-react";
+import { BriefcaseBusiness, Pencil, Save, UserMinus, UserPlus, X } from "lucide-react";
 import Layout from "../../Components/Layout";
 import SearchSelect from "../../Components/SearchSelect";
 import {
@@ -34,7 +34,7 @@ const positionUnit = (position) =>
 
 export default function Users() {
     const { t: _t } = useTextI18n();
-    const { user: currentUser, setSession } = useAuth();
+    const { user: currentUser, setSession, refreshUser } = useAuth();
     const [users, setUsers] = useState([]);
     const [positions, setPositions] = useState([]);
     const [filters, setFilters] = useState({
@@ -49,6 +49,7 @@ export default function Users() {
     const [form, setForm] = useState({
         name: "",
         email: "",
+        username: "",
         phone: "",
         role: "user",
         password: "",
@@ -59,6 +60,17 @@ export default function Users() {
     const [positionUserId, setPositionUserId] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [savingPosition, setSavingPosition] = useState(false);
+    const [usernameUserId, setUsernameUserId] = useState(null);
+    const [usernameDraft, setUsernameDraft] = useState('');
+    const [usernameError, setUsernameError] = useState('');
+    const [savingUsername, setSavingUsername] = useState(false);
+    const usernameDialog = useRef(null);
+
+    useEffect(() => {
+        if (!usernameDialog.current) return;
+        if (usernameUserId !== null && !usernameDialog.current.open) usernameDialog.current.showModal();
+        else if (usernameUserId === null && usernameDialog.current.open) usernameDialog.current.close();
+    }, [usernameUserId]);
 
     const load = async (params = applied) => {
         setLoading(true);
@@ -97,6 +109,7 @@ export default function Users() {
             setForm({
                 name: "",
                 email: "",
+                username: "",
                 phone: "",
                 role: "user",
                 password: "",
@@ -178,6 +191,25 @@ export default function Users() {
         }
     };
 
+    const saveUsername = async (event, item) => {
+        event.preventDefault();
+        if (savingUsername) return;
+        setSavingUsername(true);
+        setUsernameError('');
+        setMessage('');
+        try {
+            const { data } = await axios.put(`/api/admin/users/${item.id}/username`, { username: usernameDraft.trim() || null });
+            updateUser(data.user);
+            if (Number(item.id) === Number(currentUser?.id)) await refreshUser();
+            setUsernameUserId(null);
+            setMessage(data.message);
+        } catch (requestError) {
+            setUsernameError(errorText(requestError));
+        } finally {
+            setSavingUsername(false);
+        }
+    };
+
     const detachPosition = async (item, position) => {
         if (
             !window.confirm(
@@ -204,6 +236,7 @@ export default function Users() {
     const managedUser = users.find(
         (item) => Number(item.id) === Number(positionUserId),
     );
+    const usernameUser = users.find((item) => Number(item.id) === Number(usernameUserId));
     const availablePositions = useMemo(() => {
         const used = new Set(
             (managedUser?.positions || []).map((position) =>
@@ -248,7 +281,7 @@ export default function Users() {
                         onSubmit={create}
                     >
                         <h2 className="mb-4 font-bold text-[#174a9c]">{_t("Новый пользователь")}</h2>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <Field label={_t("ФИО")}>
                                 <input
                                     required
@@ -275,6 +308,9 @@ export default function Users() {
                                         })
                                     }
                                 />
+                            </Field>
+                            <Field label={_t("Логин")}>
+                                <input className={inputClass} value={form.username} minLength={3} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoComplete="off" autoCapitalize="none" spellCheck={false} onChange={(event) => setForm({ ...form, username: event.target.value })} />
                             </Field>
                             <Field label={_t("Телефон")}>
                                 <input
@@ -339,7 +375,7 @@ export default function Users() {
                     <input
                         className={inputClass.replace("mt-1 ", "")}
                         value={filters.q}
-                        placeholder={_t("ФИО, email, телефон")}
+                        placeholder={_t("ФИО, логин, email, телефон")}
                         onChange={(event) =>
                             setFilters({ ...filters, q: event.target.value })
                         }
@@ -412,6 +448,10 @@ export default function Users() {
                                                 <td className="px-5 py-4">
                                                     <div className="font-semibold">{item.name}</div>
                                                     <div className="text-xs text-gray-500">{item.email}</div>
+                                                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                                        <span className="break-all">{_t("Логин")}: {item.username || _t("Не задан")}</span>
+                                                        <button type="button" disabled={savingUsername} title={_t("Изменить логин")} aria-label={`${_t("Изменить логин")}: ${item.name}`} className="shrink-0 rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-[#005eb8] disabled:opacity-50" onClick={() => { setUsernameUserId(Number(usernameUserId) === Number(item.id) ? null : item.id); setUsernameDraft(item.username || ''); setUsernameError(''); }}><Pencil size={14} /></button>
+                                                    </div>
                                                     <div className="mt-1 text-xs text-gray-400">ID: {_t(item.id)}</div>
                                                 </td>
                                                 <td className="px-5 py-4">
@@ -496,6 +536,17 @@ export default function Users() {
                     )}
                 </section>
             </div>
+            <dialog ref={usernameDialog} aria-labelledby="username-dialog-title" className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-md border border-gray-200 bg-white p-5 shadow-2xl backdrop:bg-black/50" onClose={() => setUsernameUserId(null)} onCancel={(event) => { if (savingUsername) event.preventDefault(); }}>
+                <form className="space-y-4" onSubmit={(event) => { if (usernameUser) saveUsername(event, usernameUser); else event.preventDefault(); }}>
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0"><h2 id="username-dialog-title" className="font-bold text-gray-900">{_t("Изменить логин")}</h2><p className="mt-1 break-words text-sm text-gray-500">{usernameUser?.name}</p></div>
+                        <button type="button" disabled={savingUsername} title={_t("Закрыть")} aria-label={_t("Закрыть")} className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-gray-100 disabled:opacity-50" onClick={() => setUsernameUserId(null)}><X size={17} /></button>
+                    </div>
+                    <Field label={_t("Логин")}><input autoFocus className={inputClass} value={usernameDraft} minLength={3} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={savingUsername} onChange={(event) => setUsernameDraft(event.target.value)} /></Field>
+                    <Alert>{_t(usernameError)}</Alert>
+                    <div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={savingUsername} className={secondaryButtonClass} onClick={() => setUsernameUserId(null)}>{_t("Отмена")}</button><button type="submit" disabled={savingUsername} className={`${primaryButtonClass} inline-flex items-center gap-2`}><Save size={16} />{_t(savingUsername ? "Сохранение..." : "Сохранить")}</button></div>
+                </form>
+            </dialog>
         </Layout>
     );
 }

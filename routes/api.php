@@ -143,6 +143,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::post('/admin/users/{id}/impersonate', [AdminUserController::class, 'impersonate']);
     Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
+    Route::put('/admin/users/{id}/username', [AdminUserController::class, 'updateUsername']);
     Route::post('/admin/users/{id}/positions', [AdminUserController::class, 'assignPosition']);
     Route::delete('/admin/users/{id}/positions/{positionId}', [AdminUserController::class, 'detachPosition']);
 

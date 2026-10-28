@@ -155,6 +155,11 @@ export default function Profile() {
                                             ],
                                             [
                                                 UserRound,
+                                                "Логин",
+                                                user.username || "Не задан",
+                                            ],
+                                            [
+                                                UserRound,
                                                 "ID пользователя",
                                                 `№${user.id}`,
                                             ],
