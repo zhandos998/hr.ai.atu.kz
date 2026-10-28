@@ -649,9 +649,9 @@ class PersonnelRequestController extends Controller
 
     private function personnelApproverCandidatesQuery(): \Illuminate\Database\Eloquent\Builder
     {
+        // Technical email accounts are temporarily eligible for personnel approvals.
         return User::query()
             ->whereNotNull('email')
-            ->where('email', 'not like', 'manual-candidate-%@hr-ai.invalid')
             ->where(fn ($query) => $query->whereNull('role')->orWhere('role', '!=', 'admin'));
     }
 

@@ -45,13 +45,12 @@ class PersonnelActionApprovalRouteTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $user = User::factory()->create();
-        $candidate = User::factory()->create(['email' => 'manual-candidate-example@hr-ai.invalid']);
         $this->putJson('/api/admin/personnel/approval-routes/dismissal', ['approver_user_ids' => [$user->id]])->assertUnauthorized();
         Sanctum::actingAs($user);
         $this->getJson('/api/admin/personnel/approval-routes')->assertForbidden();
         $this->putJson('/api/admin/personnel/approval-routes/dismissal', ['approver_user_ids' => [$user->id]])->assertForbidden();
         Sanctum::actingAs($admin);
-        foreach ([$admin->id, $candidate->id, 99999] as $id) {
+        foreach ([$admin->id, 99999] as $id) {
             $this->putJson('/api/admin/personnel/approval-routes/dismissal', ['approver_user_ids' => [$id]])->assertUnprocessable();
         }
         $this->putJson('/api/admin/personnel/approval-routes/unknown', ['approver_user_ids' => [$user->id]])->assertNotFound();

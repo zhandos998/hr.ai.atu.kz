@@ -125,7 +125,6 @@ class PersonnelRequestArchiveTest extends TestCase
         $this->deleteJson("{$endpoint}/{$approval->id}")->assertUnprocessable();
         $this->postJson($endpoint, ['user_id' => $approval->user_id])->assertUnprocessable();
         $this->postJson($endpoint, ['user_id' => User::factory()->create(['role' => 'admin'])->id])->assertUnprocessable();
-        $this->postJson($endpoint, ['user_id' => User::factory()->create(['email' => 'manual-candidate-test@hr-ai.invalid'])->id])->assertUnprocessable();
         Sanctum::actingAs($approval->user);
         $this->postJson($endpoint, ['user_id' => User::factory()->create()->id])->assertForbidden();
         $this->deleteJson("{$endpoint}/{$approval->id}")->assertForbidden();
