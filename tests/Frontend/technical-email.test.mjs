@@ -15,12 +15,14 @@ test("ordinary addresses, lookalike domains and missing users do not trigger the
     }
 });
 
-test("the email warning and action have Kazakh translations", () => {
+test("the email and password warning and both actions have Kazakh translations", () => {
     for (const message of [
-        "Укажите действующий email",
+        "Обновите email и пароль",
+        "Для безопасности смените выданный вам пароль на собственный.",
         "В вашем аккаунте указана техническая почта. Замените её на действующий адрес, чтобы получать письма и восстанавливать пароль.",
         "Техническая почта",
         "Сменить email",
+        "Сменить пароль",
     ]) {
         assert.ok(kazakh[message]);
         assert.notEqual(kazakh[message], message);
