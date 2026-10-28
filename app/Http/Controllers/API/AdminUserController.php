@@ -20,12 +20,18 @@ class AdminUserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'account_type' => ['nullable', Rule::in(['regular', 'technical'])],
+            'paginate' => ['sometimes', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', Rule::in([25, 50, 100])],
+        ]);
         $q = trim((string) $request->query('q', ''));
         $role = trim((string) $request->query('role', ''));
         $emailVerified = trim((string) $request->query('email_verified', ''));
         $commission = trim((string) $request->query('commission', ''));
 
-        $users = User::query()
+        $query = User::query()
             ->with([
                 'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
@@ -34,18 +40,22 @@ class AdminUserController extends Controller
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
             ])
-            ->select('id', 'name', 'email', 'username', 'phone', 'role', 'email_verified_at', 'created_at')
-            ->where(function ($query) {
+            ->select('id', 'name', 'email', 'phone', 'role', 'email_verified_at', 'created_at')
+            ->where(function ($query) use ($request) {
+                if ($request->query('account_type') === 'technical') {
+                    $query->where('email', 'like', '%@hr-ai.invalid');
+
+                    return;
+                }
                 $query
                     ->whereNull('email')
-                    ->orWhere('email', 'not like', 'manual-candidate-%@hr-ai.invalid');
+                    ->orWhere('email', 'not like', '%@hr-ai.invalid');
             })
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
                     $inner
                         ->where('name', 'like', "%{$q}%")
                         ->orWhere('email', 'like', "%{$q}%")
-                        ->orWhere('username', 'like', "%{$q}%")
                         ->orWhere('phone', 'like', "%{$q}%");
                 });
             })
@@ -79,22 +89,28 @@ class AdminUserController extends Controller
                     ->whereDoesntHave('commissionVacancies')
                     ->whereDoesntHave('ppsFacultyCommissionMemberships');
             })
-            ->orderBy('name')
-            ->limit(300)
-            ->get()
-            ->map(fn (User $user) => $this->transformUser($user))
-            ->values();
+            ->orderBy('name')->orderBy('id');
+
+        if ($request->boolean('paginate')) {
+            $users = $query->paginate((int) $request->query('per_page', 25));
+
+            return response()->json([
+                'data' => $users->getCollection()->map(fn (User $user) => $this->transformUser($user))->values(),
+                'meta' => ['current_page' => $users->currentPage(), 'last_page' => $users->lastPage(), 'per_page' => $users->perPage(), 'total' => $users->total()],
+            ]);
+        }
+
+        $users = $query->limit(300)->get()->map(fn (User $user) => $this->transformUser($user))->values();
 
         return response()->json($users);
     }
 
     public function store(Request $request): JsonResponse
     {
-        $this->normalizeUsername($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-            'username' => $this->usernameRules(),
+            'username' => ['prohibited'],
             'phone' => ['nullable', 'string', 'max:255'],
             'role' => ['required', 'string', Rule::in(array_merge(self::ALLOWED_ROLES, array_keys(self::LEGACY_ROLE_ALIASES)))],
             'password' => ['required', 'string', 'min:4', 'max:64'],
@@ -103,7 +119,6 @@ class AdminUserController extends Controller
         $user = User::query()->create([
             'name' => trim($validated['name']),
             'email' => mb_strtolower(trim($validated['email'])),
-            'username' => $validated['username'] ?? null,
             'phone' => $this->emptyToNull($validated['phone'] ?? null),
             'role' => self::normalizeRole($validated['role']),
             'password' => Hash::make($validated['password']),
@@ -141,21 +156,6 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => 'Роль пользователя обновлена.',
             'user' => $user->fresh(['positions.department', 'positions.academicUnit', 'commissionMember', 'commissionVacancies:id', 'ppsFacultyCommissionMemberships:id,user_id']),
-        ]);
-    }
-
-    public function updateUsername(Request $request, int $id): JsonResponse
-    {
-        $user = User::query()->findOrFail($id);
-        $this->normalizeUsername($request);
-        $validated = $request->validate([
-            'username' => ['present', ...$this->usernameRules($user)],
-        ]);
-        $user->update(['username' => $validated['username']]);
-
-        return response()->json([
-            'message' => 'Логин пользователя обновлён.',
-            'user' => $this->transformUser($this->userWithRelations($user->id)),
         ]);
     }
 
@@ -270,7 +270,6 @@ class AdminUserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'username' => $user->username,
             'phone' => $user->phone,
             'role' => self::normalizeRole($user->role),
             'email_verified_at' => $user->email_verified_at,
@@ -309,21 +308,5 @@ class AdminUserController extends Controller
         $trimmed = trim((string) ($value ?? ''));
 
         return $trimmed === '' ? null : $trimmed;
-    }
-
-    private function normalizeUsername(Request $request): void
-    {
-        if (is_string($request->input('username'))) {
-            $username = mb_strtolower(trim($request->input('username')));
-            $request->merge(['username' => $username === '' ? null : $username]);
-        }
-    }
-
-    private function usernameRules(?User $user = null): array
-    {
-        return [
-            'nullable', 'string', 'min:3', 'max:64', 'regex:/^[a-z0-9][a-z0-9._-]*$/D',
-            Rule::unique('users', 'username')->ignore($user?->id),
-        ];
     }
 }

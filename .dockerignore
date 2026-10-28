@@ -31,6 +31,7 @@ database/*.sqlite
 database/*.sqlite-*
 **/*.sql
 **/*.sql.gz
+**/*.xlsx
 .phpunit.result.cache
 tests
 output_pages

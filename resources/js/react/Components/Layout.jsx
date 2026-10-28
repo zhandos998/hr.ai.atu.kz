@@ -4,6 +4,7 @@ import { Link, usePage } from "@inertiajs/react";
 import { ChevronDown, Undo2 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 import { useI18n } from "../I18nContext";
+import TechnicalEmailWarning from "./TechnicalEmailWarning";
 
 const requirementsUrl = "https://library.atu.edu.kz/files/doc/231020231/";
 const menuGroups = {
@@ -401,6 +402,7 @@ export default function Layout({
                     description={_t(description)}
                     actions={actions}
                 />
+                <TechnicalEmailWarning email={user?.email} />
                 <main className="min-w-0 flex-1">{_t(children)}</main>
             </div>
         );
@@ -494,6 +496,7 @@ export default function Layout({
                         actions={actions}
                     />
                 </div>
+                <TechnicalEmailWarning email={user?.email} />
                 <main className="min-w-0 flex-1">{_t(children)}</main>
             </div>
         </div>

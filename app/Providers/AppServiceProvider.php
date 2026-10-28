@@ -28,9 +28,9 @@ class AppServiceProvider extends ServiceProvider
         ], 429, $headers);
 
         RateLimiter::for('login', function (Request $request) use ($response) {
-            $identifier = $request->input('login', $request->input('email'));
+            $identifier = $request->input('email');
             $identifier = is_string($identifier) ? mb_strtolower(trim($identifier)) : '';
-            $user = mb_strlen($identifier) <= 255 ? User::findForLogin($identifier) : null;
+            $user = User::findForEmail($identifier);
             $identity = $user ? 'user:'.$user->id : 'identifier:'.hash('sha256', $identifier);
 
             return [

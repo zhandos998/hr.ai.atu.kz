@@ -1,8 +1,8 @@
 import { useI18n as useTextI18n } from "../../I18nContext";
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Head } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import axios from "axios";
-import { BriefcaseBusiness, Pencil, Save, UserMinus, UserPlus, X } from "lucide-react";
+import { BriefcaseBusiness, UserMinus, UserPlus, X } from "lucide-react";
 import Layout from "../../Components/Layout";
 import SearchSelect from "../../Components/SearchSelect";
 import {
@@ -31,25 +31,21 @@ const roleLabel = (value) =>
     roles.find(([role]) => role === value)?.[1] || value;
 const positionUnit = (position) =>
     position.academic_unit || position.department;
+const emptyFilters = { q: '', role: '', email_verified: '', commission: '' };
 
 export default function Users() {
     const { t: _t } = useTextI18n();
-    const { user: currentUser, setSession, refreshUser } = useAuth();
+    const technical = Boolean(usePage().props.technical);
+    const { user: currentUser, setSession } = useAuth();
     const [users, setUsers] = useState([]);
     const [positions, setPositions] = useState([]);
-    const [filters, setFilters] = useState({
-        q: "",
-        role: "",
-        email_verified: "",
-        commission: "",
-    });
+    const [filters, setFilters] = useState(emptyFilters);
     const [applied, setApplied] = useState(filters);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState({
         name: "",
         email: "",
-        username: "",
         phone: "",
         role: "user",
         password: "",
@@ -60,32 +56,31 @@ export default function Users() {
     const [positionUserId, setPositionUserId] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [savingPosition, setSavingPosition] = useState(false);
-    const [usernameUserId, setUsernameUserId] = useState(null);
-    const [usernameDraft, setUsernameDraft] = useState('');
-    const [usernameError, setUsernameError] = useState('');
-    const [savingUsername, setSavingUsername] = useState(false);
-    const usernameDialog = useRef(null);
+    const latestLoad = useRef(0);
+    const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, per_page: 25 });
 
-    useEffect(() => {
-        if (!usernameDialog.current) return;
-        if (usernameUserId !== null && !usernameDialog.current.open) usernameDialog.current.showModal();
-        else if (usernameUserId === null && usernameDialog.current.open) usernameDialog.current.close();
-    }, [usernameUserId]);
-
-    const load = async (params = applied) => {
+    const load = async (params = applied, page = 1, perPage = meta.per_page) => {
+        const sequence = ++latestLoad.current;
         setLoading(true);
         try {
-            const { data } = await axios.get("/api/admin/users", { params });
-            setUsers(data);
+            const { data } = await axios.get("/api/admin/users", { params: { ...params, account_type: technical ? 'technical' : 'regular', paginate: 1, page, per_page: perPage } });
+            if (sequence !== latestLoad.current) return;
+            setUsers(data.data);
+            setMeta(data.meta);
         } catch (requestError) {
-            setError(errorText(requestError));
+            if (sequence === latestLoad.current) setError(errorText(requestError));
         } finally {
-            setLoading(false);
+            if (sequence === latestLoad.current) setLoading(false);
         }
     };
 
     useEffect(() => {
-        load();
+        setFilters(emptyFilters); setApplied(emptyFilters); setShowCreate(false); setPositionUserId(null);
+        load(emptyFilters, 1);
+        return () => { latestLoad.current += 1; };
+    }, [technical]);
+
+    useEffect(() => {
         axios
             .get("/api/admin/user-position-options")
             .then(({ data }) => setPositions(data))
@@ -109,7 +104,6 @@ export default function Users() {
             setForm({
                 name: "",
                 email: "",
-                username: "",
                 phone: "",
                 role: "user",
                 password: "",
@@ -191,25 +185,6 @@ export default function Users() {
         }
     };
 
-    const saveUsername = async (event, item) => {
-        event.preventDefault();
-        if (savingUsername) return;
-        setSavingUsername(true);
-        setUsernameError('');
-        setMessage('');
-        try {
-            const { data } = await axios.put(`/api/admin/users/${item.id}/username`, { username: usernameDraft.trim() || null });
-            updateUser(data.user);
-            if (Number(item.id) === Number(currentUser?.id)) await refreshUser();
-            setUsernameUserId(null);
-            setMessage(data.message);
-        } catch (requestError) {
-            setUsernameError(errorText(requestError));
-        } finally {
-            setSavingUsername(false);
-        }
-    };
-
     const detachPosition = async (item, position) => {
         if (
             !window.confirm(
@@ -236,7 +211,6 @@ export default function Users() {
     const managedUser = users.find(
         (item) => Number(item.id) === Number(positionUserId),
     );
-    const usernameUser = users.find((item) => Number(item.id) === Number(usernameUserId));
     const availablePositions = useMemo(() => {
         const used = new Set(
             (managedUser?.positions || []).map((position) =>
@@ -254,26 +228,27 @@ export default function Users() {
             }));
     }, [managedUser?.positions, positions]);
 
-    const actions = (
+    const actions = !technical ? (
         <button
             className={primaryButtonClass}
             onClick={() => setShowCreate((value) => !value)}
         >
             {_t(showCreate ? "Закрыть форму" : "Добавить пользователя")}
         </button>
-    );
+    ) : null;
 
     return (
         <Layout
             admin
-            title={_t("Пользователи")}
+            title={_t(technical ? "Пользователи с технической почтой" : "Пользователи")}
             description={_t("Учётные записи, роли, должности и проверка доступа от имени пользователя.")}
             actions={actions}
         >
-            <Head title={_t("Пользователи")} />
+            <Head title={_t(technical ? "Пользователи с технической почтой" : "Пользователи")} />
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
                 <Alert>{_t(error)}</Alert>
                 {message && <Alert type="success">{_t(message)}</Alert>}
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><span className="text-gray-500">{_t("Всего")}: {meta.total}</span><Link href={technical ? '/admin/users' : '/admin/users/technical'} className={secondaryButtonClass}>{_t(technical ? 'Обычные пользователи' : 'Пользователи с технической почтой')}</Link></div>
 
                 {showCreate && (
                     <form
@@ -308,9 +283,6 @@ export default function Users() {
                                         })
                                     }
                                 />
-                            </Field>
-                            <Field label={_t("Логин")}>
-                                <input className={inputClass} value={form.username} minLength={3} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoComplete="off" autoCapitalize="none" spellCheck={false} onChange={(event) => setForm({ ...form, username: event.target.value })} />
                             </Field>
                             <Field label={_t("Телефон")}>
                                 <input
@@ -375,7 +347,7 @@ export default function Users() {
                     <input
                         className={inputClass.replace("mt-1 ", "")}
                         value={filters.q}
-                        placeholder={_t("ФИО, логин, email, телефон")}
+                        placeholder={_t("ФИО, email, телефон")}
                         onChange={(event) =>
                             setFilters({ ...filters, q: event.target.value })
                         }
@@ -448,10 +420,6 @@ export default function Users() {
                                                 <td className="px-5 py-4">
                                                     <div className="font-semibold">{item.name}</div>
                                                     <div className="text-xs text-gray-500">{item.email}</div>
-                                                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                                                        <span className="break-all">{_t("Логин")}: {item.username || _t("Не задан")}</span>
-                                                        <button type="button" disabled={savingUsername} title={_t("Изменить логин")} aria-label={`${_t("Изменить логин")}: ${item.name}`} className="shrink-0 rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-[#005eb8] disabled:opacity-50" onClick={() => { setUsernameUserId(Number(usernameUserId) === Number(item.id) ? null : item.id); setUsernameDraft(item.username || ''); setUsernameError(''); }}><Pencil size={14} /></button>
-                                                    </div>
                                                     <div className="mt-1 text-xs text-gray-400">ID: {_t(item.id)}</div>
                                                 </td>
                                                 <td className="px-5 py-4">
@@ -535,18 +503,11 @@ export default function Users() {
                         </div>
                     )}
                 </section>
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <label className="flex items-center gap-2 text-gray-500">{_t("На странице")}<select className="rounded-md border border-gray-300 bg-white px-2 py-2" value={meta.per_page} disabled={loading} onChange={(event) => load(applied, 1, Number(event.target.value))}>{[25,50,100].map((count) => <option key={count} value={count}>{count}</option>)}</select></label>
+                    <div className="flex items-center gap-3"><button type="button" className={secondaryButtonClass} disabled={loading || meta.current_page <= 1} onClick={() => load(applied, meta.current_page - 1)}>{_t("Назад")}</button><span>{meta.current_page} / {meta.last_page}</span><button type="button" className={secondaryButtonClass} disabled={loading || meta.current_page >= meta.last_page} onClick={() => load(applied, meta.current_page + 1)}>{_t("Далее")}</button></div>
+                </div>
             </div>
-            <dialog ref={usernameDialog} aria-labelledby="username-dialog-title" className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-md border border-gray-200 bg-white p-5 shadow-2xl backdrop:bg-black/50" onClose={() => setUsernameUserId(null)} onCancel={(event) => { if (savingUsername) event.preventDefault(); }}>
-                <form className="space-y-4" onSubmit={(event) => { if (usernameUser) saveUsername(event, usernameUser); else event.preventDefault(); }}>
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0"><h2 id="username-dialog-title" className="font-bold text-gray-900">{_t("Изменить логин")}</h2><p className="mt-1 break-words text-sm text-gray-500">{usernameUser?.name}</p></div>
-                        <button type="button" disabled={savingUsername} title={_t("Закрыть")} aria-label={_t("Закрыть")} className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-gray-100 disabled:opacity-50" onClick={() => setUsernameUserId(null)}><X size={17} /></button>
-                    </div>
-                    <Field label={_t("Логин")}><input autoFocus className={inputClass} value={usernameDraft} minLength={3} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={savingUsername} onChange={(event) => setUsernameDraft(event.target.value)} /></Field>
-                    <Alert>{_t(usernameError)}</Alert>
-                    <div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={savingUsername} className={secondaryButtonClass} onClick={() => setUsernameUserId(null)}>{_t("Отмена")}</button><button type="submit" disabled={savingUsername} className={`${primaryButtonClass} inline-flex items-center gap-2`}><Save size={16} />{_t(savingUsername ? "Сохранение..." : "Сохранить")}</button></div>
-                </form>
-            </dialog>
         </Layout>
     );
 }

@@ -43,6 +43,7 @@ foreach ([
     '/admin/structure-tree' => 'Admin/StructureTree',
     '/admin/commission-members' => 'Admin/CommissionMembers',
     '/admin/users' => 'Admin/Users',
+    '/admin/users/import' => 'Admin/UserImport',
     '/admin/vacancies' => 'Admin/Vacancies/Index',
     '/admin/vacancies/create' => 'Admin/Vacancies/Create',
     '/admin/applications' => 'Admin/Applications/Index',
@@ -53,6 +54,7 @@ foreach ([
 }
 
 Route::get('/admin/academic-units', fn () => Inertia::render('Admin/Departments/Index', ['academic' => true]));
+Route::get('/admin/users/technical', fn () => Inertia::render('Admin/Users', ['technical' => true]));
 Route::get('/admin/academic-units/create', fn () => Inertia::render('Admin/Departments/Form', ['academic' => true]));
 Route::get('/admin/academic-units/{unit}/edit', fn (int $unit) => Inertia::render('Admin/Departments/Form', ['academic' => true, 'departmentId' => $unit]))->whereNumber('unit');
 

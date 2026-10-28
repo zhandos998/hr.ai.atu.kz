@@ -22,6 +22,7 @@ use App\Http\Controllers\API\ScienceApplicationController;
 use App\Http\Controllers\API\StrategyApplicationController;
 use App\Http\Controllers\API\TeacherAuditController;
 use App\Http\Controllers\API\VacancyController;
+use App\Http\Controllers\API\WorkerImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -139,11 +140,12 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/commission-members/{userId}', [CommissionController::class, 'adminRemoveMember']);
 
     Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::post('/admin/users/import/preview', [WorkerImportController::class, 'preview'])->middleware('throttle:10,1');
+    Route::post('/admin/users/import/apply', [WorkerImportController::class, 'apply'])->middleware('throttle:10,1');
     Route::get('/admin/user-position-options', [AdminUserController::class, 'positionOptions']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::post('/admin/users/{id}/impersonate', [AdminUserController::class, 'impersonate']);
     Route::put('/admin/users/{id}/role', [AdminUserController::class, 'updateRole']);
-    Route::put('/admin/users/{id}/username', [AdminUserController::class, 'updateUsername']);
     Route::post('/admin/users/{id}/positions', [AdminUserController::class, 'assignPosition']);
     Route::delete('/admin/users/{id}/positions/{positionId}', [AdminUserController::class, 'detachPosition']);
 

@@ -18,6 +18,7 @@ import Layout from "../../Components/Layout";
 import UserApplications from "../../Components/UserApplications";
 import { Alert, errorText } from "../../Components/Form";
 import { useAuth } from "../../AuthContext";
+import { isTechnicalEmail } from "../../lib/email";
 
 const roleLabels = {
     admin: "Администратор",
@@ -46,6 +47,7 @@ const userInitials = (name) =>
 export default function Profile() {
     const { t: _t } = useTextI18n();
     const { user, logout, refreshUser } = useAuth();
+    const technicalEmail = isTechnicalEmail(user?.email);
     const [loading, setLoading] = useState(false);
     const [savingContact, setSavingContact] = useState(false);
     const [phone, setPhone] = useState("");
@@ -126,19 +128,21 @@ export default function Profile() {
                                 </div>
                                 <span
                                     className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                                        user.email_verified_at
+                                        user.email_verified_at && !technicalEmail
                                             ? "bg-emerald-100 text-emerald-800"
                                             : "bg-amber-100 text-amber-800"
                                     }`}
                                 >
-                                    {user.email_verified_at ? (
+                                    {user.email_verified_at && !technicalEmail ? (
                                         <BadgeCheck size={16} />
                                     ) : (
                                         <ShieldCheck size={16} />
                                     )}
-                                    {_t(user.email_verified_at
-                                        ? "Email подтверждён"
-                                        : "Email не подтверждён")}
+                                    {_t(technicalEmail
+                                        ? "Техническая почта"
+                                        : user.email_verified_at
+                                          ? "Email подтверждён"
+                                          : "Email не подтверждён")}
                                 </span>
                             </div>
 
@@ -152,11 +156,6 @@ export default function Profile() {
                                                 Phone,
                                                 "Телефон",
                                                 user.phone || "Не указан",
-                                            ],
-                                            [
-                                                UserRound,
-                                                "Логин",
-                                                user.username || "Не задан",
                                             ],
                                             [
                                                 UserRound,
@@ -255,7 +254,7 @@ export default function Profile() {
                                                 className="text-gray-400"
                                             />
                                         </Link>
-                                        {!user.email_verified_at && (
+                                        {!user.email_verified_at && !technicalEmail && (
                                             <button
                                                 type="button"
                                                 disabled={loading}

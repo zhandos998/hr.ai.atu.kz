@@ -40,17 +40,19 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        $identifierField = $request->exists('login') ? 'login' : 'email';
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => mb_strtolower(trim($request->input('email')))]);
+        }
         $fields = $request->validate([
-            $identifierField => 'required|string|max:255',
+            'email' => 'required|string|email|max:255',
             'password' => 'required|string',
         ]);
 
-        $user = User::findForLogin($fields[$identifierField]);
+        $user = User::findForEmail($fields['email']);
 
         if (! $user || ! Hash::check($fields['password'], $user->password)) {
             throw ValidationException::withMessages([
-                $identifierField => [__('messages.invalid_credentials')],
+                'email' => [__('messages.invalid_credentials')],
             ]);
         }
 
@@ -58,7 +60,7 @@ class AuthController extends Controller
             $this->sendEmailVerificationLink($user->email);
 
             throw ValidationException::withMessages([
-                $identifierField => [__('messages.email_not_verified')],
+                'email' => [__('messages.email_not_verified')],
             ]);
         }
 
