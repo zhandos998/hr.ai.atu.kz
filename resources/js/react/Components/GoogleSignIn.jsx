@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { useI18n } from '../I18nContext';
-import { Alert, errorText } from './Form';
+import { errorText } from './Form';
+import FloatingNotification from './FloatingNotification';
 
 let sdkPromise;
 function loadGoogle() {
@@ -105,12 +106,12 @@ export default function GoogleSignIn({ button = true }) {
     }, [button, loading, user, locale, setSession]);
 
     if (user || loading || (!enabled && !error)) return null;
-    return <div className={button ? 'mt-5 space-y-3' : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'} aria-busy={busy}>
-        {button && enabled && <>
+    return <>
+        <FloatingNotification title="Не удалось войти" message={error} onClose={() => setError('')} />
+        {button && enabled && <div className="mt-5 space-y-3" aria-busy={busy}>
             <div className="flex items-center gap-3 text-xs text-gray-400"><span className="h-px flex-1 bg-gray-200" />{t('или')}<span className="h-px flex-1 bg-gray-200" /></div>
             <div ref={target} className={`flex min-h-10 w-full justify-center ${busy ? 'pointer-events-none opacity-60' : ''}`} />
-        </>}
-        {busy && <p className="text-center text-sm text-gray-500" role="status">{t('Вход...')}</p>}
-        <Alert>{error}</Alert>
-    </div>;
+            {busy && <p className="text-center text-sm text-gray-500" role="status">{t('Вход...')}</p>}
+        </div>}
+    </>;
 }

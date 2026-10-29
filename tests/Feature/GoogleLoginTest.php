@@ -99,7 +99,13 @@ class GoogleLoginTest extends TestCase
 
     public function test_unknown_google_user_is_not_registered(): void
     {
-        $this->signIn()->assertUnprocessable()->assertJsonValidationErrors('credential');
+        foreach ([
+            'ru' => 'Для вашего аккаунта нет доступа к порталу. Обратитесь в ДИТ: кабинет 406, внутренние номера 127, 128.',
+            'kk' => 'Аккаунтыңызға порталға кіру рұқсаты берілмеген. ДИТ бөліміне хабарласыңыз: 406-кабинет, ішкі нөмірлер: 127, 128.',
+        ] as $locale => $message) {
+            $this->withHeader('X-Locale', $locale)->signIn()->assertUnprocessable()
+                ->assertJsonPath('errors.credential.0', $message);
+        }
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
@@ -153,11 +159,17 @@ class GoogleLoginTest extends TestCase
     public function test_invalid_signature_is_rejected(): void
     {
         User::factory()->create(['email' => 'teacher@atu.edu.kz']);
-        $nonce = $this->challenge()['nonce'];
-        $token = $this->credential($nonce);
-        $parts = explode('.', $token);
-        $parts[2] = JWT::urlsafeB64Encode(str_repeat('x', 256));
-        $this->postJson('/api/auth/google', ['nonce' => $nonce, 'credential' => implode('.', $parts)])->assertUnprocessable();
+        foreach ([
+            'ru' => 'Не удалось подтвердить вход через Google. Повторите попытку. Если ошибка повторяется, обратитесь в ДИТ: кабинет 406, внутренние номера 127, 128.',
+            'kk' => 'Google арқылы кіруді растау мүмкін болмады. Қайталап көріңіз. Қате қайталанса, ДИТ бөліміне хабарласыңыз: 406-кабинет, ішкі нөмірлер: 127, 128.',
+        ] as $locale => $message) {
+            $nonce = $this->challenge()['nonce'];
+            $token = $this->credential($nonce);
+            $parts = explode('.', $token);
+            $parts[2] = JWT::urlsafeB64Encode(str_repeat('x', 256));
+            $this->withHeader('X-Locale', $locale)->postJson('/api/auth/google', ['nonce' => $nonce, 'credential' => implode('.', $parts)])
+                ->assertUnprocessable()->assertJsonPath('errors.credential.0', $message);
+        }
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
