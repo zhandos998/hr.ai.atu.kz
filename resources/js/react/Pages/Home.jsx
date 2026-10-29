@@ -4,6 +4,7 @@ import { Head, Link } from "@inertiajs/react";
 import { ArrowRight, ArrowUpRight, BookOpen, ClipboardCheck, UserRound } from "lucide-react";
 import Layout from "../Components/Layout";
 import { useAuth } from "../AuthContext";
+import GoogleSignIn from "../Components/GoogleSignIn";
 
 const requirementsUrl = "https://library.atu.edu.kz/files/doc/231020231/";
 
@@ -45,6 +46,7 @@ export default function Home() {
     return (
         <Layout>
             <Head title={_t("Главная")} />
+            <GoogleSignIn button={false} />
             <div className="flex min-h-[calc(100svh-80px)] flex-col bg-[#f5f8fd]">
                 <section className="border-b border-[#dfe7f5] bg-white">
                     <div className="mx-auto flex max-w-7xl flex-col items-start gap-6 px-4 py-9 sm:px-6 sm:py-12 lg:flex-row lg:items-center lg:justify-between lg:px-8">

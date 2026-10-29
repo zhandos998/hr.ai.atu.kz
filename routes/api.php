@@ -27,6 +27,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/auth/google/challenge', [\App\Http\Controllers\API\GoogleAuthController::class, 'challenge']);
+    Route::post('/auth/google', [\App\Http\Controllers\API\GoogleAuthController::class, 'login']);
+});
 Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])->middleware('throttle:mail');
 Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
 Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:mail');

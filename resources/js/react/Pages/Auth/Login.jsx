@@ -5,6 +5,7 @@ import axios from 'axios';
 import Layout from '../../Components/Layout';
 import { Alert, AuthCard, Field, errorText, inputClass, primaryButtonClass } from '../../Components/Form';
 import { useAuth } from '../../AuthContext';
+import GoogleSignIn from '../../Components/GoogleSignIn';
 
 export default function Login() {
     const { t: _t } = useTextI18n();
@@ -23,6 +24,6 @@ export default function Login() {
         } catch (requestError) { setError(errorText(requestError, 'Ошибка входа. Проверьте данные.')); }
         finally { setLoading(false); }
     };
-    return <Layout><Head title={_t("Вход")} /><AuthCard title={_t("Вход в HR-портал АТУ")}><form className="space-y-4" onSubmit={submit}><Alert>{_t(error)}</Alert><Field label={_t("Email")}><input className={inputClass} type="email" name="email" required maxLength={255} autoComplete="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field><Field label={_t("Пароль")}><input className={inputClass} type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field><button className={`${primaryButtonClass} w-full`} disabled={loading}>{_t(loading ? 'Вход...' : 'Войти')}</button><div className="text-center text-sm"><Link href="/forgot-password" className="text-[#174a9c] hover:underline">{_t("Забыли пароль?")}</Link></div></form></AuthCard></Layout>;
+    return <Layout><Head title={_t("Вход")} /><AuthCard title={_t("Вход в HR-портал АТУ")}><form className="space-y-4" onSubmit={submit}><Alert>{_t(error)}</Alert><Field label={_t("Email")}><input className={inputClass} type="email" name="email" required maxLength={255} autoComplete="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field><Field label={_t("Пароль")}><input className={inputClass} type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field><button className={`${primaryButtonClass} w-full`} disabled={loading}>{_t(loading ? 'Вход...' : 'Войти')}</button><div className="text-center text-sm"><Link href="/forgot-password" className="text-[#174a9c] hover:underline">{_t("Забыли пароль?")}</Link></div></form><GoogleSignIn /></AuthCard></Layout>;
 }
 

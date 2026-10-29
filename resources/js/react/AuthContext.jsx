@@ -103,6 +103,7 @@ export function AuthProvider({ children }) {
         refreshUser,
         returnFromImpersonation,
         logout: async () => {
+            window.google?.accounts?.id?.disableAutoSelect();
             try {
                 await axios.post('/api/logout');
             } finally {

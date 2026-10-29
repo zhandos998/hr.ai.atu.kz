@@ -35,6 +35,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'google_sub',
         'username',
         'password',
         'remember_token',

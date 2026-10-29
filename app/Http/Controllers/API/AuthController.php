@@ -389,6 +389,7 @@ class AuthController extends Controller
         $user->forceFill([
             'email' => $record->new_email,
             'email_verified_at' => now(),
+            'google_sub' => null,
         ])->save();
 
         DB::table('email_change_requests')->where('id', $record->id)->delete();

@@ -3,10 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
-use Illuminate\Support\Facades\Route;
 
 class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
@@ -22,6 +22,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $isLocal = $this->app->environment('local');
 
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal) {
+            if (request()->is('api/auth/google', 'api/auth/google/*')) {
+                return false;
+            }
+
             return $isLocal ||
                    $entry->isReportableException() ||
                    $entry->isFailedRequest() ||
@@ -33,7 +37,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         Telescope::tag(function (IncomingEntry $entry) {
             if ($entry->type === 'request') {
                 $tags = [
-                    'status:' . $entry->content['response_status'],
+                    'status:'.$entry->content['response_status'],
                 ];
 
                 $path = parse_url($entry->content['uri'], PHP_URL_PATH);
@@ -51,7 +55,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
                 if ($action && $action !== 'Closure') {
                     $controller = explode('@', class_basename($action))[0] ?? null; // UserController
                     if ($controller) {
-                        $tags[] = 'controller:' . $controller;
+                        $tags[] = 'controller:'.$controller;
                     }
                 } else {
                     $tags[] = 'controller:unknown';
