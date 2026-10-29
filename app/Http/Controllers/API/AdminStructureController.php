@@ -24,23 +24,29 @@ class AdminStructureController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'description', 'parent_id']);
 
+        $children = $departments->groupBy('parent_id');
+        $counts = $departments->mapWithKeys(fn ($department) => [$department->id => $department->positions->count()]);
+        foreach ($departments as $department) {
+            $department->subtree_positions_count = collect($this->departmentSubtreeIds($department->id, $children))
+                ->sum(fn ($id) => $counts->get($id, 0));
+        }
+
         return response()->json($departments);
     }
 
     public function showDepartment(int $id)
     {
         $department = Department::query()
-            ->with([
-                'parent:id,name',
-                'positions' => function ($query) {
-                    $query
-                        ->with('users:id,name,email')
-                        ->select('id', 'department_id', 'name', 'duties', 'qualification')
-                        ->orderBy('name');
-                },
-            ])
+            ->with('parent:id,name')
             ->withCount('children')
             ->findOrFail($id, ['id', 'name', 'description', 'parent_id']);
+
+        $children = Department::get(['id', 'parent_id'])->groupBy('parent_id');
+        $positions = Position::whereIn('department_id', $this->departmentSubtreeIds($id, $children))
+            ->with(['users:id,name,email', 'department:id,name'])
+            ->select('id', 'department_id', 'name', 'duties', 'qualification')
+            ->orderBy('name')->orderBy('id')->get();
+        $department->setRelation('positions', $positions);
 
         return response()->json($department);
     }
@@ -358,6 +364,25 @@ class AdminStructureController extends Controller
             'message' => 'Пользователь удален из должности.',
             'position' => $position->fresh()->load('users:id,name,email,phone'),
         ]);
+    }
+
+    private function departmentSubtreeIds(int $rootId, \Illuminate\Support\Collection $children): array
+    {
+        $seen = [];
+        $pending = [$rootId];
+        // Use the preloaded adjacency list, without per-node queries or recursion.
+        while ($pending !== []) {
+            $id = array_pop($pending);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($children->get($id, []) as $child) {
+                $pending[] = (int) $child->id;
+            }
+        }
+
+        return array_keys($seen);
     }
 
     private function isDescendantDepartment(int $departmentId, int $candidateParentId): bool

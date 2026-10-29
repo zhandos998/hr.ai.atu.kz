@@ -10,9 +10,9 @@ No users are registered by Google sign-in. Existing roles, passwords and commiss
 3. Configure Audience. Use External if personal Gmail accounts must sign in. While in testing, add the intended test accounts where required by Google.
 4. Create a client in Clients, type Web application.
 5. Add Authorized JavaScript origins, without paths:
-   - `http://localhost`
-   - `http://localhost:8020`
-   - `https://vacancy.atu.kz`
+    - `http://localhost`
+    - `http://localhost:8020`
+    - `https://vacancy.atu.kz`
 6. This integration uses a JavaScript callback, so no redirect URI or Client Secret is needed.
 7. Copy the public client ID ending in `.apps.googleusercontent.com`.
 
@@ -58,5 +58,6 @@ unknown account rejection, wrong audience, normal password login, logout, email 
 Automated tests use local RSA keys and a mocked Google public-key endpoint; they do not replace real Google consent testing.
 
 References:
+
 - https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid
 - https://developers.google.com/identity/gsi/web/guides/verify-google-id-token

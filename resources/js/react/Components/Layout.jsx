@@ -8,8 +8,13 @@ import TechnicalEmailWarning from "./TechnicalEmailWarning";
 
 const requirementsUrl = "https://library.atu.edu.kz/files/doc/231020231/";
 const menuGroups = {
+    personnelRegister: [
+        { href: "/admin/sick-leaves", label: "sickLeaves" },
+        { href: "/admin/leaves", label: "leaves" },
+    ],
     personnel: [
-        { href: "/admin/personnel-requests", label: "personnel" },
+        { href: "/admin/personnel-requests?employee_type=pps", label: "personnelTeachers" },
+        { href: "/admin/personnel-requests?employee_type=staff", label: "personnelStaff" },
         {
             href: "/admin/personnel-approval-routes",
             label: "defaultCommission",
@@ -93,10 +98,10 @@ function matchesMenuLink(currentUrl, href) {
     }
     const [targetPath, targetQuery = ""] = href.split("?");
     if (path !== targetPath && !path.startsWith(`${targetPath}/`)) return false;
-    const targetType = new URLSearchParams(targetQuery).get("type");
-    return (
-        !targetType ||
-        (new URLSearchParams(query).get("type") || "pps") === targetType
+    const targetParams = new URLSearchParams(targetQuery);
+    const currentParams = new URLSearchParams(query);
+    return [['type', 'pps'], ['employee_type', 'staff']].every(([key, fallback]) =>
+        !targetParams.has(key) || (currentParams.get(key) || fallback) === targetParams.get(key)
     );
 }
 
@@ -287,6 +292,15 @@ export default function Layout({
                     id="vacancies"
                     label={_t(t("vacancies"))}
                     items={items("vacancies")}
+                    currentPath={currentPath}
+                    openGroup={openGroup}
+                    setOpenGroup={setOpenGroup}
+                    onNavigate={close}
+                />
+                <MenuGroup
+                    id="personnelRegister"
+                    label={t("personnelRegister")}
+                    items={items("personnelRegister")}
                     currentPath={currentPath}
                     openGroup={openGroup}
                     setOpenGroup={setOpenGroup}

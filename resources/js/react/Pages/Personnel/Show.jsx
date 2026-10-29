@@ -98,12 +98,14 @@ export default function PersonnelRequestDetails() {
     const backBase = admin
         ? "/admin/personnel-requests"
         : "/personnel/requests";
-    const backPath = `${backBase}${window.location.search}`;
+    const backParams = new URLSearchParams(window.location.search);
+    if (admin && item?.employee_type) backParams.set('employee_type', item.employee_type);
+    const backPath = `${backBase}?${backParams}`;
     const actions = admin ? (
         <>
         {item && <PersonnelArchiveButton item={item} onChanged={setItem} onError={setActionError} />}
         {!item?.archived_at && <Link
-            href={`/admin/personnel-requests/${requestId}/edit`}
+            href={`/admin/personnel-requests/${requestId}/edit?employee_type=${item?.employee_type || backParams.get('employee_type') || 'staff'}`}
             className="rounded-md bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#244f9d]"
         >{_t("Изменить")}</Link>}
         </>
@@ -220,13 +222,21 @@ export default function PersonnelRequestDetails() {
                                 </span>
                             </div>
                             <dl className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2">
-                                <DataItem label={_t("Подразделение")}>
+                                <DataItem label={_t('Категория')}>{_t(item.employee_type === 'pps' ? 'Преподаватель' : 'Сотрудник')}</DataItem>
+                                {item.employee_type === 'pps' ? <>
+                                    <DataItem label={_t('Факультет')}>{item.faculty?.name || '—'}</DataItem>
+                                    <DataItem label={_t('Кафедра')}>{item.academic_unit?.name || '—'}</DataItem>
+                                </> : <DataItem label={_t("Подразделение")}>
                                     {_t(item.department?.name || "—")}
-                                </DataItem>
+                                </DataItem>}
                                 <DataItem label={_t("Должность")}>
                                     {_t(item.position?.name || "Не указана")}
                                 </DataItem>
-                                {item.action_type === "transfer" && (
+                                {item.action_type === "transfer" && item.employee_type === 'pps' && <>
+                                    <DataItem label={_t('Новый факультет')}>{item.target_faculty?.name || '—'}</DataItem>
+                                    <DataItem label={_t('Новая кафедра')}>{item.target_academic_unit?.name || '—'}</DataItem>
+                                </>}
+                                {item.action_type === "transfer" && item.employee_type !== 'pps' && (
                                     <DataItem label={_t("Новое подразделение")}>
                                         {_t(item.target_department?.name || "—")}
                                     </DataItem>

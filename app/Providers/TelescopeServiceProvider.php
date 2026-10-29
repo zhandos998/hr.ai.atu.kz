@@ -22,7 +22,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $isLocal = $this->app->environment('local');
 
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal) {
-            if (request()->is('api/auth/google', 'api/auth/google/*')) {
+            if (request()->is('api/auth/google', 'api/auth/google/*', 'api/admin/personnel-register/*', 'admin/sick-leaves', 'admin/sick-leaves/*', 'admin/leaves', 'admin/leaves/*')) {
                 return false;
             }
 

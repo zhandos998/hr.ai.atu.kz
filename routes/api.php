@@ -77,6 +77,13 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::prefix('admin/personnel-register/{type}')->whereIn('type', \App\Models\PersonnelRegisterEntry::TYPES)->group(function () {
+        Route::get('/', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'show'])->whereNumber('id');
+        Route::put('/{id}', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'update'])->whereNumber('id');
+        Route::delete('/{id}', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'destroy'])->whereNumber('id');
+    });
     Route::get('/admin/competitions', [CompetitionController::class, 'index']);
     Route::get('/admin/competitions/defaults', [CompetitionController::class, 'defaults']);
     Route::post('/admin/competitions', [CompetitionController::class, 'store']);

@@ -17,7 +17,9 @@ import {
 
 export default function PersonnelRequests() {
     const { t: _t } = useTextI18n();
-    const { admin } = usePage().props;
+    const { props: { admin }, url } = usePage();
+    const routeEmployeeType = new URLSearchParams(url.split('?')[1] || '').get('employee_type') || (admin ? 'staff' : '');
+    const title = admin ? (routeEmployeeType === 'pps' ? 'Кадровые процессы преподавателей' : 'Кадровые процессы сотрудников') : 'Кадровое согласование';
     const { user } = useAuth();
     const canViewFinancialData = admin || user?.role === "economist";
     const [requests, setRequests] = useState([]);
@@ -30,7 +32,7 @@ export default function PersonnelRequests() {
     const [error, setError] = useState('');
     const [filters, setFilters] = useState(() => {
         const params = new URLSearchParams(window.location.search);
-        return { q: params.get('q') || '', status: params.get('status') || '', action_type: params.get('action_type') || '', archived: params.get('archived') === '1' ? '1' : '0' };
+        return { employee_type: routeEmployeeType, q: params.get('q') || '', status: params.get('status') || '', action_type: params.get('action_type') || '', archived: params.get('archived') === '1' ? '1' : '0' };
     });
     const [draft, setDraft] = useState(filters);
     const latestLoad = useRef(0);
@@ -57,14 +59,17 @@ export default function PersonnelRequests() {
     };
 
     useEffect(() => {
-        load(Math.max(1, Number(new URLSearchParams(window.location.search).get('page')) || 1));
+        const params = new URLSearchParams(window.location.search);
+        const next = { employee_type: routeEmployeeType, q: params.get('q') || '', status: params.get('status') || '', action_type: params.get('action_type') || '', archived: params.get('archived') === '1' ? '1' : '0' };
+        setFilters(next); setDraft(next);
+        load(Math.max(1, Number(params.get('page')) || 1), next);
         return () => { latestLoad.current += 1; };
-    }, []);
+    }, [routeEmployeeType, admin]);
 
     const actions = admin ? (
         <>
             <Link
-                href="/admin/personnel-requests/create"
+                href={`/admin/personnel-requests/create?employee_type=${routeEmployeeType}`}
                 className="rounded-md bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#244f9d]"
             >{_t("Добавить заявку")}</Link>
         </>
@@ -73,7 +78,7 @@ export default function PersonnelRequests() {
     return (
         <Layout
             admin={admin}
-            title={_t(admin ? "Кадровые процессы" : "Кадровое согласование")}
+            title={_t(title)}
             description={
                 _t(admin
                     ? "Приём, увольнение, перевод и отпуск по беременности."
@@ -82,7 +87,7 @@ export default function PersonnelRequests() {
             actions={actions}
         >
             <Head
-                title={_t(admin ? "Кадровые процессы" : "Кадровое согласование")}
+                title={_t(title)}
             />
             <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
                 <div className="flex items-center justify-between gap-3">
@@ -104,7 +109,7 @@ export default function PersonnelRequests() {
                     <input
                         value={draft.q}
                         className="rounded-md border border-gray-300 px-3 py-2.5 text-sm"
-                        placeholder={_t("Сотрудник, подразделение или должность")}
+                        placeholder={_t(admin && routeEmployeeType === 'pps' ? 'Преподаватель, факультет, кафедра или должность' : 'Сотрудник, подразделение или должность')}
                         onChange={(event) =>
                             setDraft({ ...draft, q: event.target.value })
                         }
@@ -151,7 +156,7 @@ export default function PersonnelRequests() {
                             <table className="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead className="bg-[#edf4ff] text-left text-xs uppercase text-gray-500">
                                     <tr>
-                                        <th className="px-5 py-3">{_t("Сотрудник")}</th>
+                                        <th className="px-5 py-3">{_t(admin && routeEmployeeType === 'pps' ? 'Преподаватель' : 'Сотрудник')}</th>
                                         <th className="px-5 py-3">{_t("Действие")}</th>
                                         <th className="px-5 py-3">{_t("Подразделение")}</th>
                                         <th className="px-5 py-3">{_t("Согласование")}</th>
@@ -190,7 +195,7 @@ export default function PersonnelRequests() {
                                                     ))}
                                                 </td>
                                                 <td className="max-w-xs px-5 py-4 text-gray-600">
-                                                    {item.department?.name}
+                                                    {item.employee_type === 'pps' ? <><div>{item.faculty?.name}</div><div className="mt-1 text-xs text-gray-500">{item.academic_unit?.name}</div></> : item.department?.name}
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span
@@ -220,7 +225,7 @@ export default function PersonnelRequests() {
                                                         >{_t("Открыть")}</Link>
                                                         {admin && !item.archived_at && (
                                                             <Link
-                                                                href={`${base}/${item.id}/edit`}
+                                                                href={`${base}/${item.id}/edit?employee_type=${item.employee_type || 'staff'}`}
                                                                 className="font-semibold text-gray-600"
                                                             >{_t("Изменить")}</Link>
                                                         )}

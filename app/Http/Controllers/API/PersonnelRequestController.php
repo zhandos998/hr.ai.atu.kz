@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicUnit;
 use App\Models\Department;
 use App\Models\PersonnelActionApprovalRoute;
 use App\Models\PersonnelRequest;
@@ -54,6 +55,7 @@ class PersonnelRequestController extends Controller
                 'position:id,name',
                 'targetDepartment:id,name',
                 'targetPosition:id,name',
+                'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
                 'approvals.user:id,name,contact_info',
                 'approvals.user.positions:id,name,department_id,academic_unit_id',
                 'approvals.user.positions.department:id,name',
@@ -67,6 +69,11 @@ class PersonnelRequestController extends Controller
                 'id' => $item->id,
                 'employee_name' => $item->employee_name,
                 'action_type' => $item->action_type,
+                'employee_type' => $item->employee_type,
+                'faculty' => $item->faculty?->only(['id', 'name']),
+                'academic_unit' => $item->academicUnit?->only(['id', 'name']),
+                'target_faculty' => $item->targetFaculty?->only(['id', 'name']),
+                'target_academic_unit' => $item->targetAcademicUnit?->only(['id', 'name']),
                 'status' => $item->status,
                 'created_at' => $item->created_at,
                 'department' => $item->department?->only(['id', 'name']),
@@ -99,18 +106,21 @@ class PersonnelRequestController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $filters = $request->validate(['employee_type' => ['nullable', Rule::in(PersonnelRequest::EMPLOYEE_TYPES)]]);
         $user = $request->user();
         $search = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
         $actionType = trim((string) $request->query('action_type', ''));
 
         $query = PersonnelRequest::query()
+            ->when($filters['employee_type'] ?? null, fn ($query, $type) => $query->where('employee_type', $type))
             ->when($request->boolean('archived'), fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
             ->with([
                 'department:id,name',
                 'position:id,name',
                 'targetDepartment:id,name',
                 'targetPosition:id,name',
+                'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
                 'approvals.user:id,name,email',
             ]);
 
@@ -127,6 +137,8 @@ class PersonnelRequestController extends Controller
                 $builder->where(function ($inner) use ($search) {
                     $inner->where('employee_name', 'like', "%{$search}%")
                         ->orWhereHas('department', fn ($department) => $department->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('faculty', fn ($unit) => $unit->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('academicUnit', fn ($unit) => $unit->where('name', 'like', "%{$search}%"))
                         ->orWhereHas('position', fn ($position) => $position->where('name', 'like', "%{$search}%"));
                 });
             })
@@ -163,13 +175,12 @@ class PersonnelRequestController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $employeeType = $request->input('employee_type', 'staff');
         $validated = $request->validate([
+            'employee_type' => ['sometimes', 'required', Rule::in(PersonnelRequest::EMPLOYEE_TYPES)],
+            ...$this->personnelStructureRules($request, $employeeType === 'pps'),
             'employee_name' => ['required', 'string', 'max:255'],
             'action_type' => ['required', Rule::in(self::ACTION_TYPES)],
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-            'position_id' => ['nullable', 'integer', 'exists:positions,id'],
-            'target_department_id' => ['nullable', 'required_if:action_type,transfer', 'integer', 'exists:departments,id'],
-            'target_position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
             'work_experience' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:5000'],
@@ -179,15 +190,7 @@ class PersonnelRequestController extends Controller
             'documents.*' => ['file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'extensions:pdf,doc,docx,xls,xlsx,jpg,jpeg,png'],
         ]);
 
-        $this->validatePositionDepartment($validated['position_id'] ?? null, (int) $validated['department_id'], 'position_id');
-
-        if ($validated['action_type'] === PersonnelRequest::ACTION_TRANSFER) {
-            $this->validatePositionDepartment(
-                $validated['target_position_id'] ?? null,
-                (int) $validated['target_department_id'],
-                'target_position_id'
-            );
-        }
+        $structure = $this->validatedPersonnelStructure($validated, $employeeType);
 
         $approverIds = array_key_exists('approver_user_ids', $validated)
             ? array_map('intval', $validated['approver_user_ids'])
@@ -202,18 +205,11 @@ class PersonnelRequestController extends Controller
             ]);
         }
 
-        $personnelRequest = DB::transaction(function () use ($request, $validated, $approverIds) {
+        $personnelRequest = DB::transaction(function () use ($request, $validated, $approverIds, $structure) {
             $personnelRequest = PersonnelRequest::query()->create([
                 'employee_name' => trim($validated['employee_name']),
                 'action_type' => $validated['action_type'],
-                'department_id' => $validated['department_id'],
-                'position_id' => $validated['position_id'] ?? null,
-                'target_department_id' => $validated['action_type'] === PersonnelRequest::ACTION_TRANSFER
-                    ? $validated['target_department_id']
-                    : null,
-                'target_position_id' => $validated['action_type'] === PersonnelRequest::ACTION_TRANSFER
-                    ? ($validated['target_position_id'] ?? null)
-                    : null,
+                ...$structure,
                 'salary' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE ? $validated['salary'] : null,
                 'work_experience' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE
                     ? $this->emptyToNull($validated['work_experience'] ?? null)
@@ -264,13 +260,12 @@ class PersonnelRequestController extends Controller
     {
         $personnelRequest = PersonnelRequest::query()->findOrFail($id);
         $this->ensureEditable($personnelRequest);
+        $employeeType = $personnelRequest->employee_type;
         $validated = $request->validate([
+            'employee_type' => ['sometimes', 'required', Rule::in([$employeeType])],
+            ...$this->personnelStructureRules($request, $employeeType === 'pps'),
             'employee_name' => ['required', 'string', 'max:255'],
             'action_type' => ['required', Rule::in(self::ACTION_TYPES)],
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-            'position_id' => ['nullable', 'integer', 'exists:positions,id'],
-            'target_department_id' => ['nullable', 'required_if:action_type,transfer', 'integer', 'exists:departments,id'],
-            'target_position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
             'work_experience' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:5000'],
@@ -278,32 +273,16 @@ class PersonnelRequestController extends Controller
             'documents.*' => ['file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'extensions:pdf,doc,docx,xls,xlsx,jpg,jpeg,png'],
         ]);
 
-        $departmentId = (int) $validated['department_id'];
-        $this->validatePositionDepartment($validated['position_id'] ?? null, $departmentId, 'position_id');
-
-        if ($validated['action_type'] === PersonnelRequest::ACTION_TRANSFER) {
-            $this->validatePositionDepartment(
-                $validated['target_position_id'] ?? null,
-                (int) $validated['target_department_id'],
-                'target_position_id'
-            );
-        }
+        $structure = $this->validatedPersonnelStructure($validated, $employeeType);
 
         $actionChanged = $validated['action_type'] !== $personnelRequest->action_type;
         $approverIds = $actionChanged ? $this->defaultApproverIds($validated['action_type']) : [];
 
-        DB::transaction(function () use ($personnelRequest, $validated, $actionChanged, $approverIds, $request) {
+        DB::transaction(function () use ($personnelRequest, $validated, $actionChanged, $approverIds, $request, $structure) {
             $personnelRequest->update([
                 'employee_name' => trim($validated['employee_name']),
                 'action_type' => $validated['action_type'],
-                'department_id' => $validated['department_id'],
-                'position_id' => $validated['position_id'] ?? null,
-                'target_department_id' => $validated['action_type'] === PersonnelRequest::ACTION_TRANSFER
-                    ? $validated['target_department_id']
-                    : null,
-                'target_position_id' => $validated['action_type'] === PersonnelRequest::ACTION_TRANSFER
-                    ? ($validated['target_position_id'] ?? null)
-                    : null,
+                ...$structure,
                 'salary' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE ? $validated['salary'] : null,
                 'work_experience' => $validated['action_type'] === PersonnelRequest::ACTION_HIRE
                     ? $this->emptyToNull($validated['work_experience'] ?? $personnelRequest->work_experience)
@@ -509,6 +488,8 @@ class PersonnelRequestController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'parent_id', 'description']),
             'users' => $users,
+            'academic_units' => AcademicUnit::query()->with(['positions' => fn ($query) => $query->select('id', 'academic_unit_id', 'name')->whereNull('department_id')->orderBy('name')])
+                ->orderByRaw("CASE WHEN name = 'Другое' THEN 1 ELSE 0 END")->orderBy('name')->get(['id', 'name', 'parent_id', 'kind']),
         ]);
     }
 
@@ -595,6 +576,7 @@ class PersonnelRequestController extends Controller
             'position:id,name',
             'targetDepartment:id,name',
             'targetPosition:id,name',
+            'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
             'documents:id,personnel_request_id,original_name,mime_type,size,created_at',
             'approvals.user:id,name,email',
         ]);
@@ -632,6 +614,49 @@ class PersonnelRequestController extends Controller
         );
 
         return $personnelRequest;
+    }
+
+    private function personnelStructureRules(Request $request, bool $teacher): array
+    {
+        $transfer = $request->input('action_type') === PersonnelRequest::ACTION_TRANSFER;
+        $rules = [];
+        foreach (['', 'target_'] as $prefix) {
+            $required = $prefix === '' || $transfer;
+            $rules[$prefix.'department_id'] = $teacher ? ['prohibited'] : [$required ? 'required' : 'nullable', 'integer', 'exists:departments,id'];
+            $rules[$prefix.'position_id'] = [$teacher && $required ? 'required' : 'nullable', 'integer', 'exists:positions,id'];
+            $rules[$prefix.'faculty_id'] = $teacher ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'faculty')] : ['prohibited'];
+            $rules[$prefix.'academic_unit_id'] = $teacher ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'chair')] : ['prohibited'];
+        }
+
+        return $rules;
+    }
+
+    private function validatedPersonnelStructure(array $data, string $type): array
+    {
+        $structure = ['employee_type' => $type];
+        foreach (['', 'target_'] as $prefix) {
+            $active = $prefix === '' || $data['action_type'] === PersonnelRequest::ACTION_TRANSFER;
+            $teacher = $type === 'pps';
+            $structure[$prefix.'department_id'] = $active && ! $teacher ? $data[$prefix.'department_id'] : null;
+            $structure[$prefix.'faculty_id'] = $active && $teacher ? $data[$prefix.'faculty_id'] : null;
+            $structure[$prefix.'academic_unit_id'] = $active && $teacher ? $data[$prefix.'academic_unit_id'] : null;
+            $structure[$prefix.'position_id'] = $active ? ($data[$prefix.'position_id'] ?? null) : null;
+            if (! $active) {
+                continue;
+            }
+            if ($teacher) {
+                if (! AcademicUnit::whereKey($data[$prefix.'academic_unit_id'])->where('parent_id', $data[$prefix.'faculty_id'])->exists()) {
+                    throw ValidationException::withMessages([$prefix.'academic_unit_id' => [__('messages.personnel_chair_mismatch')]]);
+                }
+                if (! Position::whereKey($data[$prefix.'position_id'])->where('academic_unit_id', $data[$prefix.'academic_unit_id'])->whereNull('department_id')->exists()) {
+                    throw ValidationException::withMessages([$prefix.'position_id' => [__('messages.personnel_position_mismatch')]]);
+                }
+            } else {
+                $this->validatePositionDepartment($data[$prefix.'position_id'] ?? null, (int) $data[$prefix.'department_id'], $prefix.'position_id');
+            }
+        }
+
+        return $structure;
     }
 
     private function validatePositionDepartment(?int $positionId, int $departmentId, string $field): void

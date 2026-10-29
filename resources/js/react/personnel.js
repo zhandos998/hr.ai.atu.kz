@@ -6,6 +6,8 @@ export const actionOptions = [
 ];
 
 export const emptyPersonnelForm = {
+    employee_type: 'staff', faculty_id: null, academic_unit_id: null,
+    target_faculty_id: null, target_academic_unit_id: null,
     employee_name: '', action_type: 'hire', department_id: null, position_id: null,
     target_department_id: null, target_position_id: null, salary: '', work_experience: '', details: '',
 };

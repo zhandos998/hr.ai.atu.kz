@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PersonnelRequest extends Model
 {
+    public const EMPLOYEE_TYPES = ['staff', 'pps'];
+
     public const ACTION_HIRE = 'hire';
 
     public const ACTION_DISMISSAL = 'dismissal';
@@ -27,6 +29,26 @@ class PersonnelRequest extends Model
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function faculty()
+    {
+        return $this->belongsTo(AcademicUnit::class, 'faculty_id');
+    }
+
+    public function academicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class);
+    }
+
+    public function targetFaculty()
+    {
+        return $this->belongsTo(AcademicUnit::class, 'target_faculty_id');
+    }
+
+    public function targetAcademicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class, 'target_academic_unit_id');
     }
 
     public function position()

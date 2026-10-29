@@ -109,6 +109,12 @@ Route::get('/admin/personnel-requests/create', fn () => Inertia::render('Personn
     'requestId' => null,
 ]));
 Route::get('/admin/personnel-approval-routes', fn () => Inertia::render('Personnel/ApprovalRoutes'));
+foreach (['sick-leaves' => 'sick_leave', 'leaves' => 'leave'] as $path => $type) {
+    Route::get('/admin/'.$path, fn () => Inertia::render('Admin/PersonnelRegister/Index', ['registerType' => $type]));
+    Route::get('/admin/'.$path.'/create', fn () => Inertia::render('Admin/PersonnelRegister/Form', ['registerType' => $type]));
+    Route::get('/admin/'.$path.'/{id}/edit', fn (int $id) => Inertia::render('Admin/PersonnelRegister/Form', ['registerType' => $type, 'recordId' => $id]))->whereNumber('id');
+    Route::get('/admin/'.$path.'/{id}', fn (int $id) => Inertia::render('Admin/PersonnelRegister/Show', ['registerType' => $type, 'recordId' => $id]))->whereNumber('id');
+}
 Route::get('/admin/personnel-requests/{personnelRequest}/edit', fn (int $personnelRequest) => Inertia::render('Personnel/RequestForm', [
     'mode' => 'edit',
     'requestId' => $personnelRequest,

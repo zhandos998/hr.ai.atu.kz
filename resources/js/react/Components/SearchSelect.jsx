@@ -41,7 +41,8 @@ export default function SearchSelect({
                 disabled={disabled}
                 placeholder={_t(placeholder)}
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#005eb8] focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500"
-                onFocus={() => setOpen(true)}
+                onFocus={() => { window.clearTimeout(closeTimer.current); setOpen(true); }}
+                onClick={() => setOpen(true)}
                 onChange={(event) => {
                     setQuery(event.target.value);
                     onChange(null);

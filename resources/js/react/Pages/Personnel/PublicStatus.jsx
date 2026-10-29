@@ -191,9 +191,15 @@ export default function PublicPersonnelStatus() {
                                 </header>
 
                                 <dl className="grid gap-4 border-b border-gray-100 px-5 py-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                                    <div><dt className="text-xs text-gray-500">{_t(text.department)}</dt><dd className="mt-1 font-semibold">{_t(item.department?.name || "—")}</dd></div>
+                                    {item.employee_type === 'pps' ? <>
+                                        <div><dt className="text-xs text-gray-500">{_t('Факультет')}</dt><dd className="mt-1 font-semibold">{item.faculty?.name || '—'}</dd></div>
+                                        <div><dt className="text-xs text-gray-500">{_t('Кафедра')}</dt><dd className="mt-1 font-semibold">{item.academic_unit?.name || '—'}</dd></div>
+                                    </> : <div><dt className="text-xs text-gray-500">{_t(text.department)}</dt><dd className="mt-1 font-semibold">{_t(item.department?.name || "—")}</dd></div>}
                                     <div><dt className="text-xs text-gray-500">{_t(text.position)}</dt><dd className="mt-1 font-semibold">{_t(item.position?.name || "—")}</dd></div>
-                                    {item.action_type === "transfer" && <div><dt className="text-xs text-gray-500">{_t(text.targetDepartment)}</dt><dd className="mt-1 font-semibold">{_t(item.target_department?.name || "—")}</dd></div>}
+                                    {item.action_type === "transfer" && (item.employee_type === 'pps' ? <>
+                                        <div><dt className="text-xs text-gray-500">{_t('Новый факультет')}</dt><dd className="mt-1 font-semibold">{item.target_faculty?.name || '—'}</dd></div>
+                                        <div><dt className="text-xs text-gray-500">{_t('Новая кафедра')}</dt><dd className="mt-1 font-semibold">{item.target_academic_unit?.name || '—'}</dd></div>
+                                    </> : <div><dt className="text-xs text-gray-500">{_t(text.targetDepartment)}</dt><dd className="mt-1 font-semibold">{_t(item.target_department?.name || "—")}</dd></div>)}
                                     {item.action_type === "transfer" && <div><dt className="text-xs text-gray-500">{_t(text.targetPosition)}</dt><dd className="mt-1 font-semibold">{_t(item.target_position?.name || "—")}</dd></div>}
                                     <div><dt className="text-xs text-gray-500">{_t(text.created)}</dt><dd className="mt-1 font-semibold">{_t(formatDate(item.created_at, locale))}</dd></div>
                                 </dl>

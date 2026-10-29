@@ -6,6 +6,11 @@ const I18nContext = createContext(null);
 
 const messages = {
     ru: {
+        personnelTeachers: "Процессы преподавателей",
+        personnelStaff: "Процессы сотрудников",
+        personnelRegister: "Кадровый учёт",
+        sickLeaves: "Больничные листы",
+        leaves: "Отпуска",
         competitions: "Конкурсы",
         teacherApplications: "Заявки преподавателей",
         staffApplications: "Заявки сотрудников",
@@ -31,6 +36,11 @@ const messages = {
         defaultCommission: "Комиссия по умолчанию",
     },
     kk: {
+        personnelTeachers: "Оқытушылардың процестері",
+        personnelStaff: "Қызметкерлердің процестері",
+        personnelRegister: "Кадрлық есеп",
+        sickLeaves: "Еңбекке жарамсыздық парақтары",
+        leaves: "Демалыстар",
         competitions: "Конкурстар",
         teacherApplications: "Оқытушылардың өтінімдері",
         staffApplications: "Қызметкерлердің өтінімдері",

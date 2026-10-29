@@ -11,11 +11,13 @@ import { actionOptions, emptyPersonnelForm, errorText, formatFileSize } from '..
 
 export default function PersonnelRequestForm() {
     const { t: _t } = useTextI18n();
-    const { mode, requestId } = usePage().props;
+    const { props: { mode, requestId }, url } = usePage();
+    const requestedType = new URLSearchParams(url.split('?')[1] || '').get('employee_type') === 'pps' ? 'pps' : 'staff';
     const editing = mode === 'edit';
-    const [form, setForm] = useState(emptyPersonnelForm);
+    const [form, setForm] = useState(() => ({ ...emptyPersonnelForm, employee_type: requestedType }));
     const [item, setItem] = useState(null);
     const [departments, setDepartments] = useState([]);
+    const [academicUnits, setAcademicUnits] = useState([]);
     const [users, setUsers] = useState([]);
     const [defaultRoutes, setDefaultRoutes] = useState([]);
     const [files, setFiles] = useState([]);
@@ -25,8 +27,15 @@ export default function PersonnelRequestForm() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const fileInput = useRef(null);
+    const teacher = form.employee_type === 'pps';
 
     useEffect(() => {
+        let active = true;
+        setLoading(true);
+        setError('');
+        setForm({ ...emptyPersonnelForm, employee_type: requestedType });
+        setFiles([]);
+        setItem(null);
         const load = async () => {
             try {
                 const requests = [
@@ -35,7 +44,9 @@ export default function PersonnelRequestForm() {
                 ];
                 if (editing) requests.push(axios.get(`/api/personnel/requests/${requestId}`));
                 const [referenceResponse, routesResponse, requestResponse] = await Promise.all(requests);
+                if (!active) return;
                 setDepartments(referenceResponse.data.departments);
+                setAcademicUnits(referenceResponse.data.academic_units || []);
                 setUsers(referenceResponse.data.users);
                 setDefaultRoutes(routesResponse.data);
                 if (!editing) {
@@ -45,6 +56,9 @@ export default function PersonnelRequestForm() {
                     const data = requestResponse.data;
                     setItem(data);
                     setForm({
+                        employee_type: data.employee_type || 'staff',
+                        faculty_id: data.faculty_id, academic_unit_id: data.academic_unit_id,
+                        target_faculty_id: data.target_faculty_id, target_academic_unit_id: data.target_academic_unit_id,
                         employee_name: data.employee_name || '', action_type: data.action_type || 'hire',
                         department_id: data.department_id, position_id: data.position_id,
                         target_department_id: data.target_department_id, target_position_id: data.target_position_id,
@@ -52,18 +66,22 @@ export default function PersonnelRequestForm() {
                     });
                 }
             } catch (requestError) {
-                setError(errorText(requestError));
+                if (active) setError(errorText(requestError));
             } finally {
-                setLoading(false);
+                if (active) setLoading(false);
             }
         };
         load();
-    }, [editing, requestId]);
+        return () => { active = false; };
+    }, [editing, requestId, requestedType]);
 
     const departmentOptions = useMemo(() => departments.map((department) => ({ id: department.id, name: department.name, secondary: department.description || '' })), [departments]);
     const positions = (departmentId) => departments.find((department) => Number(department.id) === Number(departmentId))?.positions || [];
     const positionOptions = useMemo(() => positions(form.department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.department_id]);
     const targetPositionOptions = useMemo(() => positions(form.target_department_id).map((position) => ({ id: position.id, name: position.name })), [departments, form.target_department_id]);
+    const facultyOptions = academicUnits.filter(unit => unit.kind === 'faculty').map(unit => ({ id: unit.id, name: unit.name }));
+    const chairOptions = facultyId => academicUnits.filter(unit => unit.kind === 'chair' && Number(unit.parent_id) === Number(facultyId)).map(unit => ({ id: unit.id, name: unit.name }));
+    const ppsPositionOptions = chairId => (academicUnits.find(unit => Number(unit.id) === Number(chairId))?.positions || []).map(position => ({ id: position.id, name: position.name }));
     const contentLocked = editing && item && (item.archived_at || item.status !== 'pending' || item.approvals.some((approval) => approval.decision !== 'pending'));
     const actionChanged = editing && item && item.action_type !== form.action_type;
     const selectedDefaults = defaultRoutes.filter((route) => route.action_type === form.action_type);
@@ -87,8 +105,12 @@ export default function PersonnelRequestForm() {
             const next = { ...current, [name]: value };
             if (name === 'department_id') next.position_id = null;
             if (name === 'target_department_id') next.target_position_id = null;
+            if (name === 'faculty_id') { next.academic_unit_id = null; next.position_id = null; }
+            if (name === 'academic_unit_id') next.position_id = null;
+            if (name === 'target_faculty_id') { next.target_academic_unit_id = null; next.target_position_id = null; }
+            if (name === 'target_academic_unit_id') next.target_position_id = null;
             if (name === 'action_type' && value !== 'hire') { next.salary = ''; next.work_experience = ''; }
-            if (name === 'action_type' && value !== 'transfer') { next.target_department_id = null; next.target_position_id = null; }
+            if (name === 'action_type' && value !== 'transfer') { next.target_department_id = null; next.target_position_id = null; next.target_faculty_id = null; next.target_academic_unit_id = null; }
             return next;
         });
     };
@@ -114,7 +136,7 @@ export default function PersonnelRequestForm() {
         try {
             const endpoint = editing ? `/api/admin/personnel/requests/${requestId}/update` : '/api/admin/personnel/requests';
             const { data } = await axios.post(endpoint, payload);
-            window.location.assign(`/admin/personnel-requests/${data.request.id}`);
+            window.location.assign(`/admin/personnel-requests/${data.request.id}?employee_type=${form.employee_type}`);
         } catch (requestError) {
             setError(errorText(requestError));
         } finally {
@@ -148,10 +170,11 @@ export default function PersonnelRequestForm() {
         setCreateApprovers((current) => current.filter((user) => Number(user.id) !== Number(userId)));
     };
 
-    const title = editing ? `Изменить кадровую заявку №${requestId}` : 'Новая кадровая заявка';
-    const actions = <Link href={editing ? `/admin/personnel-requests/${requestId}` : '/admin/personnel-requests'} className={secondaryButtonClass}>{_t(editing ? 'К просмотру' : 'Назад к списку')}</Link>;
+    const title = editing ? `${_t('Изменить кадровую заявку')} №${requestId}` : _t(teacher ? 'Новый кадровый процесс преподавателя' : 'Новый кадровый процесс сотрудника');
+    const back = editing ? `/admin/personnel-requests/${requestId}?employee_type=${form.employee_type}` : `/admin/personnel-requests?employee_type=${form.employee_type}`;
+    const actions = <Link href={back} className={secondaryButtonClass}>{_t(editing ? 'К просмотру' : 'Назад к списку')}</Link>;
 
-    return <Layout admin title={_t(title)} description={_t("Данные сотрудника, документы и состав комиссии.")} actions={actions}>
+    return <Layout admin title={title} description={_t(teacher ? 'Данные преподавателя, документы и состав комиссии.' : 'Данные сотрудника, документы и состав комиссии.')} actions={actions}>
         <Head title={_t(title)} />
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
             <Alert>{_t(error)}</Alert>
@@ -162,12 +185,22 @@ export default function PersonnelRequestForm() {
                         <h2 className="font-bold text-[#174a9c]">{_t("Данные заявки")}</h2>
                         {actionChanged && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{_t("Комиссия нового кадрового действия:")} {_t(selectedDefaults.length ? selectedDefaults.map((route) => route.approver?.name).join(', ') : 'не настроена')}.</div>}
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            <Field label={_t("ФИО сотрудника")}><input required className={inputClass} value={form.employee_name} onChange={(event) => updateField('employee_name', event.target.value)} /></Field>
+                            <Field label={_t(teacher ? "ФИО преподавателя" : "ФИО сотрудника")}><input required className={inputClass} value={form.employee_name} onChange={(event) => updateField('employee_name', event.target.value)} /></Field>
                             <Field label={_t("Кадровое действие")}><select required className={inputClass} value={form.action_type} onChange={(event) => updateField('action_type', event.target.value)}>{actionOptions.map((option) => <option key={option.value} value={option.value}>{_t(option.label)}</option>)}</select></Field>
-                            <Field label={_t("Подразделение")}><SearchSelect value={form.department_id} onChange={(value) => updateField('department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field>
-                            <Field label={_t("Текущая должность")}><SearchSelect value={form.position_id} onChange={(value) => updateField('position_id', value)} options={positionOptions} disabled={!form.department_id} placeholder={_t("Найти должность")} /></Field>
+                            {teacher ? <>
+                                <Field label={_t("Факультет")}><SearchSelect value={form.faculty_id} onChange={value => updateField('faculty_id', value)} options={facultyOptions} placeholder={_t("Найти факультет")} /></Field>
+                                <Field label={_t("Кафедра")}><SearchSelect key={`chair-${form.faculty_id}`} value={form.academic_unit_id} onChange={value => updateField('academic_unit_id', value)} options={chairOptions(form.faculty_id)} disabled={!form.faculty_id} placeholder={_t("Найти кафедру")} /></Field>
+                                <Field label={_t("Позиция ППС")}><SearchSelect key={`pps-position-${form.academic_unit_id}`} value={form.position_id} onChange={value => updateField('position_id', value)} options={ppsPositionOptions(form.academic_unit_id)} disabled={!form.academic_unit_id} placeholder={_t("Найти должность")} /></Field>
+                            </> : <>
+                                <Field label={_t("Подразделение")}><SearchSelect value={form.department_id} onChange={(value) => updateField('department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field>
+                                <Field label={_t("Текущая должность")}><SearchSelect value={form.position_id} onChange={(value) => updateField('position_id', value)} options={positionOptions} disabled={!form.department_id} placeholder={_t("Найти должность")} /></Field>
+                            </>}
                             {form.action_type === 'hire' && <><Field label={_t("Заработная плата")}><input required type="number" min="0" step="0.01" className={inputClass} value={form.salary} onChange={(event) => updateField('salary', event.target.value)} /></Field>{editing && <Field label={_t("Стаж работы")}><input className={inputClass} value={form.work_experience} onChange={(event) => updateField('work_experience', event.target.value)} /></Field>}</>}
-                            {form.action_type === 'transfer' && <><Field label={_t("Новое подразделение")}><SearchSelect value={form.target_department_id} onChange={(value) => updateField('target_department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field><Field label={_t("Новая должность")}><SearchSelect value={form.target_position_id} onChange={(value) => updateField('target_position_id', value)} options={targetPositionOptions} disabled={!form.target_department_id} placeholder={_t("Найти должность")} /></Field></>}
+                            {form.action_type === 'transfer' && (teacher ? <>
+                                <Field label={_t("Новый факультет")}><SearchSelect value={form.target_faculty_id} onChange={value => updateField('target_faculty_id', value)} options={facultyOptions} placeholder={_t("Найти факультет")} /></Field>
+                                <Field label={_t("Новая кафедра")}><SearchSelect key={`target-chair-${form.target_faculty_id}`} value={form.target_academic_unit_id} onChange={value => updateField('target_academic_unit_id', value)} options={chairOptions(form.target_faculty_id)} disabled={!form.target_faculty_id} placeholder={_t("Найти кафедру")} /></Field>
+                                <Field label={_t("Новая должность")}><SearchSelect key={`target-pps-position-${form.target_academic_unit_id}`} value={form.target_position_id} onChange={value => updateField('target_position_id', value)} options={ppsPositionOptions(form.target_academic_unit_id)} disabled={!form.target_academic_unit_id} placeholder={_t("Найти должность")} /></Field>
+                            </> : <><Field label={_t("Новое подразделение")}><SearchSelect value={form.target_department_id} onChange={(value) => updateField('target_department_id', value)} options={departmentOptions} placeholder={_t("Найти подразделение")} /></Field><Field label={_t("Новая должность")}><SearchSelect value={form.target_position_id} onChange={(value) => updateField('target_position_id', value)} options={targetPositionOptions} disabled={!form.target_department_id} placeholder={_t("Найти должность")} /></Field></>)}
                             <div className="md:col-span-2"><Field label={_t("Дополнительная информация")}><textarea rows="4" className={inputClass} value={form.details} onChange={(event) => updateField('details', event.target.value)} /></Field></div>
                         </div>
                     </section>
@@ -198,7 +231,7 @@ export default function PersonnelRequestForm() {
                         {createApprovers.length === 0 && <p className="mt-3 text-sm text-amber-700">{_t("Добавьте хотя бы одного участника комиссии.")}</p>}
                     </section>}
 
-                    <div className="flex justify-end gap-3"><Link href={editing ? `/admin/personnel-requests/${requestId}` : '/admin/personnel-requests'} className={secondaryButtonClass}>{_t("Отмена")}</Link><button className={primaryButtonClass} disabled={saving || !form.department_id || (!editing && createApprovers.length === 0)}>{_t(saving ? 'Сохранение...' : 'Сохранить')}</button></div>
+                    <div className="flex justify-end gap-3"><Link href={back} className={secondaryButtonClass}>{_t("Отмена")}</Link><button className={primaryButtonClass} disabled={saving || (teacher ? !form.faculty_id || !form.academic_unit_id || !form.position_id || (form.action_type === 'transfer' && (!form.target_faculty_id || !form.target_academic_unit_id || !form.target_position_id)) : !form.department_id) || (!editing && createApprovers.length === 0)}>{_t(saving ? 'Сохранение...' : 'Сохранить')}</button></div>
                 </form>}
 
                 {editing && item && !item.archived_at && <PersonnelCommission item={item} onChanged={setItem} />}

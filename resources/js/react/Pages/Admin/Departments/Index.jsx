@@ -33,7 +33,7 @@ export default function Departments() {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [parent, setParent] = useState("");
+    const [parent, setParent] = useState(academic ? "" : "none");
     const load = async () => {
         setLoading(true);
         try {
@@ -47,7 +47,7 @@ export default function Departments() {
     };
     useEffect(() => {
         setSearch("");
-        setParent("");
+        setParent(academic ? "" : "none");
         load();
     }, [base]);
     const filtered = useMemo(() => {
@@ -159,8 +159,7 @@ export default function Departments() {
                                                     </Link>
                                                 )}
                                                 <div className="mt-1 text-xs text-gray-400">
-                                                    {item.full_name} · ID:{" "}
-                                                    {_t(item.id)}
+                                                    {item.full_name}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-600">
@@ -174,7 +173,7 @@ export default function Departments() {
                                                 {_t(item.description || "—")}
                                             </td>
                                             <td className="px-4 py-3">
-                                                {item.positions?.length || 0}
+                                                {item.subtree_positions_count ?? item.positions?.length ?? 0}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex justify-end gap-3">
