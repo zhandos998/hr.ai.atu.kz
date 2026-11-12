@@ -245,7 +245,7 @@ export default function Users() {
             actions={actions}
         >
             <Head title={_t(technical ? "Пользователи с технической почтой" : "Пользователи")} />
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+            <div data-guide-busy={loading} className="mx-auto max-w-7xl space-y-6 px-4 py-8">
                 <Alert>{_t(error)}</Alert>
                 {message && <Alert type="success">{_t(message)}</Alert>}
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><span className="text-gray-500">{_t("Всего")}: {meta.total}</span><Link href={technical ? '/admin/users' : '/admin/users/technical'} className={secondaryButtonClass}>{_t(technical ? 'Обычные пользователи' : 'Пользователи с технической почтой')}</Link></div>
@@ -340,7 +340,7 @@ export default function Users() {
                     </form>
                 )}
 
-                <form
+                <form data-admin-guide="users-filters"
                     className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 md:grid-cols-[1fr_220px_180px_180px_auto]"
                     onSubmit={submitFilters}
                 >
@@ -397,7 +397,7 @@ export default function Users() {
                     <button className={primaryButtonClass}>{_t("Фильтр")}</button>
                 </form>
 
-                <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                <section data-admin-guide="users-list" className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
                     {loading ? (
                         <div className="p-10 text-center text-gray-500">{_t("Загрузка...")}</div>
                     ) : (

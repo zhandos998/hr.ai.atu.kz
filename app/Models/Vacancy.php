@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Vacancy extends Model
 {
+    public const TYPES = ['pps', 'staff', 'uvp'];
+
     use HasFactory;
     use SoftDeletes;
 
@@ -21,6 +23,11 @@ class Vacancy extends Model
     public function position()
     {
         return $this->belongsTo(Position::class);
+    }
+
+    public function uvpPosition()
+    {
+        return $this->belongsTo(UvpPosition::class);
     }
 
     public function commissionMembers()

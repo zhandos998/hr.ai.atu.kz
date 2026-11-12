@@ -77,3 +77,89 @@ input[type="file"]:disabled {
     background: #edf4ff;
     color: #005eb8;
 }
+
+.driver-popover.vacancy-admin-guide {
+    box-sizing: border-box;
+    width: 340px;
+    min-width: 0;
+    max-width: calc(100vw - 24px);
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 12px 36px rgb(15 23 42 / 18%);
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+    color: #172033;
+}
+.vacancy-admin-guide .driver-popover-title {
+    margin: 8px 16px 8px 0;
+    font-size: 16px;
+    line-height: 1.45;
+    font-weight: 600;
+}
+.vacancy-admin-guide .driver-popover-description {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.65;
+}
+.vacancy-admin-guide .driver-popover-progress-text {
+    color: #005eb8;
+    font-size: 11px;
+    font-weight: 600;
+}
+.vacancy-admin-guide .driver-popover-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 20px;
+}
+.vacancy-admin-guide .driver-popover-navigation-btns {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+}
+.vacancy-admin-guide .driver-popover-footer button {
+    min-height: 34px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    box-shadow: none;
+    background: #fff;
+    color: #174a9c;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 600;
+    text-shadow: none;
+    cursor: pointer;
+}
+.vacancy-admin-guide .driver-popover-footer .driver-popover-next-btn {
+    border-color: #005eb8;
+    background: #005eb8;
+    color: #fff;
+}
+.vacancy-admin-guide .driver-popover-footer .admin-guide-skip {
+    min-width: 0;
+    padding: 6px 0;
+    border-color: transparent;
+    color: #64748b;
+    font-weight: 400;
+    white-space: normal;
+    text-align: left;
+}
+.vacancy-admin-guide button:focus-visible {
+    outline: 2px solid #005eb8;
+    outline-offset: 3px;
+}
+.vacancy-admin-guide .driver-popover-close-btn {
+    color: #64748b;
+}
+@media (max-width: 359px) {
+    .driver-popover.vacancy-admin-guide { padding: 16px; }
+    .vacancy-admin-guide .driver-popover-footer { flex-wrap: wrap; }
+    .vacancy-admin-guide .driver-popover-navigation-btns { margin-left: auto; }
+}

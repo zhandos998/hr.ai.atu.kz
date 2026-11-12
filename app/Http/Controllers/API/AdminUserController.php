@@ -36,7 +36,7 @@ class AdminUserController extends Controller
                 'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
                 'positions.academicUnit:id,name,parent_id',
-                'commissionMember:id,user_id,is_pps,is_staff',
+                'commissionMember:id,user_id,is_pps,is_staff,is_uvp',
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
             ])
@@ -229,7 +229,7 @@ class AdminUserController extends Controller
                 'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
                 'positions.academicUnit:id,name,parent_id',
-                'commissionMember:id,user_id,is_pps,is_staff',
+                'commissionMember:id,user_id,is_pps,is_staff,is_uvp',
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
             ])
@@ -296,7 +296,7 @@ class AdminUserController extends Controller
                 'positions:id,name,department_id,academic_unit_id',
                 'positions.department:id,name',
                 'positions.academicUnit:id,name,parent_id',
-                'commissionMember:id,user_id,is_pps,is_staff',
+                'commissionMember:id,user_id,is_pps,is_staff,is_uvp',
                 'commissionVacancies:id',
                 'ppsFacultyCommissionMemberships:id,user_id',
             ])

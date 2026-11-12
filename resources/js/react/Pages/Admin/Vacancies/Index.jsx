@@ -4,8 +4,10 @@ import { Head, Link } from "@inertiajs/react";
 import axios from "axios";
 import { loadPositionUnits, positionUnitKey } from "../../../lib/positionUnits";
 import Layout from "../../../Components/Layout";
+import SearchSelect from "../../../Components/SearchSelect";
 import {
     Alert,
+    Field,
     errorText,
     inputClass,
     primaryButtonClass,
@@ -17,6 +19,7 @@ export default function AdminVacancies() {
     const [vacancies, setVacancies] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [positions, setPositions] = useState([]);
+    const [uvpPositions, setUvpPositions] = useState([]);
     const [search, setSearch] = useState("");
     const [type, setType] = useState("");
     const [editId, setEditId] = useState(null);
@@ -26,21 +29,24 @@ export default function AdminVacancies() {
         type: "",
         unit_key: "",
         position_id: "",
+        uvp_position_id: null,
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const load = async () => {
         setLoading(true);
         try {
-            const [vacancyResponse, departmentResponse, positionResponse] =
+            const [vacancyResponse, departmentResponse, positionResponse, uvpResponse] =
                 await Promise.all([
                     axios.get("/api/admin/vacancies"),
                     loadPositionUnits(),
                     axios.get("/api/admin/positions"),
+                    axios.get("/api/admin/uvp-positions"),
                 ]);
             setVacancies(vacancyResponse.data);
             setDepartments(departmentResponse);
             setPositions(positionResponse.data);
+            setUvpPositions(uvpResponse.data);
         } catch (requestError) {
             setError(errorText(requestError));
         } finally {
@@ -62,6 +68,7 @@ export default function AdminVacancies() {
                         item.title,
                         item.description,
                         item.position?.name,
+                        item.uvp_position?.name,
                         departmentName(positionUnitKey(item.position)),
                     ].some((value) =>
                         String(value || "")
@@ -81,6 +88,7 @@ export default function AdminVacancies() {
             type: item.type || "",
             unit_key: positionUnitKey(item.position),
             position_id: item.position_id || "",
+            uvp_position_id: item.uvp_position_id || null,
         });
     };
     const save = async (event) => {
@@ -90,7 +98,9 @@ export default function AdminVacancies() {
                 title: edit.title,
                 description: edit.description,
                 type: edit.type,
-                ...(edit.position_id
+                ...(edit.type === 'uvp'
+                    ? { uvp_position_id: edit.uvp_position_id }
+                    : edit.position_id
                     ? { position_id: Number(edit.position_id) }
                     : {}),
             });
@@ -136,6 +146,7 @@ export default function AdminVacancies() {
                     >
                         <option value="">{_t("Все типы")}</option>
                         <option value="pps">{_t("ППС")}</option>
+                        <option value="uvp">{_t("УВП")}</option>
                         <option value="staff">{_t("АУП")}</option>
                     </select>
                 </section>
@@ -189,13 +200,13 @@ export default function AdminVacancies() {
                                                                 disabled
                                                                 className={`${inputClass} bg-gray-100`}
                                                                 value={
-                                                                    edit.type ===
+                                                                    edit.type === 'uvp' ? 'УВП' : edit.type ===
                                                                     "pps"
                                                                         ? "ППС"
                                                                         : "АУП"
                                                                 }
                                                             />
-                                                            <select
+                                                            {edit.type === 'uvp' ? <Field label={_t('Должность УВП')}><SearchSelect value={edit.uvp_position_id} options={uvpPositions} onChange={value => setEdit({ ...edit, uvp_position_id: value })} placeholder={_t('Найти должность')} /></Field> : <><select
                                                                 className={
                                                                     inputClass
                                                                 }
@@ -278,7 +289,7 @@ export default function AdminVacancies() {
                                                                         </option>
                                                                     ),
                                                                 )}
-                                                            </select>
+                                                            </select></>}
                                                             <textarea
                                                                 className={`${inputClass} md:col-span-2`}
                                                                 rows="4"
@@ -312,6 +323,7 @@ export default function AdminVacancies() {
                                                                 className={
                                                                     primaryButtonClass
                                                                 }
+                                                                disabled={edit.type === 'uvp' && !edit.uvp_position_id}
                                                             >{_t("Сохранить")}</button>
                                                         </div>
                                                     </form>
@@ -331,7 +343,7 @@ export default function AdminVacancies() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {_t(item.type === "pps"
+                                                    {_t(item.type === 'uvp' ? 'УВП' : item.type === "pps"
                                                         ? "ППС"
                                                         : "АУП")}
                                                 </td>
@@ -342,7 +354,7 @@ export default function AdminVacancies() {
                                                         ),
                                                     ))}
                                                     <div className="text-xs text-gray-400">
-                                                        {_t(item.position?.name ||
+                                                        {_t(item.uvp_position?.name || item.position?.name ||
                                                             "Должность не указана")}
                                                     </div>
                                                 </td>

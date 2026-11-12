@@ -1,5 +1,5 @@
 import { useI18n as useTextI18n } from "../../../I18nContext";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import {
@@ -10,12 +10,17 @@ import {
     Pencil,
     UserPlus,
     UserMinus,
+    ArrowRight,
+    GraduationCap,
+    BriefcaseBusiness,
+    BookOpen,
 } from "lucide-react";
 import { useI18n } from "../../../I18nContext";
 import { StatusDot } from "../../../Components/ApplicationStatus";
 import Layout from "../../../Components/Layout";
 import SearchSelect from "../../../Components/SearchSelect";
 import Dialog from "../../../Components/Dialog";
+import { applicationTabs, applicationCategoryPreferenceKey, applicationListType, applicationListUrl, applicationTabUrl, applicationType, applicationTypeLabel } from '../../../applicationNavigation';
 import {
     Alert,
     Field,
@@ -41,8 +46,20 @@ export default function AdminApplications() {
         props: { competitionId },
     } = usePage();
     const query = new URLSearchParams(url.split("?")[1] || "");
-    const type = query.get("type") === "staff" ? "staff" : "pps";
+    const type = useMemo(() => {
+        const value = new URLSearchParams(url.split('?')[1] || '').get('type');
+        let remembered = 'all';
+        if (value === null && !competitionId) {
+            try { remembered = localStorage.getItem(applicationCategoryPreferenceKey) || 'all'; } catch { /* Storage may be unavailable. */ }
+        }
+        return applicationListType(value, remembered);
+    }, [url, competitionId]);
     const archived = query.get("archived") === "1";
+    useEffect(() => {
+        if (!competitionId) {
+            try { localStorage.setItem(applicationCategoryPreferenceKey, type); } catch { /* Storage may be unavailable. */ }
+        }
+    }, [type, competitionId]);
     if (competitionId)
         return (
             <CompetitionApplications
@@ -106,13 +123,11 @@ function ApplicationsList({ type, archived, competition = null }) {
     const { t: _t } = useTextI18n();
     const { t } = useI18n();
     const pageQuery = new URLSearchParams(usePage().url.split("?")[1] || "");
-    const sectionTitle = t(
-        type === "pps" ? "teacherApplications" : "staffApplications",
-    );
+    const sectionTitle = t('applications');
     const title = `${competition?.title || sectionTitle}${archived ? ": архив" : ""}`;
     const listUrl = competition
         ? `/admin/competitions/${competition.id}`
-        : `/admin/applications?type=${type}`;
+        : applicationListUrl({ type });
     const [items, setItems] = useState([]);
     const [meta, setMeta] = useState({
         current_page: 1,
@@ -120,6 +135,8 @@ function ApplicationsList({ type, archived, competition = null }) {
         total: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [counts, setCounts] = useState({ pps: 0, staff: 0 });
+    const latestLoad = useRef(0);
     const [filters, setFilters] = useState({
         q: pageQuery.get("q") || "",
         resume_status: pageQuery.get("resume_status") || "",
@@ -132,6 +149,7 @@ function ApplicationsList({ type, archived, competition = null }) {
     const [departments, setDepartments] = useState([]);
     const [academicUnits, setAcademicUnits] = useState([]);
     const [positions, setPositions] = useState([]);
+    const [uvpPositions, setUvpPositions] = useState([]);
     const [showCreate, setShowCreate] = useState(false);
     const [createForm, setCreateForm] = useState({
         ...emptyCreate,
@@ -143,17 +161,20 @@ function ApplicationsList({ type, archived, competition = null }) {
     const [confirm, setConfirm] = useState(null);
     const loadReferences = async () => {
         if (departments.length) return;
-        const [departmentResponse, positionResponse, academicResponse] =
+        const [departmentResponse, positionResponse, academicResponse, uvpResponse] =
             await Promise.all([
                 axios.get("/api/admin/departments"),
                 axios.get("/api/admin/positions"),
                 axios.get("/api/admin/academic-units"),
+                axios.get('/api/admin/uvp-positions'),
             ]);
         setDepartments(departmentResponse.data);
         setAcademicUnits(academicResponse.data);
         setPositions(positionResponse.data);
+        setUvpPositions(uvpResponse.data);
     };
     const load = async (page = 1, next = {}) => {
+        const sequence = ++latestLoad.current;
         setLoading(true);
         setError("");
         const params = {
@@ -168,21 +189,24 @@ function ApplicationsList({ type, archived, competition = null }) {
             const { data } = await axios.get("/api/admin/applications", {
                 params,
             });
+            if (sequence !== latestLoad.current) return;
             setItems(data.data);
             setMeta(data.meta);
+            setCounts(data.counts || { pps: 0, staff: 0 });
             const visibleQuery = new URLSearchParams();
             Object.entries({ ...params, competition_id: undefined, archived: archived ? 1 : undefined }).forEach(([key, value]) => {
                 if (value !== undefined && value !== null && value !== "") visibleQuery.set(key, String(value));
             });
             router.replace({ url: `${listUrl.split("?")[0]}?${visibleQuery}`, preserveState: true, preserveScroll: true });
         } catch (requestError) {
-            setError(errorText(requestError));
+            if (sequence === latestLoad.current) setError(errorText(requestError));
         } finally {
-            setLoading(false);
+            if (sequence === latestLoad.current) setLoading(false);
         }
     };
     useEffect(() => {
         load(Math.max(1, Number(pageQuery.get("page")) || 1));
+        return () => { latestLoad.current += 1; };
     }, [type, archived]);
     const roots = useMemo(
         () => academicUnits.filter((item) => item.kind === "faculty"),
@@ -195,7 +219,7 @@ function ApplicationsList({ type, archived, competition = null }) {
         (item) => Number(item.parent_id) === Number(selectedFaculty?.id),
     );
     const selectedDepartment =
-        createForm.vacancy_type === "pps"
+        createForm.vacancy_type !== "staff"
             ? academicUnits.find(
                   (item) => item.name === createForm.department_name,
               )
@@ -220,7 +244,7 @@ function ApplicationsList({ type, archived, competition = null }) {
               )?.name
             : "",
     }));
-    const positionOptions = availablePositions.map((item) => ({
+    const positionOptions = (createForm.vacancy_type === 'uvp' ? uvpPositions : availablePositions).map((item) => ({
         id: item.id,
         name: item.name,
     }));
@@ -247,10 +271,14 @@ function ApplicationsList({ type, archived, competition = null }) {
         setCreating(true);
         setError("");
         const payload = new FormData();
-        Object.entries({
-            ...createForm,
-            vacancy_type: createForm.vacancy_type,
-        }).forEach(
+        const fields = { ...createForm };
+        if (createForm.vacancy_type === 'uvp') {
+            delete fields.position_id; delete fields.department_id; delete fields.faculty_name; delete fields.department_name;
+            fields.uvp_position_id = createForm.position_id;
+            fields.uvp_faculty_id = selectedFaculty?.id;
+            fields.uvp_academic_unit_id = selectedDepartment?.id;
+        }
+        Object.entries(fields).forEach(
             ([key, value]) =>
                 value !== null && value !== "" && payload.append(key, value),
         );
@@ -261,7 +289,9 @@ function ApplicationsList({ type, archived, competition = null }) {
             setCreateForm({ ...emptyCreate, vacancy_type: type });
             setResume(null);
             setShowCreate(false);
-            await load(1);
+            if (!competition && type !== 'all' && createForm.vacancy_type !== type) {
+                router.visit(applicationTabUrl(applied, createForm.vacancy_type));
+            } else await load(1);
         } catch (requestError) {
             setError(errorText(requestError));
         } finally {
@@ -309,10 +339,12 @@ function ApplicationsList({ type, archived, competition = null }) {
     };
     const actions = (
         <>
-            <span className="text-sm text-gray-500">{_t("Всего заявок:")}<strong>{_t(meta.total)}</strong>
+            <span className="text-sm text-gray-500">{_t("Всего заявок:")}{' '}<strong>{_t(meta.total)}</strong>
             </span>
-            <Link
-                href={`${listUrl}${archived ? "" : `${competition ? "?" : "&"}archived=1`}`}
+            <Link data-admin-guide="application-archive"
+                href={competition
+                    ? `${listUrl}?${new URLSearchParams({ ...applied, type, archived: archived ? '0' : '1', page: '1' })}`
+                    : applicationListUrl({ ...applied, type, archived: archived ? '0' : '1' })}
                 className={`${secondaryButtonClass} inline-flex items-center gap-2`}
             >
                 {archived ? (
@@ -323,14 +355,14 @@ function ApplicationsList({ type, archived, competition = null }) {
                 {_t(archived ? "К активным заявкам" : "Архивные")}
             </Link>
             {!archived && (
-                <button
+                <button data-admin-guide="application-create"
                     className={primaryButtonClass}
                     onClick={async () => {
                         try {
                             await loadReferences();
                             setCreateForm({
                                 ...emptyCreate,
-                                vacancy_type: type,
+                                vacancy_type: competition ? type : '',
                             });
                             setShowCreate((value) => !value);
                         } catch (requestError) {
@@ -353,7 +385,7 @@ function ApplicationsList({ type, archived, competition = null }) {
             title={_t(title)}
             description={
                 _t(competition
-                    ? `${type === "pps" ? "ППС" : "АУП"} · ${archived ? "Архивные конкурсанты" : "Конкурсанты"}`
+                    ? `${applicationTypeLabel(type)} · ${archived ? "Архивные конкурсанты" : "Конкурсанты"}`
                     : archived
                       ? "Архив конкурсных заявок."
                       : "Заявки кандидатов, статусы и этапы рассмотрения.")
@@ -361,10 +393,18 @@ function ApplicationsList({ type, archived, competition = null }) {
             actions={actions}
         >
             <Head title={_t(title)} />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+            <div data-guide-busy={loading} className="mx-auto max-w-7xl space-y-5 px-4 py-8">
                 <Alert>{_t(error)}</Alert>
+                {!competition && <nav data-admin-guide="application-categories" aria-label={_t('Категория')} className="flex flex-wrap gap-2">
+                    {applicationTabs.map(tab => <Link
+                        key={tab.value}
+                        href={applicationTabUrl({ ...applied, archived: archived ? '1' : '0' }, tab.value)}
+                        aria-current={type === tab.value ? 'page' : undefined}
+                        className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition ${type === tab.value ? 'border-[#005eb8] bg-[#005eb8] text-white' : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:text-[#005eb8]'}`}
+                    >{_t(tab.label)}<span className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${type === tab.value ? 'bg-white/20' : 'bg-blue-50 text-[#174a9c]'}`}>{tab.value === 'all' ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[tab.value] || 0}</span></Link>)}
+                </nav>}
                 {competition && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div data-admin-guide="competition-actions" className="flex flex-wrap items-center justify-between gap-3 text-sm">
                         <Link
                             href="/admin/competitions"
                             className="inline-flex items-center gap-2 text-[#005eb8]"
@@ -386,16 +426,29 @@ function ApplicationsList({ type, archived, competition = null }) {
                         </div>
                     </div>
                 )}
-                {showCreate && (
+                {showCreate && !createForm.vacancy_type && <section className="space-y-4 border-y border-gray-200 py-5">
+                    <h2 className="font-semibold text-gray-900">{_t('Выберите категорию')}</h2>
+                    <div className="divide-y divide-gray-200">
+                        {applicationTabs.filter(tab => tab.value !== 'all').map(tab => {
+                            const Icon = tab.value === 'pps' ? GraduationCap : tab.value === 'uvp' ? BookOpen : BriefcaseBusiness;
+                            return <button key={tab.value} type="button" className="group flex w-full items-center gap-4 px-2 py-4 text-left hover:bg-blue-50" onClick={() => { setCreateForm({ ...emptyCreate, vacancy_type: tab.value }); setResume(null); }}>
+                                <Icon size={24} className="shrink-0 text-[#005eb8]" />
+                                <span className="min-w-0 flex-1"><span className="block font-semibold text-[#174a9c]">{_t(tab.label)}</span><span className="mt-1 block text-sm text-gray-500">{_t(tab.value !== 'staff' ? 'Факультет, кафедра и должность' : 'Департамент и должность')}</span></span>
+                                <ArrowRight size={18} className="shrink-0 text-gray-400 group-hover:text-[#005eb8]" />
+                            </button>;
+                        })}
+                    </div>
+                </section>}
+                {showCreate && createForm.vacancy_type && (
                     <form
                         className="space-y-4 rounded-md border border-gray-200 bg-white p-5 shadow-sm"
                         onSubmit={create}
                     >
-                        <h2 className="font-bold text-[#174a9c]">
+                        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold text-[#174a9c]">
                             {_t(competition
                                 ? "Новый конкурсант"
-                                : "Добавить заявку вручную")}
-                        </h2>
+                                : createForm.vacancy_type === 'uvp' ? 'Заявки УВП' : createForm.vacancy_type === 'pps' ? 'Заявки преподавателей' : 'Заявки сотрудников')}
+                        </h2>{!competition && <button type="button" className={secondaryButtonClass} onClick={() => { setCreateForm({ ...emptyCreate, vacancy_type: '' }); setResume(null); }}>{_t('Изменить категорию')}</button>}</div>
                         <div className="grid gap-4 md:grid-cols-2">
                             <Field label={_t("ФИО кандидата")}>
                                 <input
@@ -410,7 +463,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                     }
                                 />
                             </Field>
-                            {createForm.vacancy_type === "pps" ? (
+                            {createForm.vacancy_type !== "staff" ? (
                                 <>
                                     <Field label={_t("Факультет")}>
                                         <select
@@ -463,7 +516,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                             ))}
                                         </select>
                                     </Field>
-                                    <Field label={_t("Позиция")}>
+                                    <Field label={_t(createForm.vacancy_type === 'uvp' ? 'Должность УВП' : "Позиция")}>
                                         <SearchSelect
                                             value={createForm.position_id}
                                             onChange={(value) =>
@@ -534,7 +587,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                     </form>
                 )}
 
-                <form
+                <form data-admin-guide="application-filters"
                     className="flex flex-wrap items-center gap-3"
                     onSubmit={applyFilters}
                 >
@@ -580,12 +633,13 @@ function ApplicationsList({ type, archived, competition = null }) {
                             [
                                 ["not_started", "Не начато"],
                                 ["voting", "Голосование"],
-                                ...(type === "pps"
+                                ...(['all', 'pps'].includes(type)
                                     ? [
                                           ["hired_1_year", "На 1 год"],
                                           ["hired_3_year", "На 3 года"],
                                       ]
-                                    : [["hired", "Принят"]]),
+                                    : []),
+                                ...(type !== 'pps' ? [["hired", "Принят"]] : []),
                                 ["rejected", "Не брать"],
                             ],
                         ],
@@ -681,7 +735,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                         <th className="w-[16%] px-4 py-4">{_t("Кандидат")}</th>
                                         <th className="w-[17%] px-4 py-4">{_t("Претендуемая должность")}</th>
                                         <th className="w-[19%] px-4 py-4">
-                                            {_t(type === "pps"
+                                            {_t(type === "all" ? 'Подразделение' : type === "pps"
                                                 ? "Факультет / кафедра"
                                                 : "Подразделение")}
                                         </th>
@@ -693,6 +747,8 @@ function ApplicationsList({ type, archived, competition = null }) {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {items.map((item) => {
+                                        const itemType = applicationType(item);
+                                        const applicationUrl = `/admin/applications/${item.id}?type=${itemType}${archived ? "&archived=1" : ""}${competition ? `&competition_id=${competition.id}` : ""}&return=${encodeURIComponent(window.location.pathname + window.location.search)}`;
                                         const profile = item.pps_profile || {};
                                         const hiringStatus =
                                             item.hiring_status === "hired" &&
@@ -705,11 +761,11 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                 className="align-top hover:bg-gray-50/70"
                                             >
                                                 <td className="break-words px-4 py-4">
-                                                    <div className="font-semibold leading-5">
+                                                    <Link data-admin-guide="candidate-link" href={applicationUrl} className="font-semibold leading-5 text-[#174a9c] hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005eb8]">
                                                         {_t(item.user?.name ||
                                                             "Кандидат не указан")}
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-gray-400">{_t("ID заявки:")}{_t(item.id)}
+                                                    </Link>
+                                                    <div className="mt-1 text-xs text-gray-400">{`${_t('ID заявки:')} ${item.id}`}
                                                     </div>
                                                     {!competition &&
                                                         item.competition && (
@@ -727,7 +783,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                 </td>
                                                 <td className="break-words px-4 py-4">
                                                     <div className="font-medium leading-5">
-                                                        {_t(profile.desired_position ||
+                                                        {_t(item.vacancy?.uvp_position?.name || profile.desired_position ||
                                                             item.vacancy
                                                                 ?.position
                                                                 ?.name ||
@@ -736,18 +792,16 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                             "Не указана")}
                                                     </div>
                                                     <span className="mt-1 inline-block rounded bg-blue-50 px-2 py-0.5 text-xs text-[#174a9c]">
-                                                        {_t(type === "pps"
-                                                            ? "ППС"
-                                                            : "АУП")}
+                                                        {_t(applicationTypeLabel(itemType))}
                                                     </span>
                                                 </td>
                                                 <td className="break-words px-4 py-4 text-xs leading-5 text-gray-600">
-                                                    {_t(type === "pps" ? (
+                                                    {_t(itemType !== "staff" ? (
                                                         <>
-                                                            {_t(profile.faculty_name ||
+                                                            {_t(item.uvp_faculty?.name || profile.faculty_name ||
                                                                 "Факультет не указан")}
                                                             <div className="mt-1 text-gray-400">
-                                                                {_t(profile.department_name ||
+                                                                {_t(item.uvp_academic_unit?.name || profile.department_name ||
                                                                     "Кафедра не указана")}
                                                             </div>
                                                         </>
@@ -759,7 +813,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                     ))}
                                                 </td>
                                                 <td className="px-3 py-4">
-                                                    <div className="flex gap-1">
+                                                    <div data-admin-guide="application-statuses" className="flex gap-1">
                                                         {[
                                                             [
                                                                 "Резюме",
@@ -841,7 +895,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                     >
                                                         <option value="not_started">{_t("Не начато")}</option>
                                                         <option value="voting">{_t("Голосование")}</option>
-                                                        {type === "pps" ? (
+                                                        {itemType === "pps" ? (
                                                             <>
                                                                 <option value="hired_1_year">{_t("Взять на 1 год")}</option>
                                                                 <option value="hired_3_year">{_t("Взять на 3 года")}</option>
@@ -853,7 +907,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                                                     </select>
                                                     <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-xs">
                                                         <Link
-                                                            href={`/admin/applications/${item.id}?type=${type}${archived ? "&archived=1" : ""}${competition ? `&competition_id=${competition.id}` : ""}&return=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+                                                            href={applicationUrl}
                                                             className="py-1.5 font-medium text-[#174a9c] hover:underline"
                                                         >{_t("Открыть")}</Link>
                                                         {competition && (
@@ -904,7 +958,7 @@ function ApplicationsList({ type, archived, competition = null }) {
                     )}
                     {meta.last_page > 1 && (
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3 text-sm">
-                            <span className="text-gray-500">{_t("Страница")}{_t(meta.current_page)}{_t("из")}{_t(meta.last_page)}
+                            <span className="text-gray-500">{_t("Страница")}{' '}{meta.current_page}{' '}{_t("из")}{' '}{meta.last_page}
                             </span>
                             <div className="flex gap-2">
                                 <button

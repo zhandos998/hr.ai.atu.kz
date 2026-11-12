@@ -1,11 +1,11 @@
 import { useI18n as useTextI18n } from "../../I18nContext";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Head, Link, usePage } from "@inertiajs/react";
 import axios from "axios";
 import Layout from "../../Components/Layout";
 import { useAuth } from "../../AuthContext";
 import PersonnelArchiveButton from "../../Components/PersonnelArchiveButton";
-import { Archive, ArrowLeft } from 'lucide-react';
+import { Archive, ArrowLeft, Plus } from 'lucide-react';
 import {
     actionLabel,
     actionOptions,
@@ -13,13 +13,27 @@ import {
     formatDate,
     statusClass,
     statusLabel,
+    personnelCategory,
+    personnelPosition,
+    usesAcademicStructure,
+    personnelTabs,
+    personnelCategoryPreferenceKey,
+    personnelListCategory,
+    personnelListUrl,
 } from "../../personnel";
 
 export default function PersonnelRequests() {
     const { t: _t } = useTextI18n();
     const { props: { admin }, url } = usePage();
-    const routeEmployeeType = new URLSearchParams(url.split('?')[1] || '').get('employee_type') || (admin ? 'staff' : '');
-    const title = admin ? (routeEmployeeType === 'pps' ? 'Кадровые процессы преподавателей' : 'Кадровые процессы сотрудников') : 'Кадровое согласование';
+    const routeEmployeeType = useMemo(() => {
+        const queryType = new URLSearchParams(url.split('?')[1] || '').get('employee_type');
+        let remembered = '';
+        if (admin && queryType === null) {
+            try { remembered = localStorage.getItem(personnelCategoryPreferenceKey) || ''; } catch { /* Storage may be unavailable. */ }
+        }
+        return personnelListCategory(queryType, remembered);
+    }, [url, admin]);
+    const title = admin ? 'Кадровые процессы' : 'Кадровое согласование';
     const { user } = useAuth();
     const canViewFinancialData = admin || user?.role === "economist";
     const [requests, setRequests] = useState([]);
@@ -49,8 +63,8 @@ export default function PersonnelRequests() {
             if (page > data.meta.last_page) return load(data.meta.last_page, activeFilters);
             setRequests(data.data);
             setMeta(data.meta);
-            const params = new URLSearchParams({ ...activeFilters, page: String(page) });
-            window.history.replaceState(window.history.state, '', `${window.location.pathname}?${params}`);
+            const nextUrl = admin ? personnelListUrl(activeFilters, page) : `${window.location.pathname}?${new URLSearchParams({ ...activeFilters, page: String(page) })}`;
+            window.history.replaceState(window.history.state, '', nextUrl);
         } catch (error) {
             if (sequence === latestLoad.current) setError(errorText(error));
         } finally {
@@ -59,19 +73,22 @@ export default function PersonnelRequests() {
     };
 
     useEffect(() => {
+        if (admin) {
+            try { localStorage.setItem(personnelCategoryPreferenceKey, routeEmployeeType); } catch { /* Storage may be unavailable. */ }
+        }
         const params = new URLSearchParams(window.location.search);
         const next = { employee_type: routeEmployeeType, q: params.get('q') || '', status: params.get('status') || '', action_type: params.get('action_type') || '', archived: params.get('archived') === '1' ? '1' : '0' };
         setFilters(next); setDraft(next);
         load(Math.max(1, Number(params.get('page')) || 1), next);
         return () => { latestLoad.current += 1; };
-    }, [routeEmployeeType, admin]);
+    }, [url, routeEmployeeType, admin]);
 
     const actions = admin ? (
         <>
             <Link
-                href={`/admin/personnel-requests/create?employee_type=${routeEmployeeType}`}
-                className="rounded-md bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#244f9d]"
-            >{_t("Добавить заявку")}</Link>
+                href="/admin/personnel-requests/create"
+                className="inline-flex items-center gap-2 rounded-md bg-[#005eb8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#244f9d]"
+            ><Plus size={16} />{_t("Добавить заявку")}</Link>
         </>
     ) : null;
 
@@ -89,7 +106,15 @@ export default function PersonnelRequests() {
             <Head
                 title={_t(title)}
             />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+            <div data-guide-busy={loading} className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+                {admin && <nav data-admin-guide="personnel-categories" aria-label={_t('Категория')} className="flex flex-wrap gap-2">
+                    {personnelTabs.map(tab => <Link
+                        key={tab.value}
+                        href={personnelListUrl({ ...filters, employee_type: tab.value })}
+                        aria-current={filters.employee_type === tab.value ? 'page' : undefined}
+                        className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${filters.employee_type === tab.value ? 'border-[#005eb8] bg-[#005eb8] text-white' : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:text-[#005eb8]'}`}
+                    >{_t(tab.label)}</Link>)}
+                </nav>}
                 <div className="flex items-center justify-between gap-3">
                     <h2 className="text-sm font-semibold text-gray-700">{_t(filters.archived === '1' ? 'Архивные кадровые процессы' : 'Кадровые процессы')} <span className="text-gray-400">({meta.total})</span></h2>
                     <button type="button" disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 disabled:opacity-50" onClick={() => {
@@ -98,7 +123,7 @@ export default function PersonnelRequests() {
                     }}>{filters.archived === '1' ? <ArrowLeft size={16} /> : <Archive size={16} />}{_t(filters.archived === '1' ? 'К активным' : 'Архивные')}</button>
                 </div>
                 {error && <p role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">{_t(error)}</p>}
-                <form
+                <form data-admin-guide="personnel-filters"
                     className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 md:grid-cols-[1fr_220px_200px_auto]"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -109,7 +134,7 @@ export default function PersonnelRequests() {
                     <input
                         value={draft.q}
                         className="rounded-md border border-gray-300 px-3 py-2.5 text-sm"
-                        placeholder={_t(admin && routeEmployeeType === 'pps' ? 'Преподаватель, факультет, кафедра или должность' : 'Сотрудник, подразделение или должность')}
+                        placeholder={_t(usesAcademicStructure(filters.employee_type) ? 'ФИО, факультет, кафедра или должность' : 'ФИО, подразделение или должность')}
                         onChange={(event) =>
                             setDraft({ ...draft, q: event.target.value })
                         }
@@ -146,7 +171,7 @@ export default function PersonnelRequests() {
                     <button className="rounded-md bg-[#005eb8] px-5 py-2.5 text-sm font-semibold text-white">{_t("Найти")}</button>
                 </form>
 
-                <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                <section data-admin-guide="personnel-list" className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
                     {loading ? (
                         <div className="p-12 text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
                     ) : requests.length === 0 ? (
@@ -156,7 +181,7 @@ export default function PersonnelRequests() {
                             <table className="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead className="bg-[#edf4ff] text-left text-xs uppercase text-gray-500">
                                     <tr>
-                                        <th className="px-5 py-3">{_t(admin && routeEmployeeType === 'pps' ? 'Преподаватель' : 'Сотрудник')}</th>
+                                        <th className="px-5 py-3">{_t(admin && filters.employee_type ? personnelCategory(filters.employee_type).label : 'Сотрудник')}</th>
                                         <th className="px-5 py-3">{_t("Действие")}</th>
                                         <th className="px-5 py-3">{_t("Подразделение")}</th>
                                         <th className="px-5 py-3">{_t("Согласование")}</th>
@@ -185,9 +210,10 @@ export default function PersonnelRequests() {
                                                         {item.employee_name}
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        {_t(item.position?.name ||
+                                                        {_t(personnelPosition(item)?.name ||
                                                             "Должность не указана")}
                                                     </div>
+                                                    {admin && !filters.employee_type && <span className="mt-1.5 inline-flex rounded bg-blue-50 px-2 py-0.5 text-xs text-[#174a9c]">{_t(personnelCategory(item.employee_type).label)}</span>}
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     {_t(actionLabel(
@@ -195,7 +221,7 @@ export default function PersonnelRequests() {
                                                     ))}
                                                 </td>
                                                 <td className="max-w-xs px-5 py-4 text-gray-600">
-                                                    {item.employee_type === 'pps' ? <><div>{item.faculty?.name}</div><div className="mt-1 text-xs text-gray-500">{item.academic_unit?.name}</div></> : item.department?.name}
+                                                    {usesAcademicStructure(item.employee_type) ? <><div>{item.faculty?.name}</div><div className="mt-1 text-xs text-gray-500">{item.academic_unit?.name}</div></> : item.department?.name}
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span

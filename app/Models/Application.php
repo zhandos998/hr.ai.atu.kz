@@ -58,6 +58,16 @@ class Application extends Model
         return $this->belongsTo(Competition::class);
     }
 
+    public function uvpFaculty()
+    {
+        return $this->belongsTo(AcademicUnit::class, 'uvp_faculty_id');
+    }
+
+    public function uvpAcademicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class, 'uvp_academic_unit_id');
+    }
+
     public function resume() // одно резюме на заявку
     {
         return $this->hasOne(\App\Models\Resume::class);
@@ -86,7 +96,7 @@ class Application extends Model
 
     public function getVotingStartedAtAttribute(): ?string
     {
-        if (!$this->voting_date) {
+        if (! $this->voting_date) {
             return null;
         }
 

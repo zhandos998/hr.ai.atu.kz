@@ -86,7 +86,7 @@ export default function ReviewQueue() {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold uppercase text-[#174a9c]">
-                                            {_t(item.vacancy?.type === "pps"
+                                            {_t(item.vacancy?.type === 'uvp' ? 'УВП' : item.vacancy?.type === "pps"
                                                 ? "ППС"
                                                 : "АУП")}
                                         </div>

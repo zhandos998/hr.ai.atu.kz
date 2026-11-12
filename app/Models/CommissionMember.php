@@ -7,10 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class CommissionMember extends Model
 {
     public const TYPE_PPS = 'pps';
+
     public const TYPE_STAFF = 'staff';
+
+    public const TYPE_UVP = 'uvp';
+
     public const TYPES = [
         self::TYPE_PPS,
         self::TYPE_STAFF,
+        self::TYPE_UVP,
     ];
 
     protected $guarded = [];
@@ -18,6 +23,7 @@ class CommissionMember extends Model
     protected $casts = [
         'is_pps' => 'boolean',
         'is_staff' => 'boolean',
+        'is_uvp' => 'boolean',
     ];
 
     public function user()
@@ -29,7 +35,7 @@ class CommissionMember extends Model
     {
         return $query->where(function ($builder) {
             $builder->where('is_pps', true)
-                ->orWhere('is_staff', true);
+                ->orWhere('is_staff', true)->orWhere('is_uvp', true);
         });
     }
 
@@ -49,12 +55,13 @@ class CommissionMember extends Model
         return match ($type) {
             self::TYPE_PPS => 'is_pps',
             self::TYPE_STAFF => 'is_staff',
+            self::TYPE_UVP => 'is_uvp',
             default => null,
         };
     }
 
     public function isActive(): bool
     {
-        return (bool) $this->is_pps || (bool) $this->is_staff;
+        return (bool) $this->is_pps || (bool) $this->is_staff || (bool) $this->is_uvp;
     }
 }

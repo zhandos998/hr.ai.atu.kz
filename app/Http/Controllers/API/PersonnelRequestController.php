@@ -11,6 +11,7 @@ use App\Models\PersonnelRequestApproval;
 use App\Models\PersonnelRequestDocument;
 use App\Models\Position;
 use App\Models\User;
+use App\Models\UvpPosition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class PersonnelRequestController extends Controller
             ->with([
                 'department:id,name',
                 'position:id,name',
+                'uvpPosition:id,name', 'targetUvpPosition:id,name',
                 'targetDepartment:id,name',
                 'targetPosition:id,name',
                 'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
@@ -77,9 +79,9 @@ class PersonnelRequestController extends Controller
                 'status' => $item->status,
                 'created_at' => $item->created_at,
                 'department' => $item->department?->only(['id', 'name']),
-                'position' => $item->position?->only(['id', 'name']),
+                'position' => ($item->uvpPosition ?: $item->position)?->only(['id', 'name']),
                 'target_department' => $item->targetDepartment?->only(['id', 'name']),
-                'target_position' => $item->targetPosition?->only(['id', 'name']),
+                'target_position' => ($item->targetUvpPosition ?: $item->targetPosition)?->only(['id', 'name']),
                 'approvals' => $item->approvals->map(fn (PersonnelRequestApproval $approval) => [
                     'id' => $approval->id,
                     'approval_order' => $approval->approval_order,
@@ -118,6 +120,7 @@ class PersonnelRequestController extends Controller
             ->with([
                 'department:id,name',
                 'position:id,name',
+                'uvpPosition:id,name', 'targetUvpPosition:id,name',
                 'targetDepartment:id,name',
                 'targetPosition:id,name',
                 'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
@@ -139,7 +142,8 @@ class PersonnelRequestController extends Controller
                         ->orWhereHas('department', fn ($department) => $department->where('name', 'like', "%{$search}%"))
                         ->orWhereHas('faculty', fn ($unit) => $unit->where('name', 'like', "%{$search}%"))
                         ->orWhereHas('academicUnit', fn ($unit) => $unit->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('position', fn ($position) => $position->where('name', 'like', "%{$search}%"));
+                        ->orWhereHas('position', fn ($position) => $position->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('uvpPosition', fn ($position) => $position->where('name', 'like', "%{$search}%"));
                 });
             })
             ->when(in_array($status, ['pending', 'approved', 'rejected'], true), fn ($builder) => $builder->where('status', $status))
@@ -178,7 +182,7 @@ class PersonnelRequestController extends Controller
         $employeeType = $request->input('employee_type', 'staff');
         $validated = $request->validate([
             'employee_type' => ['sometimes', 'required', Rule::in(PersonnelRequest::EMPLOYEE_TYPES)],
-            ...$this->personnelStructureRules($request, $employeeType === 'pps'),
+            ...$this->personnelStructureRules($request, in_array($employeeType, PersonnelRequest::ACADEMIC_EMPLOYEE_TYPES, true), $employeeType === 'uvp'),
             'employee_name' => ['required', 'string', 'max:255'],
             'action_type' => ['required', Rule::in(self::ACTION_TYPES)],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
@@ -263,7 +267,7 @@ class PersonnelRequestController extends Controller
         $employeeType = $personnelRequest->employee_type;
         $validated = $request->validate([
             'employee_type' => ['sometimes', 'required', Rule::in([$employeeType])],
-            ...$this->personnelStructureRules($request, $employeeType === 'pps'),
+            ...$this->personnelStructureRules($request, in_array($employeeType, PersonnelRequest::ACADEMIC_EMPLOYEE_TYPES, true), $employeeType === 'uvp'),
             'employee_name' => ['required', 'string', 'max:255'],
             'action_type' => ['required', Rule::in(self::ACTION_TYPES)],
             'salary' => ['nullable', 'required_if:action_type,hire', 'numeric', 'min:0', 'max:999999999999.99'],
@@ -488,6 +492,7 @@ class PersonnelRequestController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'parent_id', 'description']),
             'users' => $users,
+            'uvp_positions' => UvpPosition::query()->orderBy('id')->get(['id', 'name']),
             'academic_units' => AcademicUnit::query()->with(['positions' => fn ($query) => $query->select('id', 'academic_unit_id', 'name')->whereNull('department_id')->orderBy('name')])
                 ->orderByRaw("CASE WHEN name = 'Другое' THEN 1 ELSE 0 END")->orderBy('name')->get(['id', 'name', 'parent_id', 'kind']),
         ]);
@@ -574,6 +579,7 @@ class PersonnelRequestController extends Controller
         $personnelRequest->load([
             'department:id,name',
             'position:id,name',
+            'uvpPosition:id,name', 'targetUvpPosition:id,name',
             'targetDepartment:id,name',
             'targetPosition:id,name',
             'faculty:id,name', 'academicUnit:id,name', 'targetFaculty:id,name', 'targetAcademicUnit:id,name',
@@ -616,16 +622,17 @@ class PersonnelRequestController extends Controller
         return $personnelRequest;
     }
 
-    private function personnelStructureRules(Request $request, bool $teacher): array
+    private function personnelStructureRules(Request $request, bool $academic, bool $uvp): array
     {
         $transfer = $request->input('action_type') === PersonnelRequest::ACTION_TRANSFER;
         $rules = [];
         foreach (['', 'target_'] as $prefix) {
             $required = $prefix === '' || $transfer;
-            $rules[$prefix.'department_id'] = $teacher ? ['prohibited'] : [$required ? 'required' : 'nullable', 'integer', 'exists:departments,id'];
-            $rules[$prefix.'position_id'] = [$teacher && $required ? 'required' : 'nullable', 'integer', 'exists:positions,id'];
-            $rules[$prefix.'faculty_id'] = $teacher ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'faculty')] : ['prohibited'];
-            $rules[$prefix.'academic_unit_id'] = $teacher ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'chair')] : ['prohibited'];
+            $rules[$prefix.'department_id'] = $academic ? ['prohibited'] : [$required ? 'required' : 'nullable', 'integer', 'exists:departments,id'];
+            $rules[$prefix.'position_id'] = $uvp ? ['prohibited'] : [$academic && $required ? 'required' : 'nullable', 'integer', 'exists:positions,id'];
+            $rules[$prefix.'uvp_position_id'] = $uvp ? [$required ? 'required' : 'nullable', 'integer', 'exists:uvp_positions,id'] : ['prohibited'];
+            $rules[$prefix.'faculty_id'] = $academic ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'faculty')] : ['prohibited'];
+            $rules[$prefix.'academic_unit_id'] = $academic ? [$required ? 'required' : 'nullable', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'chair')] : ['prohibited'];
         }
 
         return $rules;
@@ -636,19 +643,21 @@ class PersonnelRequestController extends Controller
         $structure = ['employee_type' => $type];
         foreach (['', 'target_'] as $prefix) {
             $active = $prefix === '' || $data['action_type'] === PersonnelRequest::ACTION_TRANSFER;
-            $teacher = $type === 'pps';
-            $structure[$prefix.'department_id'] = $active && ! $teacher ? $data[$prefix.'department_id'] : null;
-            $structure[$prefix.'faculty_id'] = $active && $teacher ? $data[$prefix.'faculty_id'] : null;
-            $structure[$prefix.'academic_unit_id'] = $active && $teacher ? $data[$prefix.'academic_unit_id'] : null;
-            $structure[$prefix.'position_id'] = $active ? ($data[$prefix.'position_id'] ?? null) : null;
+            $academic = in_array($type, PersonnelRequest::ACADEMIC_EMPLOYEE_TYPES, true);
+            $uvp = $type === 'uvp';
+            $structure[$prefix.'department_id'] = $active && ! $academic ? $data[$prefix.'department_id'] : null;
+            $structure[$prefix.'faculty_id'] = $active && $academic ? $data[$prefix.'faculty_id'] : null;
+            $structure[$prefix.'academic_unit_id'] = $active && $academic ? $data[$prefix.'academic_unit_id'] : null;
+            $structure[$prefix.'position_id'] = $active && ! $uvp ? ($data[$prefix.'position_id'] ?? null) : null;
+            $structure[$prefix.'uvp_position_id'] = $active && $uvp ? $data[$prefix.'uvp_position_id'] : null;
             if (! $active) {
                 continue;
             }
-            if ($teacher) {
+            if ($academic) {
                 if (! AcademicUnit::whereKey($data[$prefix.'academic_unit_id'])->where('parent_id', $data[$prefix.'faculty_id'])->exists()) {
                     throw ValidationException::withMessages([$prefix.'academic_unit_id' => [__('messages.personnel_chair_mismatch')]]);
                 }
-                if (! Position::whereKey($data[$prefix.'position_id'])->where('academic_unit_id', $data[$prefix.'academic_unit_id'])->whereNull('department_id')->exists()) {
+                if (! $uvp && ! Position::whereKey($data[$prefix.'position_id'])->where('academic_unit_id', $data[$prefix.'academic_unit_id'])->whereNull('department_id')->exists()) {
                     throw ValidationException::withMessages([$prefix.'position_id' => [__('messages.personnel_position_mismatch')]]);
                 }
             } else {

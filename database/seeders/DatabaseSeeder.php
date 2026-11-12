@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DepartmentPositionSeeder::class,
             FacultyDepartmentSeeder::class,
             PpsPositionSeeder::class,
+            UvpPositionSeeder::class,
             VacancySeeder::class,
             ApplicationSeeder::class,
             ApplicationStatusSeeder::class,

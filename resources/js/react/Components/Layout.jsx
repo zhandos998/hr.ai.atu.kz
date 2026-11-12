@@ -1,10 +1,13 @@
 import { useI18n as useTextI18n } from "../I18nContext";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, usePage } from "@inertiajs/react";
-import { ChevronDown, Undo2 } from "lucide-react";
+import { ChevronDown, CircleHelp, Undo2 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 import { useI18n } from "../I18nContext";
 import TechnicalEmailWarning from "./TechnicalEmailWarning";
+import ProfileMenu from './ProfileMenu';
+import { roleHome, workspaceNavigation } from '../lib/workspaceNavigation';
+import useAdminGuide from '../guides/useAdminGuide';
 
 const requirementsUrl = "https://library.atu.edu.kz/files/doc/231020231/";
 const menuGroups = {
@@ -13,8 +16,7 @@ const menuGroups = {
         { href: "/admin/leaves", label: "leaves" },
     ],
     personnel: [
-        { href: "/admin/personnel-requests?employee_type=pps", label: "personnelTeachers" },
-        { href: "/admin/personnel-requests?employee_type=staff", label: "personnelStaff" },
+        { href: "/admin/personnel-requests", label: "allPersonnelRequests" },
         {
             href: "/admin/personnel-approval-routes",
             label: "defaultCommission",
@@ -22,14 +24,14 @@ const menuGroups = {
     ],
     vacancies: [
         { href: "/admin/competitions", label: "competitions" },
-        { href: "/admin/applications?type=pps", label: "teacherApplications" },
-        { href: "/admin/applications?type=staff", label: "staffApplications" },
+        { href: "/admin/applications", label: "applications" },
         { href: "/admin/commission-members", label: "commission" },
     ],
     directory: [
         { href: "/admin/departments", label: "departments" },
         { href: "/admin/academic-units", label: "academicUnits" },
         { href: "/admin/pps-positions", label: "ppsPositions" },
+        { href: "/admin/uvp-positions", label: "uvpPositions" },
         { href: "/admin/positions", label: "positions" },
         { href: "/admin/structure-tree", label: "structure" },
     ],
@@ -47,26 +49,6 @@ const roleLabels = {
     commission: "Член комиссии",
     user: "Пользователь",
 };
-const roleHome = {
-    admin: "/admin",
-    lawyer: "/compliance/applications",
-    science_director: "/science/applications",
-    digital_director: "/digital/applications",
-    strategy_director: "/strategy/applications",
-    academic_director: "/academic/applications",
-    library_director: "/library/applications",
-    professional_development_director: "/professional-development/applications",
-    economist: "/personnel/requests",
-    commission: "/commission/applications",
-};
-
-function workspaceHref(user, role) {
-    if (roleHome[role]) return roleHome[role];
-    if (user?.is_commission_member) return "/commission/applications";
-    if (user?.has_personnel_approvals) return "/personnel/requests";
-    return null;
-}
-
 function LanguageSwitch({ locale, setLocale }) {
     const { t: _t } = useTextI18n();
     return (
@@ -171,7 +153,7 @@ function PageHeading({ title, description, actions }) {
     const { t: _t } = useTextI18n();
     if (!title) return null;
     return (
-        <header className="border-b border-gray-200 bg-white">
+        <header data-admin-guide="page-heading" className="border-b border-gray-200 bg-white">
             <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 flex-1">
                     <h1 className="text-xl font-bold [overflow-wrap:anywhere]">
@@ -184,7 +166,7 @@ function PageHeading({ title, description, actions }) {
                     )}
                 </div>
                 {actions && (
-                    <div className="flex shrink-0 flex-wrap items-center gap-3">
+                    <div data-admin-guide="page-actions" className="flex shrink-0 flex-wrap items-center gap-3">
                         {_t(actions)}
                     </div>
                 )}
@@ -241,7 +223,6 @@ export default function Layout({
         user,
         role,
         loading,
-        logout,
         impersonator,
         isImpersonating,
         returnFromImpersonation,
@@ -250,7 +231,8 @@ export default function Layout({
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [openGroup, setOpenGroup] = useState("vacancies");
     const { url: currentPath } = usePage();
-    const workHref = workspaceHref(user, role);
+    const guide = useAdminGuide({ enabled: admin && role === 'admin', url: currentPath, locale });
+    const workLinks = workspaceNavigation(user, role);
 
     useEffect(() => {
         if (loading) return;
@@ -365,30 +347,17 @@ export default function Layout({
                                 </span>
                                 <span className="md:hidden">{_t("Статус процесса")}</span>
                             </Link>
-                            {user && workHref && (
+                            {workLinks.map(link => (
                                 <Link
-                                    href={workHref}
+                                    key={link.href}
+                                    href={link.href}
                                     className="inline-flex rounded-md px-2 py-2 hover:bg-blue-50"
                                 >
-                                    {t(workHref === "/commission/applications" ? "applications" : "workspace")}
+                                    {t(link.label)}
                                 </Link>
-                            )}
+                            ))}
                             {user ? (
-                                <>
-                                    <Link
-                                        href="/profile"
-                                        className="rounded-md px-2 py-2 hover:bg-blue-50"
-                                    >
-                                        {_t(t("profile"))}
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        className="rounded-md px-2 py-2 hover:bg-blue-50"
-                                        onClick={logout}
-                                    >
-                                        {_t(t("logout"))}
-                                    </button>
-                                </>
+                                <ProfileMenu />
                             ) : (
                                 <Link
                                     href="/login"
@@ -441,7 +410,7 @@ export default function Layout({
                         </div>
                     </div>
                 </div>
-                <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-5">
+                <nav data-admin-guide="navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-5">
                     {_t(adminMenu)}
                 </nav>
                 <div className="shrink-0 border-t border-gray-200 px-4 py-4">
@@ -455,14 +424,12 @@ export default function Layout({
                         >
                             {_t(t("requirements"))}
                         </a>
-                        <MenuLink href="/profile">{_t(t("profile"))}</MenuLink>
-                        <button
-                            type="button"
-                            className="flex w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 hover:bg-[#f3f6fb] hover:text-[#174a9c]"
-                            onClick={logout}
-                        >
-                            {_t(t("logout"))}
+                        <button data-admin-guide="guide-trigger" type="button" onClick={guide.start} disabled={guide.disabled}
+                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-[#f3f6fb] hover:text-[#174a9c] disabled:opacity-60">
+                            <CircleHelp size={17} aria-hidden="true" />{guide.status === 'preparing' ? guide.labels.preparing : guide.labels.start}
                         </button>
+                        {guide.status === 'error' && <p role="alert" className="px-3 text-xs text-red-600">{guide.labels.error}</p>}
+                        <ProfileMenu sidebar />
                     </nav>
                 </div>
             </aside>
@@ -473,20 +440,29 @@ export default function Layout({
                             <img
                                 src="/logo long.png"
                                 alt={_t("АТУ")}
-                                className="h-8 w-auto"
+                                className="h-auto w-36 sm:h-8 sm:w-auto"
                             />
                         </Link>
-                        <button
+                        <div className="flex shrink-0 items-center gap-2">
+                        <button data-admin-guide="guide-trigger" type="button" onClick={guide.start} disabled={guide.disabled}
+                            title={guide.status === 'preparing' ? guide.labels.preparing : guide.labels.start} aria-label={guide.labels.start}
+                            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-[#174a9c] disabled:opacity-60">
+                            <CircleHelp size={19} aria-hidden="true" />
+                        </button>
+                        <button data-admin-guide="menu-toggle"
                             type="button"
                             className="rounded-md border border-gray-200 px-3 py-2 text-sm font-bold text-[#174a9c]"
                             onClick={() => setMobileMenuOpen((value) => !value)}
                         >
                             {_t(t("menu"))}
                         </button>
+                        </div>
                     </div>
+                    {guide.status === 'error' && <p role="alert" className="mt-2 text-xs text-red-600">{guide.labels.error}</p>}
                     {mobileMenuOpen && (
-                        <nav className="mt-3 space-y-1 border-t border-gray-200 pt-3">
+                        <nav data-admin-guide="navigation" className="mt-3 space-y-1 border-t border-gray-200 pt-3">
                             {_t(adminMenu)}
+                            <ProfileMenu sidebar onNavigate={() => setMobileMenuOpen(false)} />
                             <div className="pt-2">
                                 <LanguageSwitch
                                     locale={locale}
@@ -511,7 +487,7 @@ export default function Layout({
                     />
                 </div>
                 <TechnicalEmailWarning email={user?.email} />
-                <main className="min-w-0 flex-1">{_t(children)}</main>
+                <main data-admin-guide="page-content" className="min-w-0 flex-1">{_t(children)}</main>
             </div>
         </div>
     );

@@ -21,7 +21,7 @@ class CommissionController extends Controller
     public function adminMembers(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'nullable|in:pps,staff',
+            'type' => 'nullable|in:pps,staff,uvp',
         ]);
         $query = trim((string) $request->query('q', ''));
         $type = $validated['type'] ?? null;
@@ -51,7 +51,7 @@ class CommissionController extends Controller
     public function adminCandidateUsers(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'nullable|in:pps,staff',
+            'type' => 'nullable|in:pps,staff,uvp',
         ]);
         $query = trim((string) $request->query('q', ''));
         $type = $validated['type'] ?? null;
@@ -87,7 +87,7 @@ class CommissionController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|integer|exists:users,id',
-            'type' => 'nullable|in:pps,staff',
+            'type' => 'nullable|in:pps,staff,uvp',
         ]);
         $type = $validated['type'] ?? null;
         $user = User::query()->findOrFail($validated['user_id']);
@@ -105,6 +105,7 @@ class CommissionController extends Controller
         if (! $member->exists) {
             $member->is_pps = false;
             $member->is_staff = false;
+            $member->is_uvp = false;
         }
 
         if ($type === null) {
@@ -125,7 +126,7 @@ class CommissionController extends Controller
     public function adminRemoveMember(Request $request, int $userId)
     {
         $validated = $request->validate([
-            'type' => 'nullable|in:pps,staff',
+            'type' => 'nullable|in:pps,staff,uvp',
         ]);
         $type = $validated['type'] ?? null;
         $member = CommissionMember::query()
@@ -154,7 +155,7 @@ class CommissionController extends Controller
     public function queue(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'nullable|in:pps,staff',
+            'type' => 'nullable|in:pps,staff,uvp',
             'competition_id' => ['nullable', 'regex:/^(all|none|[1-9][0-9]*)$/'],
             'q' => 'nullable|string|max:255',
             'page' => 'nullable|integer|min:1',
@@ -226,7 +227,7 @@ class CommissionController extends Controller
                 'per_page' => $applications->perPage(), 'total' => $applications->total(),
             ],
             'filters' => ['type' => $type, 'competition_id' => $competition],
-            'counts' => ['pps' => (int) $groups->where('type', 'pps')->sum('aggregate'), 'staff' => (int) $groups->where('type', 'staff')->sum('aggregate')],
+            'counts' => ['pps' => (int) $groups->where('type', 'pps')->sum('aggregate'), 'staff' => (int) $groups->where('type', 'staff')->sum('aggregate'), 'uvp' => (int) $groups->where('type', 'uvp')->sum('aggregate')],
             'competitions' => $groups->map(fn ($group) => [
                 'type' => $group->type, 'value' => (string) ($group->competition_id ?? 'none'),
                 'label' => $group->title ?? 'Без конкурса', 'count' => (int) $group->aggregate,
@@ -335,7 +336,8 @@ class CommissionController extends Controller
         $relations = [
             'competition:id,title,type,number',
             'user:id,name,email,phone',
-            'vacancy:id,title,type,position_id',
+            'vacancy:id,title,type,position_id,uvp_position_id',
+            'vacancy.uvpPosition:id,name', 'uvpFaculty:id,name', 'uvpAcademicUnit:id,name',
             'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.position.department:id,name',
             'vacancy.position.academicUnit:id,name,parent_id',
@@ -404,7 +406,7 @@ class CommissionController extends Controller
     {
         $member = CommissionMember::query()
             ->where('user_id', $userId)
-            ->first(['is_pps', 'is_staff']);
+            ->first(['is_pps', 'is_staff', 'is_uvp']);
 
         if (! $member) {
             return [];
@@ -418,6 +420,9 @@ class CommissionController extends Controller
 
         if ($member->is_staff) {
             $types[] = CommissionMember::TYPE_STAFF;
+        }
+        if ($member->is_uvp) {
+            $types[] = CommissionMember::TYPE_UVP;
         }
 
         return $types;

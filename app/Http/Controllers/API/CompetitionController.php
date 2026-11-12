@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Competition;
+use App\Models\Vacancy;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ class CompetitionController extends Controller
 {
     public function index(Request $request)
     {
-        $data = $request->validate(['type' => ['nullable', Rule::in(['pps', 'staff'])], 'q' => 'nullable|string|max:255']);
+        $data = $request->validate(['type' => ['nullable', Rule::in(Vacancy::TYPES)], 'q' => 'nullable|string|max:255']);
 
         return Competition::query()
             ->when($data['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
@@ -26,7 +27,7 @@ class CompetitionController extends Controller
 
     public function defaults()
     {
-        return collect(['pps', 'staff'])->mapWithKeys(function ($type) {
+        return collect(Vacancy::TYPES)->mapWithKeys(function ($type) {
             $number = (int) Competition::where('type', $type)->max('number') + 1;
 
             return [$type => Competition::defaultTitle($type, $number)];
@@ -35,7 +36,7 @@ class CompetitionController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['pps', 'staff'])], 'title' => 'nullable|string|max:255']);
+        $data = $request->validate(['type' => ['required', Rule::in(Vacancy::TYPES)], 'title' => 'nullable|string|max:255']);
         // The unique sequence also protects simultaneous submissions by different admins.
         for ($attempt = 0; $attempt < 5; $attempt++) {
             try {
@@ -82,7 +83,7 @@ class CompetitionController extends Controller
         return Application::query()->notArchived()->whereNull('competition_id')
             ->whereHas('vacancy', fn ($query) => $query->where('type', $competition->type))
             ->when($data['q'] ?? null, fn ($query, $search) => $query->whereHas('user', fn ($user) => $user->where('name', 'like', '%'.$search.'%')))
-            ->with(['user:id,name', 'vacancy:id,title,type,position_id', 'vacancy.position:id,name', 'ppsProfile:id,application_id,desired_position,faculty_name,department_name'])
+            ->with(['user:id,name', 'vacancy:id,title,type,position_id,uvp_position_id', 'vacancy.position:id,name', 'vacancy.uvpPosition:id,name', 'ppsProfile:id,application_id,desired_position,faculty_name,department_name'])
             ->select(['id', 'user_id', 'vacancy_id', 'created_at'])
             ->latest('id')->paginate(20);
     }

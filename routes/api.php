@@ -85,6 +85,10 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
         Route::delete('/{id}', [\App\Http\Controllers\API\PersonnelRegisterController::class, 'destroy'])->whereNumber('id');
     });
     Route::get('/admin/competitions', [CompetitionController::class, 'index']);
+    Route::get('/admin/uvp-positions', [\App\Http\Controllers\API\UvpPositionController::class, 'index']);
+    Route::post('/admin/uvp-positions', [\App\Http\Controllers\API\UvpPositionController::class, 'store']);
+    Route::put('/admin/uvp-positions/{id}', [\App\Http\Controllers\API\UvpPositionController::class, 'update'])->whereNumber('id');
+    Route::delete('/admin/uvp-positions/{id}', [\App\Http\Controllers\API\UvpPositionController::class, 'destroy'])->whereNumber('id');
     Route::get('/admin/competitions/defaults', [CompetitionController::class, 'defaults']);
     Route::post('/admin/competitions', [CompetitionController::class, 'store']);
     Route::get('/admin/competitions/{competition}', [CompetitionController::class, 'show'])->whereNumber('competition');
@@ -110,6 +114,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/admin/applications/{id}/upload-docs', [ApplicationController::class, 'adminUploadDocs']);
     Route::delete('/admin/applications/{id}/documents/{documentId}', [ApplicationController::class, 'adminDeleteDocument']);
     Route::put('/admin/applications/{id}/staff-details', [ApplicationController::class, 'updateStaffDetails']);
+    Route::put('/admin/applications/{id}/uvp-details', [ApplicationController::class, 'updateUvpDetails']);
     Route::post('/admin/applications/{id}/pps-profile', [ApplicationController::class, 'updatePpsProfile']);
     Route::delete('/admin/applications/{id}/pps-profile/documents/{documentId}', [ApplicationController::class, 'deletePpsProfileDocument']);
     Route::put('/admin/applications/{id}', [ApplicationController::class, 'updateStatus']);

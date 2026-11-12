@@ -18,9 +18,25 @@ class AcademicStructureMigrationTest extends TestCase
 
     private function migration()
     {
+        // These later foreign keys must not exist while testing the historical schema.
+        Schema::table('applications', function ($table) {
+            $table->dropConstrainedForeignId('uvp_faculty_id');
+            $table->dropConstrainedForeignId('uvp_academic_unit_id');
+        });
         (require database_path('migrations/2026_10_15_120000_merge_duplicate_positions.php'))->down();
 
         return require database_path('migrations/2026_09_25_000000_separate_academic_units_from_departments.php');
+    }
+
+    protected function tearDown(): void
+    {
+        if (Schema::hasTable('academic_units') && ! Schema::hasColumn('applications', 'uvp_faculty_id')) {
+            Schema::table('applications', function ($table) {
+                $table->foreignId('uvp_faculty_id')->nullable()->constrained('academic_units')->restrictOnDelete();
+                $table->foreignId('uvp_academic_unit_id')->nullable()->constrained('academic_units')->restrictOnDelete();
+            });
+        }
+        parent::tearDown();
     }
 
     public function test_administrative_child_of_chair_keeps_its_academic_link_and_rolls_back(): void

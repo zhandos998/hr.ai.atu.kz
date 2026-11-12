@@ -56,6 +56,43 @@ class AdminApplicationsPaginationTest extends TestCase
             ->assertJsonPath('counts.staff', 2);
     }
 
+    public function test_all_categories_share_pagination_and_keep_their_own_types_and_profiles(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $teacher = $this->createAdminListApplication('pps', 'Mixed Teacher');
+        $staff = $this->createAdminListApplication('staff', 'Mixed Staff');
+        $this->createAdminListApplication('pps', 'Mixed Teacher Two');
+
+        $response = $this->getJson('/api/admin/applications?type=all&per_page=2&sort_by=candidate&sort_direction=asc')
+            ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 2)->assertJsonPath('counts.pps', 2)->assertJsonPath('counts.staff', 1);
+        $rows = collect($response->json('data'))->keyBy('id');
+        $this->assertSame('staff', $rows[$staff->id]['vacancy']['type']);
+        $this->assertNull($rows[$staff->id]['pps_profile']);
+        $this->assertSame('pps', $rows[$teacher->id]['vacancy']['type']);
+        $this->assertSame('Assistant', $rows[$teacher->id]['pps_profile']['desired_position']);
+        $this->getJson('/api/admin/applications?type=all&per_page=2&page=2')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.current_page', 2);
+    }
+
+    public function test_all_category_search_and_archive_keep_type_counts_in_scope(): void
+    {
+        $this->seed(ApplicationStatusSeeder::class);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $this->createAdminListApplication('pps', 'Shared Teacher');
+        $archived = $this->createAdminListApplication('staff', 'Shared Staff');
+        $archived->update(['archived_at' => now()]);
+        $this->createAdminListApplication('staff', 'Other Candidate');
+
+        $this->getJson('/api/admin/applications?type=all&q=Shared')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('counts.pps', 1)->assertJsonPath('counts.staff', 0);
+        $this->getJson('/api/admin/applications?type=all&q=Shared&archived=1')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $archived->id)
+            ->assertJsonPath('counts.pps', 0)->assertJsonPath('counts.staff', 1);
+    }
+
     private function createAdminListApplication(string $type, string $candidateName): Application
     {
         $candidate = User::factory()->create(['name' => $candidateName]);

@@ -6,6 +6,7 @@ import Layout from "../../Components/Layout";
 import { useAuth } from "../../AuthContext";
 import PersonnelArchiveButton from "../../Components/PersonnelArchiveButton";
 import PersonnelCommission from "../../Components/PersonnelCommission";
+import { personnelCategory, personnelPosition, usesAcademicStructure } from '../../personnel';
 
 const errorText = (error) =>
     error?.response?.data?.message ||
@@ -99,7 +100,6 @@ export default function PersonnelRequestDetails() {
         ? "/admin/personnel-requests"
         : "/personnel/requests";
     const backParams = new URLSearchParams(window.location.search);
-    if (admin && item?.employee_type) backParams.set('employee_type', item.employee_type);
     const backPath = `${backBase}?${backParams}`;
     const actions = admin ? (
         <>
@@ -190,7 +190,7 @@ export default function PersonnelRequestDetails() {
             actions={actions}
         >
             <Head title={_t(`Кадровая заявка №${requestId}`)} />
-            <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+            <div data-guide-busy={loading} className="mx-auto max-w-5xl space-y-6 px-4 py-8">
                 <Link
                     href={backPath}
                     className="inline-flex text-sm font-semibold text-[#005eb8] hover:text-[#174a9c]"
@@ -205,7 +205,7 @@ export default function PersonnelRequestDetails() {
 
                 {!loading && item && (
                     <>
-                        <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                        <section data-admin-guide="personnel-summary" className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
                             <div className="flex flex-col gap-3 border-b border-blue-100 bg-[#edf4ff] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <h2 className="text-lg font-bold text-[#174a9c]">
@@ -222,28 +222,28 @@ export default function PersonnelRequestDetails() {
                                 </span>
                             </div>
                             <dl className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2">
-                                <DataItem label={_t('Категория')}>{_t(item.employee_type === 'pps' ? 'Преподаватель' : 'Сотрудник')}</DataItem>
-                                {item.employee_type === 'pps' ? <>
+                                <DataItem label={_t('Категория')}>{_t(personnelCategory(item.employee_type).label)}</DataItem>
+                                {usesAcademicStructure(item.employee_type) ? <>
                                     <DataItem label={_t('Факультет')}>{item.faculty?.name || '—'}</DataItem>
                                     <DataItem label={_t('Кафедра')}>{item.academic_unit?.name || '—'}</DataItem>
                                 </> : <DataItem label={_t("Подразделение")}>
                                     {_t(item.department?.name || "—")}
                                 </DataItem>}
                                 <DataItem label={_t("Должность")}>
-                                    {_t(item.position?.name || "Не указана")}
+                                    {_t(personnelPosition(item)?.name || "Не указана")}
                                 </DataItem>
-                                {item.action_type === "transfer" && item.employee_type === 'pps' && <>
+                                {item.action_type === "transfer" && usesAcademicStructure(item.employee_type) && <>
                                     <DataItem label={_t('Новый факультет')}>{item.target_faculty?.name || '—'}</DataItem>
                                     <DataItem label={_t('Новая кафедра')}>{item.target_academic_unit?.name || '—'}</DataItem>
                                 </>}
-                                {item.action_type === "transfer" && item.employee_type !== 'pps' && (
+                                {item.action_type === "transfer" && !usesAcademicStructure(item.employee_type) && (
                                     <DataItem label={_t("Новое подразделение")}>
                                         {_t(item.target_department?.name || "—")}
                                     </DataItem>
                                 )}
                                 {item.action_type === "transfer" && (
                                     <DataItem label={_t("Новая должность")}>
-                                        {_t(item.target_position?.name ||
+                                        {_t(personnelPosition(item, true)?.name ||
                                             "Не указана")}
                                     </DataItem>
                                 )}
@@ -300,7 +300,7 @@ export default function PersonnelRequestDetails() {
                             )}
                         </section>}
 
-                        <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                        <section data-admin-guide="personnel-approvals" className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
                             <div className="border-b border-blue-100 bg-[#edf4ff] px-5 py-4">
                                 <h2 className="font-bold text-[#174a9c]">{_t("Согласование")}</h2>
                             </div>

@@ -54,6 +54,7 @@ foreach ([
 }
 
 Route::get('/admin/academic-units', fn () => Inertia::render('Admin/Departments/Index', ['academic' => true]));
+Route::get('/admin/uvp-positions', fn () => Inertia::render('Admin/UvpPositions/Index'));
 Route::get('/admin/users/technical', fn () => Inertia::render('Admin/Users', ['technical' => true]));
 Route::get('/admin/academic-units/create', fn () => Inertia::render('Admin/Departments/Form', ['academic' => true]));
 Route::get('/admin/academic-units/{unit}/edit', fn (int $unit) => Inertia::render('Admin/Departments/Form', ['academic' => true, 'departmentId' => $unit]))->whereNumber('unit');

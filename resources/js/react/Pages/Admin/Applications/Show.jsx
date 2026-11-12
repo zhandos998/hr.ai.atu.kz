@@ -12,6 +12,8 @@ import Layout from "../../../Components/Layout";
 import SearchSelect from "../../../Components/SearchSelect";
 import UploadDocsModal from "../../../Components/UploadDocsModal";
 import TeacherAudit from "../../../Components/TeacherAudit";
+import UvpApplicationForm from '../../../Components/UvpApplicationForm';
+import { applicationTypeLabel } from '../../../applicationNavigation';
 import {
     Alert,
     Field,
@@ -262,6 +264,7 @@ export default function AdminApplicationShow() {
         load();
     }, [applicationId]);
     const isPps = item?.vacancy?.type === "pps";
+    const isUvp = item?.vacancy?.type === 'uvp';
     const roots = academicUnits.filter(
         (department) => department.kind === "faculty",
     );
@@ -486,6 +489,7 @@ export default function AdminApplicationShow() {
         }
     };
     const displayPosition =
+        item?.vacancy?.uvp_position?.name ||
         item?.pps_profile?.desired_position ||
         item?.vacancy?.position?.name ||
         item?.vacancy?.title;
@@ -498,7 +502,7 @@ export default function AdminApplicationShow() {
     const safeReturn = requestedReturn && /^\/admin\/(applications(?:\?|$)|competitions\/\d+(?:\?|$))/.test(requestedReturn);
     const returnUrl = safeReturn ? requestedReturn : fromCompetition
         ? `/admin/competitions/${item.competition_id}${item.archived_at ? "?archived=1" : ""}`
-        : `/admin/applications?type=${isPps ? "pps" : "staff"}${item?.archived_at ? "&archived=1" : ""}`;
+        : `/admin/applications?type=${item?.vacancy?.type || 'pps'}${item?.archived_at ? "&archived=1" : ""}`;
     const setProfileField = (key, value) =>
         setPpsDraft((current) => ({ ...current, [key]: value }));
     const profileFiles = (field, label) => (
@@ -558,7 +562,7 @@ export default function AdminApplicationShow() {
             description={_t("Полная информация по кандидату и этапам рассмотрения.")}
         >
             <Head title={_t(`Заявка №${applicationId}`)} />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+            <div data-guide-busy={loading} className="mx-auto max-w-7xl space-y-5 px-4 py-6">
                 <Alert>{_t(error)}</Alert>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
@@ -586,10 +590,10 @@ export default function AdminApplicationShow() {
                 ) : (
                     item && (
                         <div className="grid min-w-0 gap-5 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-                            <aside className="min-w-0 space-y-4 border-b border-gray-100 pb-5 lg:border-b-0 lg:pb-0">
+                            <aside data-admin-guide="application-summary" className="min-w-0 space-y-4 border-b border-gray-100 pb-5 lg:border-b-0 lg:pb-0">
                                 <section className="space-y-1 text-sm">
                                     <span className="inline-block rounded bg-blue-50 px-2 py-1 text-xs font-medium text-[#174a9c]">
-                                        {_t(isPps ? "ППС" : "АУП")}
+                                        {_t(applicationTypeLabel(item.vacancy?.type))}
                                     </span>
                                     <h2 className="break-words text-lg font-semibold leading-6 text-[#174a9c]">
                                         {_t(displayPosition)}
@@ -598,6 +602,7 @@ export default function AdminApplicationShow() {
                                         {item.user?.name}
                                     </p>
                                     <dl className="text-xs leading-5 text-gray-600">
+                                        {isUvp && <><div>{_t('Факультет')}: {item.uvp_faculty?.name}</div><div>{_t('Кафедра')}: {item.uvp_academic_unit?.name}</div></>}
                                         <div>
                                             <dt className="inline text-gray-400">{_t("Телефон:")}{" "}
                                             </dt>
@@ -787,7 +792,7 @@ export default function AdminApplicationShow() {
                                 </section>
                             </aside>
                             <div className="min-w-0 space-y-4">
-                                <section className="space-y-3">
+                                <section data-admin-guide="application-documents" className="space-y-3">
                                     <div className="application-resume-upload flex flex-wrap items-center gap-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2">
                                         <div className="min-w-0 flex-[1_1_200px]">
                                             <input
@@ -846,7 +851,7 @@ export default function AdminApplicationShow() {
                                         >{_t("Загрузить документы")}</button>
                                     </div>
                                 </section>
-                                <section className="border-y border-gray-200 py-4">
+                                <section data-admin-guide="application-stages" className="border-y border-gray-200 py-4">
                                     <h2 className="mb-3 text-sm font-semibold">{_t("Статусы заявки")}</h2>
                                     <div className="grid gap-4 xl:grid-cols-2">
                                         {[
@@ -1049,7 +1054,7 @@ export default function AdminApplicationShow() {
                                     </div>
                                 </section>
                                 {isPps ? (
-                                    <section className="space-y-3">
+                                    <section data-admin-guide="application-teacher" className="space-y-3">
                                         <h2 className="text-sm font-semibold">{_t("Данные преподавателя")}</h2>
                                         {ppsGroups.map(
                                             ([title, fields], groupIndex) => (
@@ -1286,7 +1291,7 @@ export default function AdminApplicationShow() {
                                             </button>
                                         </div>
                                     </section>
-                                ) : (
+                                ) : isUvp ? <UvpApplicationForm application={item} units={academicUnits} onChanged={data => sync(data, 'uvp')} /> : (
                                     <section className="space-y-4 border-y border-gray-200 py-5">
                                         <h2 className="text-sm font-semibold">{_t("Департамент и должность АУП")}</h2>
                                         <div className="grid gap-4 xl:grid-cols-2">
@@ -1403,7 +1408,7 @@ export default function AdminApplicationShow() {
                                         </button>
                                     ))}
                                 </div>
-                                <section className="space-y-3 border-y border-gray-200 py-5">
+                                <section data-admin-guide="application-commission" className="space-y-3 border-y border-gray-200 py-5">
                                     <h2 className="text-sm font-semibold">{_t("Комиссия по вакансии")}</h2>
                                     <p className="text-sm text-gray-500">{_t("Найдите сотрудника по ФИО, email или телефону и добавьте в комиссию.")}</p>
                                     <div className="grid gap-3 md:grid-cols-[1fr_auto]">

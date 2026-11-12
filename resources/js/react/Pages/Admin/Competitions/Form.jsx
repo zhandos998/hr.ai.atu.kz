@@ -103,6 +103,7 @@ export default function CompetitionForm() {
                                 }
                             >
                                 <option value="pps">{_t("ППС")}</option>
+                                <option value="uvp">{_t("УВП")}</option>
                                 <option value="staff">{_t("АУП")}</option>
                             </select>
                         </Field>

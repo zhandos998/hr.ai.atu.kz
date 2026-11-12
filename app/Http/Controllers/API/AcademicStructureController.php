@@ -37,7 +37,8 @@ class AcademicStructureController extends Controller
     public function destroy(int $id)
     {
         $unit = AcademicUnit::findOrFail($id);
-        if (PersonnelRequest::where('faculty_id', $id)->orWhere('academic_unit_id', $id)->orWhere('target_faculty_id', $id)->orWhere('target_academic_unit_id', $id)->exists()) {
+        if (PersonnelRequest::where('faculty_id', $id)->orWhere('academic_unit_id', $id)->orWhere('target_faculty_id', $id)->orWhere('target_academic_unit_id', $id)->exists() ||
+            \App\Models\Application::where('uvp_faculty_id', $id)->orWhere('uvp_academic_unit_id', $id)->exists()) {
             return response()->json(['message' => __('messages.personnel_unit_in_use')], 422);
         }
         if ($unit->children()->exists() || $unit->positions()->exists()) {

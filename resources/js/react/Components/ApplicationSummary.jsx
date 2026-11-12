@@ -42,7 +42,8 @@ const stageLabel = (value) =>
 
 export default function ApplicationSummary({ application }) {
     const { t: _t } = useTextI18n();
-    const profile = application.pps_profile || {};
+    const isUvp = application.vacancy?.type === 'uvp';
+    const profile = isUvp ? { full_name: application.user?.name, desired_position: application.vacancy?.uvp_position?.name || application.vacancy?.title, faculty_name: application.uvp_faculty?.name, department_name: application.uvp_academic_unit?.name } : application.pps_profile || {};
     return (
         <div className="space-y-5">
             <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
@@ -60,7 +61,7 @@ export default function ApplicationSummary({ application }) {
                     </p>
                 </div>
                 <dl className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {infoFields.map(([key, label]) => (
+                    {infoFields.filter(([key]) => !isUvp || !['birth_year', 'work_experience'].includes(key)).map(([key, label]) => (
                         <div key={key}>
                             <dt className="text-xs font-bold uppercase text-gray-400">
                                 {_t(label)}
@@ -126,7 +127,7 @@ export default function ApplicationSummary({ application }) {
                     )}
                 </div>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    {supporting.map(([key, label, documentsKey]) => (
+                    {(isUvp ? [] : supporting).map(([key, label, documentsKey]) => (
                         <div
                             key={key}
                             className="rounded-md border border-gray-100 bg-gray-50 p-3"

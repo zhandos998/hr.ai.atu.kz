@@ -22,7 +22,7 @@ export default function CommissionApplications() {
     const queryType = query.get("type");
     const [items, setItems] = useState([]);
     const [filters, setFilters] = useState(() => ({
-        type: ["pps", "staff"].includes(queryType) ? queryType : "pps",
+        type: ["pps", "staff", "uvp"].includes(queryType) ? queryType : "pps",
         competition_id: query.get("competition_id") || "",
         q: query.get("q") || "",
         page: Math.max(1, Number(query.get("page")) || 1),
@@ -115,6 +115,7 @@ export default function CommissionApplications() {
                     <div className="flex gap-2">
                         {[
                             ["pps", "ППС"],
+                            ["uvp", "УВП"],
                             ["staff", "АУП"],
                         ].map(([value, label]) => (
                             <button
@@ -214,7 +215,7 @@ export default function CommissionApplications() {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <h2 className="font-bold text-[#174a9c]">
-                                            {_t(item.pps_profile
+                                            {_t(item.vacancy?.uvp_position?.name || item.pps_profile
                                                 ?.desired_position ||
                                                 item.vacancy?.title ||
                                                 "Заявка")}
@@ -224,6 +225,7 @@ export default function CommissionApplications() {
                                             <span className="break-all">{item.user?.email}</span>
                                         </p>
                                         <p className="text-xs text-gray-400">
+                                            {item.vacancy?.type === 'uvp' && <span className="block">{item.uvp_faculty?.name} · {item.uvp_academic_unit?.name}</span>}
                                             {_t(item.competition?.title || "Без конкурса")}
                                         </p>
                                     </div>

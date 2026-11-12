@@ -69,8 +69,8 @@ export default function Dashboard() {
         >
             <Head title={_t("Панель администратора")} />
             <div className="mx-auto max-w-7xl space-y-8 px-4 py-8">
-                {sections.map(([title, items]) => (
-                    <section key={title}>
+                {sections.map(([title, items], index) => (
+                    <section key={title} data-admin-guide={['dashboard-work', 'dashboard-directory', 'dashboard-access'][index]}>
                         <h2 className="mb-3 text-sm font-bold uppercase text-gray-500">
                             {_t(title)}
                         </h2>

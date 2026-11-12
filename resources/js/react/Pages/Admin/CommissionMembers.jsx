@@ -69,13 +69,14 @@ export default function CommissionMembers() {
         <Layout
             admin
             title={_t("Комиссия")}
-            description={_t("Основной состав комиссий для ППС и АУП.")}
+            description={_t("Основной состав комиссий для ППС, УВП и АУП.")}
         >
             <Head title={_t("Комиссия")} />
             <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {[
                         ["pps", "ППС"],
+                        ["uvp", "УВП"],
                         ["staff", "АУП"],
                     ].map(([value, label]) => (
                         <button

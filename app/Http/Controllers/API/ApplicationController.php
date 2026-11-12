@@ -17,6 +17,7 @@ use App\Models\Position;
 use App\Models\PpsFacultyCommissionMember;
 use App\Models\Resume;
 use App\Models\User;
+use App\Models\UvpPosition;
 use App\Models\Vacancy;
 use App\Support\ApplicationStageManager;
 use Dompdf\Dompdf;
@@ -64,7 +65,8 @@ class ApplicationController extends Controller
             ->with([
                 'competition:id,title,type',
                 'user:id,name,email',
-                'vacancy:id,title,type,position_id',
+                'vacancy:id,title,type,position_id,uvp_position_id',
+                'vacancy.uvpPosition:id,name', 'uvpFaculty:id,name', 'uvpAcademicUnit:id,name',
                 'vacancy.position:id,name,department_id,academic_unit_id',
                 'vacancy.position.department:id,name',
                 'vacancy.position.academicUnit:id,name',
@@ -76,18 +78,17 @@ class ApplicationController extends Controller
 
         $applications = $query->paginate($this->adminApplicationsPerPage($request));
 
-        $vacancyIds = $applications->getCollection()->pluck('vacancy_id')->unique();
-        $members = DB::table('vacancy_commission_member')->whereIn('vacancy_id', $vacancyIds)
-            ->selectRaw('vacancy_id, COUNT(*) as total')->groupBy('vacancy_id')->pluck('total', 'vacancy_id');
+        $eligibleMembers = $this->adminListCommissionMembersQuery($applications->getCollection()->pluck('id')->all());
+        $members = DB::query()->fromSub($eligibleMembers, 'members')
+            ->selectRaw('application_id, COUNT(*) as total')->groupBy('application_id')->pluck('total', 'application_id');
         $votes = DB::table('application_commission_votes as votes')
-            ->join('applications', 'applications.id', '=', 'votes.application_id')
-            ->join('vacancy_commission_member as members', function ($join) {
-                $join->on('members.vacancy_id', '=', 'applications.vacancy_id')->on('members.user_id', '=', 'votes.user_id');
-            })->whereIn('votes.application_id', $applications->getCollection()->pluck('id'))
+            ->joinSub($eligibleMembers, 'members', function ($join) {
+                $join->on('members.application_id', '=', 'votes.application_id')->on('members.user_id', '=', 'votes.user_id');
+            })
             ->selectRaw('votes.application_id, COUNT(*) as total')->groupBy('votes.application_id')->pluck('total', 'votes.application_id');
         $applications->getCollection()->transform(function ($application) use ($members, $votes) {
             ApplicationStageManager::ensureDefaults($application);
-            $application->vote_summary = ['total_members' => (int) ($members[$application->vacancy_id] ?? 0), 'voted' => (int) ($votes[$application->id] ?? 0)];
+            $application->vote_summary = ['total_members' => (int) ($members[$application->id] ?? 0), 'voted' => (int) ($votes[$application->id] ?? 0)];
 
             return $application;
         });
@@ -104,6 +105,31 @@ class ApplicationController extends Controller
             ],
             'counts' => $this->adminApplicationTypeCounts($request),
         ]);
+    }
+
+    private function adminListCommissionMembersQuery(array $applicationIds): \Illuminate\Database\Query\Builder
+    {
+        $members = DB::table('applications as a')
+            ->join('vacancy_commission_member as m', 'm.vacancy_id', '=', 'a.vacancy_id')
+            ->whereIn('a.id', $applicationIds)
+            ->select('a.id as application_id', 'm.user_id');
+
+        // UNION deduplicates people who belong to more than one commission source.
+        foreach (CommissionMember::TYPES as $type) {
+            $members->union(DB::table('applications as a')
+                ->join('vacancies as v', 'v.id', '=', 'a.vacancy_id')
+                ->crossJoin('commission_members as m')
+                ->whereIn('a.id', $applicationIds)->where('v.type', $type)
+                ->where('m.'.CommissionMember::flagColumnForType($type), true)
+                ->select('a.id as application_id', 'm.user_id'));
+        }
+
+        return $members->union(DB::table('applications as a')
+            ->join('vacancies as v', 'v.id', '=', 'a.vacancy_id')
+            ->join('application_pps_profiles as p', 'p.application_id', '=', 'a.id')
+            ->join('pps_faculty_commission_members as m', 'm.faculty_name', '=', 'p.faculty_name')
+            ->whereIn('a.id', $applicationIds)->where('v.type', CommissionMember::TYPE_PPS)
+            ->select('a.id as application_id', 'm.user_id'));
     }
 
     private function adminApplicationsPerPage(Request $request): int
@@ -126,6 +152,7 @@ class ApplicationController extends Controller
         return [
             'pps' => (int) ($counts['pps'] ?? 0),
             'staff' => (int) ($counts['staff'] ?? 0),
+            'uvp' => (int) ($counts['uvp'] ?? 0),
         ];
     }
 
@@ -137,7 +164,7 @@ class ApplicationController extends Controller
         if ($includeType) {
             $type = trim((string) $request->input('type', ''));
 
-            if (in_array($type, ['pps', 'staff'], true)) {
+            if (in_array($type, Vacancy::TYPES, true)) {
                 $query->whereHas('vacancy', fn ($vacancy) => $vacancy->where('type', $type));
             }
         }
@@ -163,6 +190,9 @@ class ApplicationController extends Controller
                             ->orWhere('faculty_name', 'like', $like)
                             ->orWhere('department_name', 'like', $like);
                     })
+                    ->orWhereHas('uvpFaculty', fn ($unit) => $unit->where('name', 'like', $like))
+                    ->orWhereHas('uvpAcademicUnit', fn ($unit) => $unit->where('name', 'like', $like))
+                    ->orWhereHas('vacancy.uvpPosition', fn ($position) => $position->where('name', 'like', $like))
                     ->orWhereHas('status', function ($status) use ($like) {
                         $status->where('name', 'like', $like)
                             ->orWhere('code', 'like', $like);
@@ -335,7 +365,7 @@ class ApplicationController extends Controller
     {
         $validated = $request->validate([
             'full_name' => 'required|string|max:255',
-            'vacancy_type' => 'nullable|in:staff,pps',
+            'vacancy_type' => 'nullable|in:staff,pps,uvp',
             'competition_id' => 'nullable|integer|exists:competitions,id',
             'vacancy_id' => 'nullable|exists:vacancies,id',
             'faculty_name' => 'nullable|string|max:255',
@@ -370,6 +400,11 @@ class ApplicationController extends Controller
                 'message' => 'Выбранная вакансия не относится к выбранному типу заявки.',
             ], 422);
         }
+
+        if ($vacancyType === 'uvp') {
+            return $this->storeUvpApplication($request, $validated, $vacancy);
+        }
+        $request->validate(['uvp_position_id' => 'prohibited', 'uvp_faculty_id' => 'prohibited', 'uvp_academic_unit_id' => 'prohibited']);
 
         if ($vacancyType === 'staff') {
             if (! $position) {
@@ -490,6 +525,66 @@ class ApplicationController extends Controller
         ], 201);
     }
 
+    private function validatedUvpStructure(Request $request): array
+    {
+        $data = $request->validate([
+            'uvp_position_id' => 'required|integer|exists:uvp_positions,id',
+            'uvp_faculty_id' => ['required', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'faculty')],
+            'uvp_academic_unit_id' => ['required', 'integer', Rule::exists('academic_units', 'id')->where('kind', 'chair')],
+            'position_id' => 'prohibited', 'department_id' => 'prohibited',
+        ]);
+        if (! AcademicUnit::whereKey($data['uvp_academic_unit_id'])->where('parent_id', $data['uvp_faculty_id'])->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['uvp_academic_unit_id' => __('messages.personnel_chair_mismatch')]);
+        }
+
+        return $data;
+    }
+
+    private function uvpVacancy(int $positionId): Vacancy
+    {
+        $position = UvpPosition::findOrFail($positionId);
+
+        return Vacancy::firstOrCreate(['type' => 'uvp', 'uvp_position_id' => $position->id], [
+            'title' => $position->name, 'description' => 'Техническая вакансия УВП: '.$position->name, 'position_id' => null,
+        ]);
+    }
+
+    private function storeUvpApplication(Request $request, array $validated, ?Vacancy $template)
+    {
+        $structure = $this->validatedUvpStructure($request);
+        if ($template?->uvp_position_id && (int) $template->uvp_position_id !== (int) $structure['uvp_position_id']) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['uvp_position_id' => __('messages.uvp_position_mismatch')]);
+        }
+        $application = DB::transaction(function () use ($request, $validated, $structure) {
+            $vacancy = $this->uvpVacancy($structure['uvp_position_id']);
+            $user = $this->createManualCandidate($validated['full_name']);
+            $application = $this->createApplicationForUser($user, $vacancy, $request->file('resume'));
+            $application->update([
+                'uvp_faculty_id' => $structure['uvp_faculty_id'], 'uvp_academic_unit_id' => $structure['uvp_academic_unit_id'],
+                'competition_id' => $validated['competition_id'] ?? null,
+            ]);
+            $this->attachDefaultCommissionMembers($vacancy);
+
+            return $application;
+        });
+
+        return response()->json(['message' => 'Заявка успешно создана.', 'application' => $this->transformAdminApplication($this->adminApplicationsQuery()->findOrFail($application->id))], 201);
+    }
+
+    public function updateUvpDetails(Request $request, int $id)
+    {
+        $application = Application::with('vacancy')->notArchived()->findOrFail($id);
+        abort_unless($application->vacancy?->type === 'uvp', 422);
+        $structure = $this->validatedUvpStructure($request);
+        DB::transaction(function () use ($application, $structure) {
+            $vacancy = $this->uvpVacancy($structure['uvp_position_id']);
+            $application->update(['vacancy_id' => $vacancy->id, 'uvp_faculty_id' => $structure['uvp_faculty_id'], 'uvp_academic_unit_id' => $structure['uvp_academic_unit_id']]);
+            $this->attachDefaultCommissionMembers($vacancy);
+        });
+
+        return response()->json(['application' => $this->transformAdminApplication($this->adminApplicationsQuery()->findOrFail($id))]);
+    }
+
     public function updatePpsProfile(Request $request, $id)
     {
         $application = Application::with(['vacancy', 'ppsProfile.documents'])->notArchived()->findOrFail($id);
@@ -570,7 +665,13 @@ class ApplicationController extends Controller
                 : $this->emptyToNull($validated[$field] ?? null);
         }
 
-        $profile->save();
+        DB::transaction(function () use ($profile, $application, $request) {
+            if ($request->exists('full_name') && filled($profile->full_name)) {
+                $profile->full_name = trim($profile->full_name);
+                $application->user()->update(['name' => $profile->full_name]);
+            }
+            $profile->save();
+        });
 
         if (
             (
@@ -801,7 +902,16 @@ class ApplicationController extends Controller
 
         return DB::transaction(function () use ($validated, $user, $request) {
             $vacancy = Vacancy::findOrFail($validated['vacancy_id']);
+            if ($vacancy->type === 'uvp') {
+                $structure = $this->validatedUvpStructure($request);
+                if ((int) $vacancy->uvp_position_id !== (int) $structure['uvp_position_id']) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['uvp_position_id' => __('messages.uvp_position_mismatch')]);
+                }
+            }
             $application = $this->createApplicationForUser($user, $vacancy, $request->file('resume'));
+            if (isset($structure)) {
+                $application->update(['uvp_faculty_id' => $structure['uvp_faculty_id'], 'uvp_academic_unit_id' => $structure['uvp_academic_unit_id']]);
+            }
             $resume = $application->resume;
 
             return response()->json([
@@ -1293,6 +1403,7 @@ class ApplicationController extends Controller
             'user:id,name,email,phone',
             'vacancy:id,title,type,position_id',
             'vacancy.position:id,department_id,academic_unit_id,name',
+            'vacancy.uvpPosition:id,name', 'uvpFaculty:id,name', 'uvpAcademicUnit:id,name',
             'vacancy.position.department:id,name',
             'vacancy.position.academicUnit:id,name,parent_id',
             'ppsProfile:id,application_id,desired_position,faculty_name,department_name',
@@ -1407,6 +1518,7 @@ class ApplicationController extends Controller
             'archivedBy:id,name,email',
             'status',
             'vacancy',
+            'vacancy.uvpPosition:id,name', 'uvpFaculty:id,name', 'uvpAcademicUnit:id,name',
             'vacancy.position:id,department_id,academic_unit_id,name',
             'vacancy.commissionMembers:id,name,email,phone',
             'commissionVotes:id,application_id,user_id,decision,hire_term_years,comment,updated_at',
@@ -1498,7 +1610,10 @@ class ApplicationController extends Controller
             ];
         });
 
+        $vacancyType = $application->vacancy?->type;
         $allMembers = $vacancyMembers
+            ->merge($vacancyType ? $this->globalCommissionMembers($vacancyType) : collect())
+            ->merge($this->facultyCommissionMembers($application))
             ->unique('id')
             ->values();
 

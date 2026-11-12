@@ -50,7 +50,7 @@ export default function PersonnelCommission({ item, onChanged }) {
         }
     };
 
-    return <section className="rounded-md border border-gray-200 bg-white shadow-sm">
+    return <section data-admin-guide="personnel-commission" className="rounded-md border border-gray-200 bg-white shadow-sm">
         <div className="rounded-t-md border-b border-blue-100 bg-[#edf4ff] px-5 py-4"><h2 className="font-bold text-[#174a9c]">{t('Комиссия по заявке')}</h2></div>
         <div className="space-y-4 p-5">
             {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{t(error)}</p>}

@@ -36,6 +36,7 @@ export default function Vacancies() {
                         ["all", "Все"],
                         ["staff", "АУП"],
                         ["pps", "ППС"],
+                        ["uvp", "УВП"],
                     ].map(([value, label]) => (
                         <button
                             key={value}
@@ -66,10 +67,10 @@ export default function Vacancies() {
                                 </p>
                                 <dl className="mt-4 space-y-1 text-sm text-gray-500">
                                     <div>{_t("Тип:")}{" "}
-                                        {_t(vacancy.type === "pps" ? "ППС" : "АУП")}
+                                        {_t(vacancy.type === 'uvp' ? 'УВП' : vacancy.type === "pps" ? "ППС" : "АУП")}
                                     </div>
                                     <div>{_t("Должность:")}{" "}
-                                        {_t(vacancy.position?.name || "Не указана")}
+                                        {_t(vacancy.uvp_position?.name || vacancy.position?.name || "Не указана")}
                                     </div>
                                 </dl>
                                 <Link

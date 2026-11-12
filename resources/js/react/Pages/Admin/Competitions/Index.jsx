@@ -54,9 +54,9 @@ export default function Competitions() {
             }
         >
             <Head title={_t("Конкурсы")} />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+            <div data-guide-busy={loading} className="mx-auto max-w-7xl space-y-5 px-4 py-6">
                 <Alert>{_t(error)}</Alert>
-                <form
+                <form data-admin-guide="competition-filters"
                     className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto_auto]"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -83,6 +83,7 @@ export default function Competitions() {
                     >
                         <option value="">{_t("Все конкурсы")}</option>
                         <option value="pps">{_t("ППС")}</option>
+                        <option value="uvp">{_t("УВП")}</option>
                         <option value="staff">{_t("АУП")}</option>
                     </select>
                     <button className={primaryButtonClass} disabled={loading}>{_t("Поиск")}</button>
@@ -98,7 +99,7 @@ export default function Competitions() {
                         }}
                     >{_t("Сброс")}</button>
                 </form>
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                <div data-admin-guide="competition-list" className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                     {loading ? (
                         <div className="p-12 text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
                     ) : (
@@ -131,7 +132,7 @@ export default function Competitions() {
                                                 <span
                                                     className={`rounded px-2 py-1 text-xs ${competition.type === "pps" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
                                                 >
-                                                    {_t(competition.type === "pps"
+                                                    {_t(competition.type === 'uvp' ? 'УВП' : competition.type === "pps"
                                                         ? "ППС"
                                                         : "АУП")}
                                                 </span>

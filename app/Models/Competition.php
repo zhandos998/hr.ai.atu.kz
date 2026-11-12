@@ -18,6 +18,8 @@ class Competition extends Model
 
     public static function defaultTitle(string $type, int $number): string
     {
-        return 'Конкурс '.($type === 'pps' ? 'ППС' : 'АУП').' #'.$number;
+        return 'Конкурс '.match ($type) {
+            'pps' => 'ППС', 'uvp' => 'УВП', default => 'АУП'
+        }.' #'.$number;
     }
 }

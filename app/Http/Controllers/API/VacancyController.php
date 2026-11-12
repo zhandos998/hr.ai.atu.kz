@@ -14,6 +14,7 @@ class VacancyController extends Controller
         $vacancies = Vacancy::query()
             ->with([
                 'position:id,department_id,academic_unit_id,name',
+                'uvpPosition:id,name',
                 'commissionMembers:id,name,email,phone',
             ])
             ->latest()
@@ -31,8 +32,9 @@ class VacancyController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'type' => 'required|in:staff,pps',
-            'position_id' => 'nullable|integer|exists:positions,id',
+            'type' => 'required|in:staff,pps,uvp',
+            'position_id' => $request->input('type') === 'uvp' ? 'prohibited' : 'nullable|integer|exists:positions,id',
+            'uvp_position_id' => $request->input('type') === 'uvp' ? 'required|integer|exists:uvp_positions,id' : 'prohibited',
         ]);
 
         $vacancy = Vacancy::create($validated);
@@ -50,14 +52,20 @@ class VacancyController extends Controller
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
-            'type' => 'sometimes|in:staff,pps',
-            'position_id' => 'sometimes|integer|exists:positions,id',
+            'type' => 'sometimes|in:staff,pps,uvp',
+            'position_id' => $request->input('type', $vacancy->type) === 'uvp' ? 'prohibited' : 'sometimes|integer|exists:positions,id',
+            'uvp_position_id' => $request->input('type', $vacancy->type) === 'uvp'
+                ? ($vacancy->type === 'uvp' && $vacancy->uvp_position_id ? 'sometimes|required' : 'required').'|integer|exists:uvp_positions,id'
+                : 'prohibited',
         ]);
 
         if (isset($validated['type']) && $validated['type'] !== $vacancy->type && $vacancy->applications()->exists()) {
             throw \Illuminate\Validation\ValidationException::withMessages(['type' => ['Нельзя менять тип вакансии, к которой уже добавлены заявки.']]);
         }
 
+        if (isset($validated['type']) && $validated['type'] !== $vacancy->type) {
+            $validated[$validated['type'] === 'uvp' ? 'position_id' : 'uvp_position_id'] = null;
+        }
         $vacancy->update($validated);
 
         return response()->json([
@@ -70,6 +78,7 @@ class VacancyController extends Controller
     {
         $vacancy = Vacancy::with([
             'position:id,department_id,academic_unit_id,name',
+            'uvpPosition:id,name',
             'commissionMembers:id,name,email,phone',
         ])->findOrFail($id);
 

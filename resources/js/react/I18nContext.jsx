@@ -6,6 +6,8 @@ const I18nContext = createContext(null);
 
 const messages = {
     ru: {
+        allPersonnelRequests: "Все заявки",
+        personnelUvp: "Процессы УВП",
         personnelTeachers: "Процессы преподавателей",
         personnelStaff: "Процессы сотрудников",
         personnelRegister: "Кадровый учёт",
@@ -21,6 +23,7 @@ const messages = {
         departments: "Департаменты",
         academicUnits: "Факультеты и кафедры",
         ppsPositions: "Позиции ППС",
+        uvpPositions: "Должности УВП",
         positions: "Должности АУП",
         structure: "Структура",
         users: "Пользователи",
@@ -36,6 +39,8 @@ const messages = {
         defaultCommission: "Комиссия по умолчанию",
     },
     kk: {
+        allPersonnelRequests: "Барлық өтінімдер",
+        personnelUvp: "ОКП процестері",
         personnelTeachers: "Оқытушылардың процестері",
         personnelStaff: "Қызметкерлердің процестері",
         personnelRegister: "Кадрлық есеп",
@@ -51,6 +56,7 @@ const messages = {
         departments: "Департаменттер",
         academicUnits: "Факультеттер мен кафедралар",
         ppsPositions: "ОПҚ позициялары",
+        uvpPositions: "ОКП лауазымдары",
         positions: "ӘБП лауазымдары",
         structure: "Құрылым",
         users: "Пайдаланушылар",
