@@ -7,12 +7,15 @@ import {
     positionOwnerFields,
 } from "../../../lib/positionUnits";
 import Layout from "../../../Components/Layout";
+import { Save } from 'lucide-react';
+import { DirectoryPage, directoryFormClass } from '../../../Components/Directory';
 import {
     Alert,
     Field,
     errorText,
     inputClass,
     primaryButtonClass,
+    secondaryButtonClass,
 } from "../../../Components/Form";
 
 export default function PositionCreate() {
@@ -83,9 +86,9 @@ export default function PositionCreate() {
             }
         >
             <Head title={_t("Добавить должность")} />
-            <div className="mx-auto max-w-3xl px-4 py-8">
+            <DirectoryPage form>
                 <form
-                    className="space-y-4 rounded-md border border-gray-200 bg-white p-5 shadow-sm"
+                    className={directoryFormClass}
                     onSubmit={submit}
                 >
                     <Alert>{_t(error)}</Alert>
@@ -142,14 +145,18 @@ export default function PositionCreate() {
                             }
                         />
                     </Field>
+                    <div className="flex flex-wrap justify-end gap-3">
+                    <Link href={selectedDepartmentId ? `/admin/departments/${selectedDepartmentId}` : '/admin/positions'} className={secondaryButtonClass}>{_t('Отмена')}</Link>
                     <button
-                        className={`${primaryButtonClass} w-full`}
+                        className={`${primaryButtonClass} inline-flex items-center gap-2`}
                         disabled={saving}
                     >
-                        {_t(saving ? "Сохранение..." : "Сохранить должность")}
+                        <Save size={16} />
+                        {_t(saving ? "Сохранение..." : "Сохранить")}
                     </button>
+                    </div>
                 </form>
-            </div>
+            </DirectoryPage>
         </Layout>
     );
 }

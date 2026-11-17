@@ -6,6 +6,7 @@ import {
     ArrowLeft,
     BriefcaseBusiness,
     ChevronDown,
+    ChevronUp,
     ChevronRight,
     Pencil,
     Plus,
@@ -15,10 +16,10 @@ import Layout from "../../../Components/Layout";
 import {
     Alert,
     errorText,
-    inputClass,
     primaryButtonClass,
 } from "../../../Components/Form";
 import { groupPositionsByDepartment } from './positionGroups';
+import { DirectoryAction, DirectoryFilters, DirectoryList, DirectoryMetric, DirectoryPage, DirectoryRow } from '../../../Components/Directory';
 
 export default function DepartmentShow() {
     const { t: _t, locale } = useTextI18n();
@@ -90,7 +91,7 @@ export default function DepartmentShow() {
             actions={actions}
         >
             <Head title={_t(department?.name || "Департамент")} />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+            <DirectoryPage loading={loading}>
                 <Link
                     href="/admin/departments"
                     className="inline-flex items-center gap-2 text-sm font-semibold text-[#005eb8]"
@@ -132,77 +133,27 @@ export default function DepartmentShow() {
                             </div>
                         </section>
 
-                        <section className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
-                            <input
-                                className={inputClass.replace("mt-1 ", "")}
-                                value={search}
-                                placeholder={_t("Поиск по должности, подразделению или сотруднику")}
-                                aria-label={_t("Поиск по должности, подразделению или сотруднику")}
-                                onChange={(event) => {
-                                    setSearch(event.target.value);
-                                    setCollapsed(new Set());
-                                }}
-                            />
-                        </section>
-
-                        <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
-                            <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
-                                <h2 className="font-bold text-gray-900">{_t("Должности департамента и подразделений")}</h2>
-                                <p className="mt-1 text-sm text-gray-500">{_t("Показано:")}{" "}{positions.length}{" "}{_t("из")}{" "}
-                                    {_t(department.positions.length)}
-                                </p>
-                            </div>
+                        <DirectoryFilters value={search} placeholder={_t("Поиск по должности, подразделению или сотруднику")} onChange={value => { setSearch(value); setCollapsed(new Set()); }} />
+                        <DirectoryList count={positions.length} total={department.positions.length} heading={_t('Должности департамента и подразделений')}
+                            emptyMessage={_t(department.positions.length ? 'По вашему запросу ничего не найдено.' : 'В этом департаменте пока нет должностей.')}>
                             <div className="divide-y divide-gray-200">
                                 {groups.map((group) => <div key={group.id}>
-                                    <div className="flex items-center gap-3 bg-[#f1f5fc] px-5 py-3">
-                                        <h3 className="min-w-0 flex-1 break-words text-sm font-semibold text-[#174a9c]">
-                                            <Link href={`/admin/departments/${group.id}`} className="hover:underline">{group.name}</Link>
-                                        </h3>
-                                        <span className="shrink-0 text-xs tabular-nums text-gray-500">{group.positions.length}</span>
-                                        <button type="button" aria-expanded={!collapsed.has(group.id)} aria-controls={`department-positions-${group.id}`} aria-label={`${_t(collapsed.has(group.id) ? 'Развернуть' : 'Свернуть')}: ${group.name}`} title={_t(collapsed.has(group.id) ? 'Развернуть' : 'Свернуть')} onClick={() => toggle(group.id)} className="flex size-9 shrink-0 items-center justify-center rounded-md text-[#174a9c] transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-                                            <ChevronDown size={18} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${collapsed.has(group.id) ? '' : 'rotate-180'}`} />
-                                        </button>
-                                    </div>
+                                    <DirectoryRow name={group.name} href={`/admin/departments/${group.id}`} secondary={_t('Подразделение')}
+                                        metrics={[<DirectoryMetric icon={BriefcaseBusiness}>{`${_t('Должности')}: ${group.positions.length}`}</DirectoryMetric>]}
+                                        actions={<DirectoryAction icon={collapsed.has(group.id) ? ChevronDown : ChevronUp} label={`${_t(collapsed.has(group.id) ? 'Развернуть' : 'Свернуть')}: ${group.name}`} aria-expanded={!collapsed.has(group.id)} aria-controls={`department-positions-${group.id}`} onClick={() => toggle(group.id)} />} />
                                     <div id={`department-positions-${group.id}`} hidden={collapsed.has(group.id)} aria-label={group.name} className="divide-y divide-gray-100">
                                         {group.positions.map((position) => (
-                                            <div
-                                                key={position.id}
-                                                className="grid items-center gap-3 px-5 py-4 hover:bg-gray-50 md:grid-cols-[1fr_220px_120px]"
-                                            >
-                                                <div className="min-w-0">
-                                                    <Link
-                                                        href={`/admin/positions/${position.id}`}
-                                                        className="break-words font-semibold text-[#005eb8] hover:underline"
-                                                    >
-                                                        {position.name}
-                                                    </Link>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <Users size={16} className="shrink-0 text-gray-400" />
-                                                    {position.users?.length || 0}{" "}{_t("сотрудников")}
-                                                </div>
-                                            <Link
-                                                href={`/admin/positions/${position.id}`}
-                                                className="inline-flex items-center justify-end gap-1 text-sm font-semibold text-[#005eb8]"
-                                            >
-                                                {_t("Открыть")}<ChevronRight size={16} />
-                                            </Link>
-                                            </div>
+                                            <DirectoryRow key={position.id} name={position.name} href={`/admin/positions/${position.id}`} secondary={_t('Должность')}
+                                                metrics={[<DirectoryMetric icon={Users}>{`${_t('Сотрудники')}: ${position.users?.length || 0}`}</DirectoryMetric>]}
+                                                actions={<DirectoryAction href={`/admin/positions/${position.id}`} icon={ChevronRight} label={`${_t('Открыть')}: ${position.name}`} />} />
                                         ))}
                                     </div>
                                 </div>)}
-                                {positions.length === 0 && (
-                                    <div className="p-10 text-center text-sm text-gray-500">
-                                        {_t(department.positions.length
-                                            ? "По вашему запросу ничего не найдено."
-                                            : "В этом департаменте пока нет должностей.")}
-                                    </div>
-                                )}
                             </div>
-                        </section>
+                        </DirectoryList>
                     </>
                 ) : null}
-            </div>
+            </DirectoryPage>
         </Layout>
     );
 }

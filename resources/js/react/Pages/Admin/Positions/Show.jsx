@@ -5,6 +5,8 @@ import axios from "axios";
 import { ArrowLeft, Save, UserMinus, UserPlus } from "lucide-react";
 import Layout from "../../../Components/Layout";
 import SearchSelect from "../../../Components/SearchSelect";
+import Dialog from '../../../Components/Dialog';
+import { DirectoryAction, DirectoryList, DirectoryPage, DirectoryRow, directoryFormClass } from '../../../Components/Directory';
 import {
     Alert,
     Field,
@@ -29,6 +31,8 @@ export default function PositionShow() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const [removing, setRemoving] = useState(null);
+    const [assigning, setAssigning] = useState(false);
 
     const load = async () => {
         const [{ data: positionData }, { data: userData }] = await Promise.all([
@@ -79,7 +83,8 @@ export default function PositionShow() {
     };
 
     const assign = async () => {
-        if (!selectedUser) return;
+        if (!selectedUser || assigning) return;
+        setAssigning(true);
         setError("");
         try {
             await axios.post(`/api/admin/positions/${position.id}/users`, {
@@ -89,11 +94,15 @@ export default function PositionShow() {
             await load();
         } catch (requestError) {
             setError(errorText(requestError));
+        } finally {
+            setAssigning(false);
         }
     };
 
-    const detach = async (user) => {
-        if (!window.confirm(`Убрать ${user.name} с этой должности?`)) return;
+    const detach = async () => {
+        if (!removing || assigning) return;
+        const user = removing;
+        setAssigning(true);
         setError("");
         try {
             await axios.delete(
@@ -102,6 +111,9 @@ export default function PositionShow() {
             await load();
         } catch (requestError) {
             setError(errorText(requestError));
+        } finally {
+            setAssigning(false);
+            setRemoving(null);
         }
     };
 
@@ -129,7 +141,7 @@ export default function PositionShow() {
             description={_t(owner?.name || "Карточка должности")}
         >
             <Head title={_t(position?.name || "Должность")} />
-            <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">
+            <DirectoryPage loading={loading}>
                 <Link
                     href={backHref}
                     className="inline-flex items-center gap-2 text-sm font-semibold text-[#005eb8]"
@@ -147,7 +159,7 @@ export default function PositionShow() {
                 ) : position ? (
                     <>
                         <form
-                            className="space-y-5 rounded-md border border-gray-200 bg-white p-5 shadow-sm"
+                            className={directoryFormClass}
                             onSubmit={save}
                         >
                             <div className="grid gap-4 md:grid-cols-2">
@@ -211,13 +223,8 @@ export default function PositionShow() {
                             </div>
                         </form>
 
-                        <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
-                            <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
-                                <h2 className="font-bold text-gray-900">{_t("Назначенные сотрудники")}</h2>
-                                <p className="mt-1 text-sm text-gray-500">{_t("Сотрудников:")}{position.users?.length || 0}
-                                </p>
-                            </div>
-                            <div className="flex gap-2 border-b border-gray-100 p-5">
+                        <DirectoryList count={position.users?.length || 0} total={position.users?.length || 0} heading={_t('Назначенные сотрудники')} emptyMessage={_t('Сотрудники не назначены.')} toolbar={
+                            <div className="flex flex-col gap-2 border-b border-gray-100 p-5 sm:flex-row">
                                 <div className="min-w-0 flex-1">
                                     <SearchSelect
                                         value={selectedUser}
@@ -229,45 +236,20 @@ export default function PositionShow() {
                                 <button
                                     type="button"
                                     className={`${secondaryButtonClass} inline-flex items-center gap-2`}
-                                    disabled={!selectedUser}
+                                    disabled={!selectedUser || assigning}
                                     onClick={assign}
                                 >
                                     <UserPlus size={16} />{_t("Назначить")}</button>
-                            </div>
-                            <div className="divide-y divide-gray-100">
+                            </div>}>
                                 {(position.users || []).map((user) => (
-                                    <div
-                                        key={user.id}
-                                        className="flex items-center justify-between gap-4 px-5 py-4"
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="font-semibold text-gray-900">
-                                                {user.name}
-                                            </div>
-                                            <div className="truncate text-sm text-gray-500">
-                                                {_t(user.email ||
-                                                    user.phone ||
-                                                    "Контакты не указаны")}
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            title={_t("Убрать сотрудника")}
-                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                                            onClick={() => detach(user)}
-                                        >
-                                            <UserMinus size={17} />
-                                        </button>
-                                    </div>
+                                    <DirectoryRow key={user.id} name={user.name} secondary={user.email || user.phone || _t('Контакты не указаны')}
+                                        actions={<DirectoryAction icon={UserMinus} danger disabled={assigning} label={`${_t('Убрать сотрудника')}: ${user.name}`} onClick={() => setRemoving(user)} />} />
                                 ))}
-                                {!position.users?.length && (
-                                    <div className="p-8 text-center text-sm text-gray-500">{_t("Сотрудники не назначены.")}</div>
-                                )}
-                            </div>
-                        </section>
+                        </DirectoryList>
                     </>
                 ) : null}
-            </div>
+            </DirectoryPage>
+            <Dialog open={Boolean(removing)} title={_t('Убрать сотрудника')} message={removing?.name || ''} confirmText={_t('Убрать')} danger onConfirm={detach} onClose={() => { if (!assigning) setRemoving(null); }} />
         </Layout>
     );
 }

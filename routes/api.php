@@ -143,6 +143,9 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/positions', [AdminStructureController::class, 'positions']);
     Route::get('/admin/pps-positions', [AdminStructureController::class, 'ppsPositions']);
     Route::post('/admin/pps-positions', [AdminStructureController::class, 'storePpsPosition']);
+    Route::get('/admin/pps-positions/{id}', [AdminStructureController::class, 'showPpsPosition'])->whereNumber('id');
+    Route::put('/admin/pps-positions/{id}', [AdminStructureController::class, 'updatePpsPosition'])->whereNumber('id');
+    Route::delete('/admin/pps-positions/{id}', [AdminStructureController::class, 'destroyPpsPosition'])->whereNumber('id');
     Route::get('/admin/positions/{id}', [AdminStructureController::class, 'showPosition']);
     Route::post('/admin/positions', [AdminStructureController::class, 'storePosition']);
     Route::put('/admin/positions/{id}', [AdminStructureController::class, 'updatePosition']);

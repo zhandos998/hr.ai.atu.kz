@@ -3,12 +3,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Head, Link, usePage } from "@inertiajs/react";
 import axios from "axios";
 import Layout from "../../../Components/Layout";
+import { Save } from 'lucide-react';
+import { DirectoryPage, directoryFormClass } from '../../../Components/Directory';
 import {
     Alert,
     Field,
     errorText,
     inputClass,
     primaryButtonClass,
+    secondaryButtonClass,
 } from "../../../Components/Form";
 
 export default function DepartmentForm() {
@@ -112,12 +115,12 @@ export default function DepartmentForm() {
             }
         >
             <Head title={_t(title)} />
-            <div data-guide-busy={loading} className="mx-auto max-w-3xl px-4 py-8">
+            <DirectoryPage form loading={loading}>
                 {loading ? (
                     <div className="text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
                 ) : (
                     <form
-                        className="space-y-4 rounded-md border border-gray-200 bg-white p-5 shadow-sm"
+                        className={directoryFormClass}
                         onSubmit={submit}
                     >
                         <Alert>{_t(error)}</Alert>
@@ -185,15 +188,19 @@ export default function DepartmentForm() {
                                 />
                             </Field>
                         )}
+                        <div className="flex flex-wrap justify-end gap-3">
+                        <Link href={back} className={secondaryButtonClass}>{_t('Отмена')}</Link>
                         <button
-                            className={`${primaryButtonClass} w-full`}
+                            className={`${primaryButtonClass} inline-flex items-center gap-2`}
                             disabled={saving}
                         >
+                            <Save size={16} />
                             {_t(saving ? "Сохранение..." : "Сохранить")}
                         </button>
+                        </div>
                     </form>
                 )}
-            </div>
+            </DirectoryPage>
         </Layout>
     );
 }

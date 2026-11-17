@@ -167,6 +167,9 @@ class AdminStructureController extends Controller
 
     public function storePpsPosition(Request $request)
     {
+        if (is_string($request->input('name'))) {
+            $request->merge(['name' => trim($request->input('name'))]);
+        }
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
@@ -206,6 +209,47 @@ class AdminStructureController extends Controller
                 'faculties_count' => $chairs->pluck('parent_id')->filter()->unique()->count(),
             ],
         ], 201);
+    }
+
+    public function showPpsPosition(int $id)
+    {
+        return response()->json(Position::whereNotNull('academic_unit_id')->findOrFail($id, ['id', 'name']));
+    }
+
+    public function updatePpsPosition(Request $request, int $id)
+    {
+        if (is_string($request->input('name'))) {
+            $request->merge(['name' => trim($request->input('name'))]);
+        }
+        $validated = $request->validate(['name' => ['required', 'string', 'max:255']]);
+
+        DB::transaction(function () use ($id, $validated) {
+            $position = Position::whereNotNull('academic_unit_id')->lockForUpdate()->findOrFail($id);
+            if ($position->name === $validated['name']) {
+                return;
+            }
+            $ids = Position::whereNotNull('academic_unit_id')->where('name', $position->name)
+                ->lockForUpdate()->pluck('id')->all();
+            if (Position::whereNotNull('academic_unit_id')->whereNotIn('id', $ids)->where('name', $validated['name'])->exists()) {
+                throw ValidationException::withMessages(['name' => __('messages.pps_position_exists')]);
+            }
+            Position::whereIn('id', $ids)->update($validated);
+        });
+
+        return response()->json(['message' => __('messages.pps_position_updated')]);
+    }
+
+    public function destroyPpsPosition(int $id)
+    {
+        DB::transaction(function () use ($id) {
+            $position = Position::whereNotNull('academic_unit_id')->lockForUpdate()->findOrFail($id);
+            $ids = Position::whereNotNull('academic_unit_id')->where('name', $position->name)
+                ->lockForUpdate()->pluck('id')->all();
+            $this->ensurePositionsCanBeDeleted($ids);
+            Position::whereIn('id', $ids)->delete();
+        });
+
+        return response()->noContent();
     }
 
     public function showPosition(int $id)
@@ -280,21 +324,24 @@ class AdminStructureController extends Controller
 
     public function destroyPosition(int $id)
     {
-        $position = Position::findOrFail($id);
-
-        $usedInCandidateResults = CandidateAIResult::query()
-            ->where('position_id', $position->id)
-            ->exists();
-
-        if ($usedInCandidateResults) {
-            return response()->json([
-                'message' => 'Нельзя удалить должность, она используется в результатах AI-оценки.',
-            ], 422);
-        }
-
-        $position->delete();
+        DB::transaction(function () use ($id) {
+            $position = Position::lockForUpdate()->findOrFail($id);
+            $this->ensurePositionsCanBeDeleted([$id]);
+            $position->delete();
+        });
 
         return response()->json(['message' => 'Должность удалена.']);
+    }
+
+    private function ensurePositionsCanBeDeleted(array $ids): void
+    {
+        // Include archived vacancies and both source/target jobs in personnel processes.
+        if (DB::table('vacancies')->whereIn('position_id', $ids)->exists()
+            || DB::table('personnel_requests')->whereIn('position_id', $ids)->orWhereIn('target_position_id', $ids)->exists()
+            || DB::table('position_user')->whereIn('position_id', $ids)->exists()
+            || CandidateAIResult::whereIn('position_id', $ids)->exists()) {
+            throw ValidationException::withMessages(['name' => __('messages.position_in_use')]);
+        }
     }
 
     public function positionUsers(Request $request)

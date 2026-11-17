@@ -1,147 +1,68 @@
-import { useI18n as useTextI18n } from "../../../I18nContext";
-import React, { useEffect, useMemo, useState } from "react";
-import { Head, Link } from "@inertiajs/react";
-import axios from "axios";
-import { ChevronRight, Plus, Users } from "lucide-react";
-import Layout from "../../../Components/Layout";
-import {
-    Alert,
-    errorText,
-    inputClass,
-    primaryButtonClass,
-} from "../../../Components/Form";
-import { loadPositionUnits, positionUnitKey } from "../../../lib/positionUnits";
+import React, { useEffect, useMemo, useState } from 'react';
+import { Head } from '@inertiajs/react';
+import axios from 'axios';
+import { ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import Layout from '../../../Components/Layout';
+import Dialog from '../../../Components/Dialog';
+import { Alert, errorText, inputClass } from '../../../Components/Form';
+import { DirectoryAction, DirectoryFilters, DirectoryList, DirectoryMetric, DirectoryPage, DirectoryRow } from '../../../Components/Directory';
+import { loadPositionUnits, positionUnitKey } from '../../../lib/positionUnits';
+import { useI18n } from '../../../I18nContext';
 
 export default function Positions() {
-    const { t: _t } = useTextI18n();
+    const { t } = useI18n();
     const [positions, setPositions] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [departmentId, setDepartmentId] = useState("");
-    const [error, setError] = useState("");
-
+    const [search, setSearch] = useState('');
+    const [departmentId, setDepartmentId] = useState('');
+    const [error, setError] = useState('');
+    const [removing, setRemoving] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     useEffect(() => {
-        Promise.all([
-            axios.get("/api/admin/positions", { params: { scope: "staff" } }),
-            loadPositionUnits({ includeAcademic: false }),
-        ])
-            .then(([positionResponse, units]) => {
-                setPositions(positionResponse.data);
-                setDepartments(units);
-            })
-            .catch((requestError) => setError(errorText(requestError)))
-            .finally(() => setLoading(false));
+        let active = true;
+        Promise.all([axios.get('/api/admin/positions', { params: { scope: 'staff' } }), loadPositionUnits({ includeAcademic: false })])
+            .then(([response, units]) => { if (active) { setPositions(response.data); setDepartments(units); } })
+            .catch(error => { if (active) setError(errorText(error)); })
+            .finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
     }, []);
-
-    const departmentName = (key) =>
-        departments.find((item) => item.id === key)?.name || "Не указано";
+    const departmentName = key => departments.find(item => item.id === key)?.name || t('Не указано');
     const filtered = useMemo(() => {
         const query = search.trim().toLocaleLowerCase();
-        return positions.filter((position) => {
-            const unitKey = positionUnitKey(position);
-            return (
-                (!departmentId || unitKey === departmentId) &&
-                (!query ||
-                    [position.name, departmentName(unitKey)].some((value) =>
-                        String(value).toLocaleLowerCase().includes(query),
-                    ))
-            );
-        });
+        return positions.filter(position => (!departmentId || positionUnitKey(position) === departmentId)
+            && [position.name, departmentName(positionUnitKey(position))].some(value => String(value).toLocaleLowerCase().includes(query)));
     }, [departmentId, departments, positions, search]);
-
-    const actions = (
-        <Link
-            href="/admin/positions/create"
-            className={`${primaryButtonClass} inline-flex items-center gap-2`}
-        >
-            <Plus size={16} />{_t("Добавить должность")}</Link>
-    );
-
-    return (
-        <Layout
-            admin
-            title={_t("Должности АУП")}
-            description={_t("Список должностей подразделений АУП.")}
-            actions={actions}
-        >
-            <Head title={_t("Должности АУП")} />
-            <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
-                <Alert>{_t(error)}</Alert>
-                <section className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 md:grid-cols-[1fr_320px]">
-                    <input
-                        className={inputClass.replace("mt-1 ", "")}
-                        value={search}
-                        placeholder={_t("Поиск по должности или департаменту")}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                    <select
-                        className={inputClass.replace("mt-1 ", "")}
-                        value={departmentId}
-                        onChange={(event) =>
-                            setDepartmentId(event.target.value)
-                        }
-                    >
-                        <option value="">{_t("Все департаменты")}</option>
-                        {departments.map((department) => (
-                            <option key={department.id} value={department.id}>
-                                {department.name}
-                            </option>
-                        ))}
-                    </select>
-                </section>
-
-                <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
-                    <div className="border-b border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-500">{_t("Показано:")}{" "}
-                        <span className="font-semibold text-gray-800">
-                            {_t(filtered.length)}
-                        </span>
-                    </div>
-                    {loading ? (
-                        <div className="p-10 text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {filtered.map((position) => (
-                                <div
-                                    key={position.id}
-                                    className="grid items-center gap-3 px-5 py-4 hover:bg-gray-50 md:grid-cols-[1fr_1fr_170px_110px]"
-                                >
-                                    <div className="min-w-0">
-                                        <Link
-                                            href={`/admin/positions/${position.id}`}
-                                            className="font-semibold text-[#005eb8] hover:underline"
-                                        >
-                                            {position.name}
-                                        </Link>
-                                        <div className="mt-1 text-xs text-gray-400">
-                                            ID: {_t(position.id)}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm text-gray-600">
-                                        {_t(departmentName(
-                                            positionUnitKey(position),
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Users
-                                            size={16}
-                                            className="text-gray-400"
-                                        />
-                                        {position.users?.length || 0}{" "}{_t("сотрудников")}</div>
-                                    <Link
-                                        href={`/admin/positions/${position.id}`}
-                                        className="inline-flex items-center justify-end gap-1 text-sm font-semibold text-[#005eb8]"
-                                    >{_t("Открыть")}<ChevronRight size={16} />
-                                    </Link>
-                                </div>
-                            ))}
-                            {filtered.length === 0 && (
-                                <div className="p-10 text-center text-sm text-gray-500">{_t("Должности не найдены.")}</div>
-                            )}
-                        </div>
-                    )}
-                </section>
-            </div>
-        </Layout>
-    );
+    const remove = async () => {
+        if (!removing || deleting) return;
+        setDeleting(true);
+        setError('');
+        try {
+            await axios.delete('/api/admin/positions/' + removing.id);
+            setPositions(current => current.filter(position => position.id !== removing.id));
+        } catch (error) { setError(errorText(error)); }
+        finally { setDeleting(false); setRemoving(null); }
+    };
+    return <Layout admin title={t('Должности АУП')} description={t('Список должностей подразделений АУП.')} actions={<DirectoryAction primary href="/admin/positions/create" icon={Plus} label={t('Добавить должность')} />}>
+        <Head title={t('Должности АУП')} />
+        <DirectoryPage loading={loading}>
+            <Alert>{error}</Alert>
+            <DirectoryFilters value={search} onChange={setSearch} placeholder={t('Поиск по должности или департаменту')}>
+                <select value={departmentId} aria-label={t('Департамент')} className={inputClass.replace('mt-1 ', '')} onChange={event => setDepartmentId(event.target.value)}>
+                    <option value="">{t('Все департаменты')}</option>
+                    {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+            </DirectoryFilters>
+            <DirectoryList count={filtered.length} total={positions.length} loading={loading} error={Boolean(error)} emptyMessage={t('Должности не найдены.')}>
+                {filtered.map(position => <DirectoryRow key={position.id} name={position.name} href={'/admin/positions/' + position.id} secondary={departmentName(positionUnitKey(position))}
+                    metrics={[<DirectoryMetric icon={Users}>{t('Сотрудники') + ': ' + (position.users?.length || 0)}</DirectoryMetric>]}
+                    actions={<>
+                        <DirectoryAction href={'/admin/positions/' + position.id} label={t('Открыть') + ': ' + position.name} icon={ChevronRight} />
+                        <DirectoryAction href={'/admin/positions/' + position.id} label={t('Изменить') + ': ' + position.name} icon={Pencil} />
+                        <DirectoryAction onClick={() => setRemoving(position)} label={t('Удалить') + ': ' + position.name} icon={Trash2} danger disabled={deleting} />
+                    </>} />)}
+            </DirectoryList>
+        </DirectoryPage>
+        <Dialog open={Boolean(removing)} title={t('Удалить должность?')} message={removing?.name || ''} confirmText={t('Удалить')} danger onClose={() => { if (!deleting) setRemoving(null); }} onConfirm={remove} />
+    </Layout>;
 }
