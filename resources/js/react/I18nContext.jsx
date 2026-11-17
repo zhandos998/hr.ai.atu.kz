@@ -21,8 +21,8 @@ const messages = {
         vacancies: "Вакансии",
         directory: "Справочник",
         departments: "Департаменты",
-        academicUnits: "Факультеты и кафедры",
-        ppsPositions: "Позиции ППС",
+        academicUnits: "Факультеты",
+        ppsPositions: "Должности ППС",
         uvpPositions: "Должности УВП",
         positions: "Должности АУП",
         structure: "Структура",
@@ -54,7 +54,7 @@ const messages = {
         vacancies: "Вакансиялар",
         directory: "Анықтамалық",
         departments: "Департаменттер",
-        academicUnits: "Факультеттер мен кафедралар",
+        academicUnits: "Факультеттер",
         ppsPositions: "ОПҚ позициялары",
         uvpPositions: "ОКП лауазымдары",
         positions: "ӘБП лауазымдары",
@@ -90,7 +90,10 @@ export function I18nProvider({ children }) {
                 axios.defaults.headers.common["X-Locale"] = normalized;
                 setLocaleState(normalized);
             },
-            t: (key) => typeof key === 'string' ? messages[locale][key] || translateText(key, locale) : key,
+            t: (key) =>
+                typeof key === "string"
+                    ? messages[locale][key] || translateText(key, locale)
+                    : key,
         }),
         [locale],
     );

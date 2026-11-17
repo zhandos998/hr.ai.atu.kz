@@ -10,11 +10,23 @@ use Illuminate\Validation\Rule;
 
 class AcademicStructureController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $data = $request->validate(['kind' => 'sometimes|required|in:faculty,chair']);
+
         return response()->json(AcademicUnit::with('positions:id,academic_unit_id,name,duties,qualification')
+            ->when($data['kind'] ?? null, fn ($query, $kind) => $query->where('kind', $kind))
+            ->withCount(['children' => fn ($query) => $query->where('kind', 'chair')])
             ->orderByRaw("CASE WHEN name = 'Другое' THEN 1 ELSE 0 END")
             ->orderBy('name')->get());
+    }
+
+    public function show(int $id)
+    {
+        return response()->json(AcademicUnit::where('kind', 'faculty')
+            ->with(['children' => fn ($query) => $query->where('kind', 'chair')
+                ->withCount('positions')->orderBy('name')])
+            ->findOrFail($id));
     }
 
     public function store(Request $request)

@@ -46,36 +46,47 @@ export default function PpsPositions() {
     return (
         <Layout
             admin
-            title={_t("Позиции ППС")}
-            description={_t("Уникальные позиции преподавателей и их распределение по кафедрам.")}
+            title={_t("Должности ППС")}
+            description={_t(
+                "Уникальные позиции преподавателей и их распределение по кафедрам.",
+            )}
             actions={
                 <Link
                     href="/admin/pps-positions/create"
                     className={`${primaryButtonClass} inline-flex items-center gap-2`}
                 >
-                    <Plus size={16} />{_t("Добавить позицию")}</Link>
+                    <Plus size={16} />
+                    {_t("Добавить позицию")}
+                </Link>
             }
         >
-            <Head title={_t("Позиции ППС")} />
+            <Head title={_t("Должности ППС")} />
             <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
                 <Alert>{_t(error)}</Alert>
                 <section className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
                     <input
                         className={inputClass.replace("mt-1 ", "")}
                         value={search}
-                        placeholder={_t("Поиск по позиции, факультету или кафедре")}
+                        placeholder={_t(
+                            "Поиск по позиции, факультету или кафедре",
+                        )}
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </section>
 
                 <section className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
-                    <div className="border-b border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-500">{_t("Показано:")}{" "}
+                    <div className="border-b border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-500">
+                        {_t("Показано:")}{" "}
                         <span className="font-semibold text-gray-800">
                             {_t(filtered.length)}
-                        </span>{" "}{_t("из")}{_t(positions.length)}
+                        </span>{" "}
+                        {_t("из")}
+                        {_t(positions.length)}
                     </div>
                     {loading ? (
-                        <div className="p-10 text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
+                        <div className="p-10 text-center text-sm text-gray-500">
+                            {_t("Загрузка...")}
+                        </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {filtered.map((position) => (
@@ -87,24 +98,32 @@ export default function PpsPositions() {
                                         <div className="font-semibold text-gray-900">
                                             {position.name}
                                         </div>
-                                        <div className="mt-1 text-xs text-gray-400">{_t("Позиция ППС")}</div>
+                                        <div className="mt-1 text-xs text-gray-400">
+                                            {_t("Позиция ППС")}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-gray-600">
                                         <Building2
                                             size={16}
                                             className="text-gray-400"
                                         />
-                                        {_t(position.chairs_count)}{_t("кафедр")}</div>
+                                        {_t(position.chairs_count)}
+                                        {_t("кафедр")}
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm text-gray-600">
                                         <GraduationCap
                                             size={16}
                                             className="text-gray-400"
                                         />
-                                        {_t(position.faculties_count)}{_t("факультетов")}</div>
+                                        {_t(position.faculties_count)}
+                                        {_t("факультетов")}
+                                    </div>
                                 </div>
                             ))}
                             {!loading && filtered.length === 0 && (
-                                <div className="p-10 text-center text-sm text-gray-500">{_t("Позиции ППС не найдены.")}</div>
+                                <div className="p-10 text-center text-sm text-gray-500">
+                                    {_t("Должности ППС не найдены.")}
+                                </div>
                             )}
                         </div>
                     )}

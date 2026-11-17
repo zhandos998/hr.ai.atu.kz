@@ -13,12 +13,15 @@ import {
 
 export default function DepartmentForm() {
     const { t: _t } = useTextI18n();
-    const { departmentId = null, academic = false } = usePage().props;
+    const { props: { departmentId = null, academic = false }, url } = usePage();
+    const requestedFaculty = academic && !departmentId ? new URLSearchParams(url.split('?')[1] || '').get('faculty_id') || '' : '';
+    const [kind, setKind] = useState(requestedFaculty ? 'chair' : 'faculty');
+    const isChair = academic && (departmentId ? kind === 'chair' : Boolean(requestedFaculty));
     const base = academic ? "/admin/academic-units" : "/admin/departments";
     const title = academic
         ? departmentId
-            ? "Изменить факультет / кафедру"
-            : "Добавить факультет / кафедру"
+            ? isChair ? "Изменить кафедру" : "Изменить факультет"
+            : isChair ? "Добавить кафедру" : "Добавить факультет"
         : departmentId
           ? "Изменить департамент"
           : "Добавить департамент";
@@ -27,15 +30,20 @@ export default function DepartmentForm() {
     const [form, setForm] = useState({
         name: "",
         description: "",
-        parent_id: "",
+        parent_id: requestedFaculty,
     });
     const [loading, setLoading] = useState(editing);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const back = academic && isChair && form.parent_id ? `${base}/${form.parent_id}` : base;
     useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        setError('');
         axios
-            .get(`/api${base}`)
+            .get(`/api${base}`, { signal: controller.signal })
             .then(({ data }) => {
+                if (controller.signal.aborted) return;
                 setItems(data);
                 if (editing) {
                     const item = data.find(
@@ -50,11 +58,13 @@ export default function DepartmentForm() {
                         description: item.description || "",
                         parent_id: item.parent_id || "",
                     });
-                }
+                    if (academic) setKind(item.kind);
+                } else setForm({ name: '', description: '', parent_id: requestedFaculty });
             })
-            .catch((requestError) => setError(errorText(requestError)))
-            .finally(() => setLoading(false));
-    }, [departmentId, editing, base]);
+            .catch((requestError) => { if (!controller.signal.aborted) setError(errorText(requestError)); })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [departmentId, editing, base, requestedFaculty]);
     const excluded = useMemo(() => {
         const result = new Set(departmentId ? [Number(departmentId)] : []);
         let changed = true;
@@ -75,23 +85,15 @@ export default function DepartmentForm() {
     const submit = async (event) => {
         event.preventDefault();
         if (!form.name.trim()) {
-            setError("Введите название департамента.");
+            setError(academic ? isChair ? 'Введите название кафедры.' : 'Введите название факультета.' : "Введите название департамента.");
             return;
         }
         setSaving(true);
         setError("");
         try {
-            if (editing)
-                await axios.put(`/api${base}/${departmentId}`, {
-                    ...form,
-                    parent_id: form.parent_id || null,
-                });
-            else
-                await axios.post(`/api${base}`, {
-                    ...form,
-                    parent_id: form.parent_id || null,
-                });
-            window.location.assign(base);
+            const payload = { ...form, parent_id: academic && !isChair ? null : form.parent_id || null };
+            const response = editing ? await axios.put(`/api${base}/${departmentId}`, payload) : await axios.post(`/api${base}`, payload);
+            window.location.assign(academic && response.data.parent_id ? `${base}/${response.data.parent_id}` : base);
         } catch (requestError) {
             setError(errorText(requestError));
         } finally {
@@ -104,13 +106,13 @@ export default function DepartmentForm() {
             title={_t(title)}
             actions={
                 <Link
-                    href={base}
+                    href={back}
                     className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
                 >{_t("Назад")}</Link>
             }
         >
             <Head title={_t(title)} />
-            <div className="mx-auto max-w-3xl px-4 py-8">
+            <div data-guide-busy={loading} className="mx-auto max-w-3xl px-4 py-8">
                 {loading ? (
                     <div className="text-center text-sm text-gray-500">{_t("Загрузка...")}</div>
                 ) : (
@@ -119,7 +121,7 @@ export default function DepartmentForm() {
                         onSubmit={submit}
                     >
                         <Alert>{_t(error)}</Alert>
-                        <Field
+                        {(!academic || isChair) && <Field
                             label={
                                 _t(academic
                                     ? "Факультет"
@@ -127,6 +129,7 @@ export default function DepartmentForm() {
                             }
                         >
                             <select
+                                required={isChair}
                                 className={inputClass}
                                 value={form.parent_id}
                                 onChange={(event) =>
@@ -138,7 +141,7 @@ export default function DepartmentForm() {
                             >
                                 <option value="">
                                     {_t(academic
-                                        ? "Самостоятельный факультет"
+                                        ? "Выберите факультет"
                                         : "Без родительского подразделения")}
                                 </option>
                                 {items
@@ -154,7 +157,7 @@ export default function DepartmentForm() {
                                         </option>
                                     ))}
                             </select>
-                        </Field>
+                        </Field>}
                         <Field label={_t("Название")}>
                             <input
                                 className={inputClass}

@@ -130,6 +130,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/admin/applications/{id}/complete', [ApplicationController::class, 'complete']);
 
     Route::get('/admin/academic-units', [\App\Http\Controllers\API\AcademicStructureController::class, 'index']);
+    Route::get('/admin/academic-units/{id}', [\App\Http\Controllers\API\AcademicStructureController::class, 'show'])->whereNumber('id');
     Route::post('/admin/academic-units', [\App\Http\Controllers\API\AcademicStructureController::class, 'store']);
     Route::put('/admin/academic-units/{id}', [\App\Http\Controllers\API\AcademicStructureController::class, 'update']);
     Route::delete('/admin/academic-units/{id}', [\App\Http\Controllers\API\AcademicStructureController::class, 'destroy']);
